@@ -19,14 +19,14 @@ endif
 
 all:
 	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) check-mnesia-schema run-tests
+	$(MAKE) -C $(BROKER_DIR) run-tests
 	$(MAKE) run-qpid-testsuite
 	cd $(TEST_DIR); ant test-suite
 	$(MAKE) cleanup
 
 lite:
 	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) check-mnesia-schema run-tests
+	$(MAKE) -C $(BROKER_DIR) run-tests
 	cd $(TEST_DIR); ant test-suite
 	$(MAKE) cleanup
 
