@@ -50,23 +50,23 @@ clean:
 
 prepare:
 	$(MAKE) -C $(BROKER_DIR) \
-		NODENAME=hare \
-		NODE_IP_ADDRESS=0.0.0.0 \
-		NODE_PORT=${TEST_HARE_PORT} \
+		RABBITMQ_NODENAME=hare \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		cleandb start-background-node start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) \
-		NODE_IP_ADDRESS=0.0.0.0 \
-		NODE_PORT=${TEST_RABBIT_PORT} \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		cleandb start-background-node ${COVER_START} start-rabbit-on-node 
 
 restart-on-node:
 	$(MAKE) -C $(BROKER_DIR) \
-		NODE_IP_ADDRESS=0.0.0.0 \
-		NODE_PORT=${TEST_RABBIT_PORT} \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		stop-rabbit-on-node 
 	$(MAKE) -C $(BROKER_DIR) \
-		NODE_IP_ADDRESS=0.0.0.0 \
-		NODE_PORT=${TEST_RABBIT_PORT} \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		start-rabbit-on-node
 
 force-snapshot:
@@ -74,11 +74,11 @@ force-snapshot:
 
 cleanup:
 	$(MAKE) -C $(BROKER_DIR) \
-		NODE_IP_ADDRESS=0.0.0.0 \
-		NODE_PORT=${TEST_RABBIT_PORT} \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 	$(MAKE) -C $(BROKER_DIR) \
-		NODENAME=hare \
-		NODE_IP_ADDRESS=0.0.0.0 \
-		NODE_PORT=${TEST_HARE_PORT} \
+		RABBITMQ_NODENAME=hare \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		stop-rabbit-on-node stop-node
