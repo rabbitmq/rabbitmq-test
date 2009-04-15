@@ -74,11 +74,11 @@ force-snapshot:
 
 cleanup:
 	$(MAKE) -C $(BROKER_DIR) \
-		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
-		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		stop-rabbit-on-node ${COVER_STOP} stop-node
-	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		stop-rabbit-on-node stop-node
+	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
+		stop-rabbit-on-node ${COVER_STOP} stop-node
