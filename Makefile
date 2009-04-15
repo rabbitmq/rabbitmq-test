@@ -19,22 +19,22 @@ endif
 
 all:
 	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) run-tests
-	$(MAKE) run-qpid-testsuite
-	cd $(TEST_DIR); ant test-suite
-	$(MAKE) cleanup
+	$(MAKE) -C $(BROKER_DIR) run-tests || ERR=1
+	$(MAKE) run-qpid-testsuite || ERR=1
+	(cd $(TEST_DIR) && ant test-suite) || ERR=1
+	$(MAKE) cleanup && if [[ "x$ERR" == "x" ]]; then true; else false; fi
 
 lite:
 	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) run-tests
-	cd $(TEST_DIR); ant test-suite
-	$(MAKE) cleanup
+	$(MAKE) -C $(BROKER_DIR) run-tests || ERR=1
+	(cd $(TEST_DIR) && ant test-suite) || ERR=1
+	$(MAKE) cleanup && if [[ "x$ERR" == "x" ]]; then true; else false; fi
 
 conformance16:
 	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) run-tests
-	cd $(TEST_DIR); ant test-suite
-	$(MAKE) cleanup
+	$(MAKE) -C $(BROKER_DIR) run-tests || ERR=1
+	(cd $(TEST_DIR) && ant test-suite) || ERR=1
+	$(MAKE) cleanup && if [[ "x$ERR" == "x" ]]; then true; else false; fi
 
 qpid_testsuite:
 	$(MAKE) update-qpid-testsuite
