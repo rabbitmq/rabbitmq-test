@@ -43,7 +43,7 @@ qpid_testsuite:
 	$(MAKE) update-qpid-testsuite
 
 update-qpid-testsuite:
-	svn co http://svn.apache.org/repos/asf/incubator/qpid/trunk/qpid/python qpid_testsuite
+	svn co http://svn.apache.org/repos/asf/qpid/trunk/qpid/python -r r732436 qpid_testsuite
 
 run-qpid-testsuite: qpid_testsuite
 	cd qpid_testsuite;./run-tests -v -s ../../rabbitmq-docs/specs/amqp0-8.xml -I ../rabbit_failing.txt;cd ..
