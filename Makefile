@@ -18,23 +18,26 @@ COVER_STOP=
 endif
 
 all:
-	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) run-tests || ERR=1
-	$(MAKE) run-qpid-testsuite || ERR=1
-	(cd $(TEST_DIR) && ant test-suite) || ERR=1
-	$(MAKE) cleanup && if [[ "x$ERR" == "x" ]]; then true; else false; fi
+	OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
+	{ $(MAKE) run-qpid-testsuite || OK=false; } && \
+	{ ( cd $(TEST_DIR) && ant test-suite ) || OK=false; } && \
+	$(MAKE) cleanup && $$OK
 
 lite:
-	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) run-tests || ERR=1
-	(cd $(TEST_DIR) && ant test-suite) || ERR=1
-	$(MAKE) cleanup && if [[ "x$ERR" == "x" ]]; then true; else false; fi
+	OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
+	{ ( cd $(TEST_DIR) && ant test-suite ) || OK=false; } && \
+	$(MAKE) cleanup && $$OK
 
 conformance16:
-	$(MAKE) prepare
-	$(MAKE) -C $(BROKER_DIR) run-tests || ERR=1
-	(cd $(TEST_DIR) && ant test-suite) || ERR=1
-	$(MAKE) cleanup && if [[ "x$ERR" == "x" ]]; then true; else false; fi
+	OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
+	{ ( cd $(TEST_DIR) && ant test-suite ) || OK=false; } && \
+	$(MAKE) cleanup && $$OK
 
 qpid_testsuite:
 	$(MAKE) update-qpid-testsuite
