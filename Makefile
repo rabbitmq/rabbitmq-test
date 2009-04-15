@@ -61,13 +61,19 @@ prepare:
 
 restart-on-node:
 	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
-		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		stop-rabbit-on-node 
+		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
+		stop-node
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		start-rabbit-on-node
+		stop-rabbit-on-node start-rabbit-on-node
+	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODENAME=hare \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
+		start-background-node start-rabbit-on-node
 
 force-snapshot:
 	$(MAKE) -C $(BROKER_DIR) force-snapshot
