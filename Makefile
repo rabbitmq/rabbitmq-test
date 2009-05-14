@@ -1,5 +1,5 @@
 .PHONY: all lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-on-node cleanup force-snapshot
+	prepare restart-app restart-secondary-node cleanup force-snapshot
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
@@ -62,21 +62,18 @@ prepare:
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		cleandb start-background-node ${COVER_START} start-rabbit-on-node 
 
-restart-on-node:
-	$(MAKE) -C $(BROKER_DIR) \
-		RABBITMQ_NODENAME=hare \
-		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
-		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
-		stop-node
+restart-app:
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		stop-rabbit-on-node start-rabbit-on-node
+
+restart-secondary-node:
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
-		start-background-node start-rabbit-on-node
+		stop-node start-background-node start-rabbit-on-node
 
 force-snapshot:
 	$(MAKE) -C $(BROKER_DIR) force-snapshot
