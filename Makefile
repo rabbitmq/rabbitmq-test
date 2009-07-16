@@ -56,11 +56,11 @@ prepare:
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
-		cleandb start-background-node start-rabbit-on-node
+		stop-node cleandb start-background-node start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		cleandb start-background-node ${COVER_START} start-rabbit-on-node 
+		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
 
 restart-app:
 	$(MAKE) -C $(BROKER_DIR) \
