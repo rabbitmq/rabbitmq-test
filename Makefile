@@ -20,8 +20,8 @@ COVER_STOP=
 endif
 
 export SSL_CERTS_DIR := $(realpath certs)
-RABBIT_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\"0.0.0.0\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\"$(SSL_CERTS_DIR)/ca/cacerts.pem\"},{certfile,\"$(SSL_CERTS_DIR)/server/cert.pem\"},{keyfile,\"$(SSL_CERTS_DIR)/server/key.pem\"}]"
-HARE_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\"0.0.0.0\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\"$(SSL_CERTS_DIR)/ca/cacerts.pem\"},{certfile,\"$(SSL_CERTS_DIR)/server/cert.pem\"},{keyfile,\"$(SSL_CERTS_DIR)/server/key.pem\"}]"
+RABBIT_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/ca/cacerts.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"}]"
+HARE_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/ca/cacerts.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"}]"
 
 all:
 	OK=true && \
@@ -100,7 +100,6 @@ cleanup:
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
-	$(MAKE) -C certs clean
 
 create_ssl_certs:
-	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) all
+	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
