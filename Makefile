@@ -19,7 +19,7 @@ COVER_START=
 COVER_STOP=
 endif
 
-SSL_CERTS_DIR := $(realpath certs)
+export SSL_CERTS_DIR := $(realpath certs)
 RABBIT_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\"0.0.0.0\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\"$(SSL_CERTS_DIR)/ca/cacerts.pem\"},{certfile,\"$(SSL_CERTS_DIR)/server/cert.pem\"},{keyfile,\"$(SSL_CERTS_DIR)/server/key.pem\"}]"
 HARE_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\"0.0.0.0\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\"$(SSL_CERTS_DIR)/ca/cacerts.pem\"},{certfile,\"$(SSL_CERTS_DIR)/server/cert.pem\"},{keyfile,\"$(SSL_CERTS_DIR)/server/key.pem\"}]"
 
