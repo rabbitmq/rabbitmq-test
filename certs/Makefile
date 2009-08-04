@@ -1,48 +1,48 @@
 OPENSSL=openssl
-VALID_DAYS=1
 
 ifndef DIR
 DIR := .
 endif
 
-OBJECTS= $(DIR)/server/key.pem \
-	 $(DIR)/server/cert.pem \
-	 $(DIR)/ca/cacerts.pem \
-	 $(DIR)/ca/cacerts.cer \
-	 $(DIR)/client/key.pem \
-	 $(DIR)/client/cert.pem
+.PRECIOUS: %/testca
+.PHONY: %/clean target all
 
-all: $(OBJECTS)
-	@echo "New Certs and Keys have been generated"
-	@echo " Please remember to use ca/cacerts.pem "
-	@echo " server/cert.pem and server/key.pem in "
-	@echo " your rabbitmq-server ssl configuration"
-	@echo
-	@echo " Also, you should import ca/cacerts.cer"
-	@echo " for your mono Trust store"
+all: $(DIR)/client $(DIR)/server
 
-$(DIR)/server/key.pem: 
-	mkdir -p $(DIR)/server
-	$(OPENSSL) genrsa -out $@ 1024
+client:
+	$(MAKE) target DIR=$(DIR) TARGET=client EXTENSIONS=client_ca_extensions
 
-$(DIR)/server/cert.pem: $(DIR)/server/key.pem
-	$(OPENSSL) req -new -x509 -key $< -nodes -sha1 -days $(VALID_DAYS) -batch -out $@
+server:
+	$(MAKE) target DIR=$(DIR) TARGET=server EXTENSIONS=server_ca_extensions
 
-$(DIR)/ca/cacerts.pem: $(DIR)/server/cert.pem
-	mkdir -p $(DIR)/ca
-	cp $< $@
+target: testca
+	mkdir $(DIR)/$(TARGET)
+	{ ( cd $(DIR)/$(TARGET) && \
+	    openssl req -newkey rsa:2048 -keyout key.pem -keyform PEM -out \
+	      req.pem -subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -outform PEM \
+	      -nodes && \
+	    cd ../testca && \
+	    openssl ca -config openssl.cnf -in ../$(TARGET)/req.pem -out \
+	      ../$(TARGET)/cert.pem -notext -batch -extensions \
+	      $(EXTENSIONS) && \
+	    cd ../$(TARGET) && \
+	    openssl pkcs12 -export -out keycert.p12 -in cert.pem -inkey key.pem \
+	      -passout pass:test ) || (rm -rf $(DIR)/$(TARGET) && false); }
 
-$(DIR)/ca/cacerts.cer: $(DIR)/ca/cacerts.pem
-	$(OPENSSL) x509 -in $< -out $@ -outform DER
-
-$(DIR)/client/key.pem:
-	mkdir -p $(DIR)/client
-	$(OPENSSL) genrsa -out $@ 1024
-
-$(DIR)/client/cert.pem: $(DIR)/client/key.pem
-	$(OPENSSL) req -new -x509 -key $< -nodes -sha1 -days $(VALID_DAYS) -batch -out $@
+testca:
+	mkdir $(DIR)/testca
+	cp openssl.cnf $(DIR)/testca/openssl.cnf
+	{ ( cd $(DIR)/testca && \
+	    mkdir certs private && \
+	    chmod 700 private && \
+	    echo 01 > serial && \
+	    touch index.txt && \
+	    openssl req -x509 -config openssl.cnf -newkey rsa:2048 -out \
+	      cacert.pem -outform PEM -subj /CN=MyTestCA/ -nodes && \
+	    openssl x509 -in cacert.pem -out cacert.cer -outform DER ) \
+	  || (rm -rf $@ && false); }
 
 clean:
+	rm -rf $(DIR)/testca
 	rm -rf $(DIR)/server
-	rm -rf $(DIR)/ca
 	rm -rf $(DIR)/client
