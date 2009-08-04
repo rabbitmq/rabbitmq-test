@@ -4,16 +4,25 @@ ifndef DIR
 DIR := .
 endif
 
+ifdef PASSWORD
+P12PASS := true
+else
+P12PASS := @echo No PASSWORD defined. && false
+endif
+
 .PRECIOUS: %/testca
-.PHONY: %/clean target all
+.PHONY: %/clean target all p12pass
 
 all: $(DIR)/client $(DIR)/server
 
-client:
+client: p12pass
 	$(MAKE) target DIR=$(DIR) TARGET=client EXTENSIONS=client_ca_extensions
 
-server:
+server: p12pass
 	$(MAKE) target DIR=$(DIR) TARGET=server EXTENSIONS=server_ca_extensions
+
+p12pass:
+	$(P12PASS)
 
 target: testca
 	mkdir $(DIR)/$(TARGET)
@@ -27,7 +36,7 @@ target: testca
 	      $(EXTENSIONS) && \
 	    cd ../$(TARGET) && \
 	    openssl pkcs12 -export -out keycert.p12 -in cert.pem -inkey key.pem \
-	      -passout pass:test ) || (rm -rf $(DIR)/$(TARGET) && false); }
+	      -passout pass:$(PASSWORD) ) || (rm -rf $(DIR)/$(TARGET) && false); }
 
 testca:
 	mkdir $(DIR)/testca
