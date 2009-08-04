@@ -13,7 +13,7 @@ endif
 .PRECIOUS: %/testca
 .PHONY: %/clean target all p12pass
 
-all: $(DIR)/client $(DIR)/server
+all: client server
 
 client: p12pass
 	$(MAKE) target DIR=$(DIR) TARGET=client EXTENSIONS=client_ca_extensions
