@@ -90,6 +90,13 @@ restart-app:
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
 		stop-rabbit-on-node start-rabbit-on-node
 
+restart-node:
+	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
+		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
+		stop-node start-background-node start-rabbit-on-node	
+
 restart-secondary-node:
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
