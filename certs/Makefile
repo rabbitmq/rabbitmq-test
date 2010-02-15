@@ -46,8 +46,8 @@ testca:
 	    chmod 700 private && \
 	    echo 01 > serial && \
 	    touch index.txt && \
-	    openssl req -x509 -config openssl.cnf -newkey rsa:2048 -out \
-	      cacert.pem -outform PEM -subj /CN=MyTestCA/ -nodes && \
+	    openssl req -x509 -config openssl.cnf -newkey rsa:2048 -days 365 \
+	      -out cacert.pem -outform PEM -subj /CN=MyTestCA/L=$$$$/ -nodes && \
 	    openssl x509 -in cacert.pem -out cacert.cer -outform DER ) \
 	  || (rm -rf $@ && false); }
 
