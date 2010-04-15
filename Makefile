@@ -13,9 +13,11 @@ COVER=true
 
 ifeq ($(COVER), true)
 COVER_START=start-cover
+COVER_REENABLE_SECONDARY=echo 'rabbit_misc:enable_cover_node("hare").' | erl_call -sname rabbit -e
 COVER_STOP=stop-cover
 else
 COVER_START=
+COVER_REENABLE_SECONDARY=
 COVER_STOP=
 endif
 
@@ -80,7 +82,7 @@ prepare: create_ssl_certs
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
-		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
+		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node start-secondary-cover
 
 restart-app:
 	$(MAKE) -C $(BROKER_DIR) \
@@ -96,6 +98,7 @@ restart-secondary-node:
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_SSL_BROKER_OPTIONS) \
 		stop-node start-background-node start-rabbit-on-node
+	$(COVER_REENABLE_SECONDARY)
 
 force-snapshot:
 	$(MAKE) -C $(BROKER_DIR) force-snapshot
