@@ -82,7 +82,7 @@ prepare: create_ssl_certs
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
-		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node start-secondary-cover
+		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
 
 restart-app:
 	$(MAKE) -C $(BROKER_DIR) \
