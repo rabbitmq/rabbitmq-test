@@ -61,11 +61,11 @@ qpid_testsuite:
 	$(MAKE) update-qpid-testsuite
 
 update-qpid-testsuite:
-	svn co http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
+	svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
 
 run-qpid-testsuite: qpid_testsuite
 	cp qpid_config.py qpid_testsuite/
-	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -v DEBUG -m tests -m tests_0-9 -I ../rabbit_failing.txt;cd ..
+	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -m tests -m tests_0-9 -I ../rabbit_failing.txt;cd ..
 
 clean:
 	rm -rf qpid_testsuite
