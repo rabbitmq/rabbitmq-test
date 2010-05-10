@@ -13,10 +13,12 @@ COVER=true
 
 ifeq ($(COVER), true)
 COVER_START=start-cover
+COVER_REENABLE=$(MAKE) -C $(BROKER_DIR) start-cover
 COVER_REENABLE_SECONDARY=$(MAKE) -C $(BROKER_DIR) start-secondary-cover
 COVER_STOP=stop-cover
 else
 COVER_START=
+COVER_REENABLE=true
 COVER_REENABLE_SECONDARY=true
 COVER_STOP=
 endif
@@ -98,7 +100,9 @@ restart-node:
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
-		stop-node start-background-node start-rabbit-on-node	
+		stop-node start-background-node
+	$(COVER_REENABLE)
+	$(MAKE) -C $(BROKER_DIR) start-rabbit-on-node
 
 restart-secondary-node:
 	$(MAKE) -C $(BROKER_DIR) \
