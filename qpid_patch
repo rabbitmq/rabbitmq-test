@@ -1,0 +1,20 @@
+Index: tests_0-8/queue.py
+===================================================================
+--- tests_0-8/queue.py	(revision 732436)
++++ tests_0-8/queue.py	(working copy)
+@@ -38,13 +38,13 @@
+         channel.basic_publish(exchange="test-exchange", routing_key="key", content=Content("three"))
+ 
+         #check that the queue now reports 3 messages:
+-        reply = channel.queue_declare(queue="test-queue")
++        reply = channel.queue_declare(queue="test-queue", exclusive=True)
+         self.assertEqual(3, reply.message_count)
+ 
+         #now do the purge, then test that three messages are purged and the count drops to 0
+         reply = channel.queue_purge(queue="test-queue");
+         self.assertEqual(3, reply.message_count)        
+-        reply = channel.queue_declare(queue="test-queue")
++        reply = channel.queue_declare(queue="test-queue", exclusive=True)
+         self.assertEqual(0, reply.message_count)
+ 
+         #send a further message and consume it, ensuring that the other messages are really gone
