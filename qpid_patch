@@ -1,3 +1,19 @@
+Index: tests_0-8/exchange.py
+===================================================================
+--- tests_0-8/exchange.py	(revision 732436)
++++ tests_0-8/exchange.py	(working copy)
+@@ -316,9 +316,9 @@
+         self.channel.exchange_declare(exchange="test_different_declared_type_exchange", type="direct")
+         try:
+             self.channel.exchange_declare(exchange="test_different_declared_type_exchange", type="topic")
+-            self.fail("Expected 530 for redeclaration of exchange with different type.")
++            self.fail("Expected 406 for redeclaration of exchange with different type.")
+         except Closed, e:
+-            self.assertConnectionException(530, e.args[0])
++            self.assertChannelException(406, e.args[0])
+         #cleanup    
+         other = self.connect()
+         c2 = other.channel(1)
 Index: tests_0-8/queue.py
 ===================================================================
 --- tests_0-8/queue.py	(revision 732436)
@@ -18,3 +34,5 @@ Index: tests_0-8/queue.py
          self.assertEqual(0, reply.message_count)
  
          #send a further message and consume it, ensuring that the other messages are really gone
+Index: qpid_config.py
+===================================================================
