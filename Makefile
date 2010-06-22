@@ -13,12 +13,10 @@ COVER=true
 
 ifeq ($(COVER), true)
 COVER_START=start-cover
-COVER_REENABLE=$(MAKE) -C $(BROKER_DIR) start-cover
 COVER_REENABLE_SECONDARY=$(MAKE) -C $(BROKER_DIR) start-secondary-cover
 COVER_STOP=stop-cover
 else
 COVER_START=
-COVER_REENABLE=true
 COVER_REENABLE_SECONDARY=true
 COVER_STOP=
 endif
@@ -67,6 +65,9 @@ qpid_testsuite:
 update-qpid-testsuite:
 	svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
 
+prepare-qpid-patch:
+	cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
+
 run-qpid-testsuite: qpid_testsuite
 	cp qpid_config.py qpid_testsuite/
 	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -m tests -m tests_0-9 -I ../rabbit_failing.txt;cd ..
@@ -94,15 +95,6 @@ restart-app:
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
 		stop-rabbit-on-node start-rabbit-on-node
-
-restart-node:
-	$(MAKE) -C $(BROKER_DIR) \
-		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
-		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
-		stop-node start-background-node
-	$(COVER_REENABLE)
-	$(MAKE) -C $(BROKER_DIR) start-rabbit-on-node
 
 restart-secondary-node:
 	$(MAKE) -C $(BROKER_DIR) \
