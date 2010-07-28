@@ -70,7 +70,9 @@ prepare-qpid-patch:
 	cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
 
 run-qpid-testsuite: qpid_testsuite
-	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -m tests -m tests_0-9 -I ../rabbit_failing.txt;cd ..
+	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -m tests -I ../rabbit_failing.txt;cd ..
+	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -m tests_0-8 -I ../rabbit_failing.txt;cd ..
+	cd qpid_testsuite; AMQP_SPEC=../../rabbitmq-docs/specs/amqp0-9-1.xml ./qpid-python-test -m tests_0-9 -I ../rabbit_failing.txt;cd ..
 
 clean:
 	rm -rf qpid_testsuite
