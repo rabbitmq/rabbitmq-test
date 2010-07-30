@@ -1,6 +1,6 @@
 Index: tests_0-8/basic.py
 ===================================================================
---- tests_0-8/basic.py	(revision 732436)
+--- tests_0-8/basic.py	(revision 906960)
 +++ tests_0-8/basic.py	(working copy)
 @@ -98,7 +98,7 @@
              channel.basic_consume(queue="")
@@ -13,7 +13,7 @@ Index: tests_0-8/basic.py
          """
 Index: tests_0-8/queue.py
 ===================================================================
---- tests_0-8/queue.py	(revision 732436)
+--- tests_0-8/queue.py	(revision 906960)
 +++ tests_0-8/queue.py	(working copy)
 @@ -38,13 +38,13 @@
          channel.basic_publish(exchange="test-exchange", routing_key="key", content=Content("three"))
@@ -40,3 +40,19 @@ Index: tests_0-8/queue.py
  
          #cleanup    
          other = self.connect()
+Index: qpid_config.py
+===================================================================
+--- qpid_config.py	(revision 906960)
++++ qpid_config.py	(working copy)
+@@ -19,7 +19,8 @@
+ 
+ import os
+ 
+-AMQP_SPEC_DIR=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "specs")
++AMQP_SPEC_DIR=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "../rabbitmq-docs/specs")
+ amqp_spec = os.path.join(AMQP_SPEC_DIR, "amqp.0-10-qpid-errata.xml")
+-amqp_spec_0_8 = os.path.join(AMQP_SPEC_DIR, "amqp.0-8.xml")
+-amqp_spec_0_9 = os.path.join(AMQP_SPEC_DIR, "amqp.0-9.xml")
++amqp_spec_0_8 = os.path.join(AMQP_SPEC_DIR, "amqp0-8.xml")
++amqp_spec_0_9 = os.path.join(AMQP_SPEC_DIR, "amqp0-9.xml")
++amqp_spec = 'file://'+os.path.join(AMQP_SPEC_DIR, 'amqp.0-10.xml')
