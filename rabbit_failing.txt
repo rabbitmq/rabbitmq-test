@@ -1,9 +1,3 @@
-tests.spec.*
-tests.codec.*
-tests.connection.*
-tests.codec010.*
-tests.connection010.*
-tests.spec010.*
 tests_0-8.basic.BasicTests.test_consume_no_local
 tests_0-8.basic.BasicTests.test_qos_prefetch_size
 tests_0-8.tx.TxTests.test_auto_rollback
