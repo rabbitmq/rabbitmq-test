@@ -110,6 +110,12 @@ restart-secondary-node:
 force-snapshot:
 	$(MAKE) -C $(BROKER_DIR) force-snapshot
 
+set-memory-alarm:
+	$(MAKE) -C $(BROKER_DIR) set-memory-alarm
+
+clear-memory-alarm:
+	$(MAKE) -C $(BROKER_DIR) clear-memory-alarm
+
 cleanup:
 	-$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
