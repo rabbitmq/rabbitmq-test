@@ -11,6 +11,19 @@ Index: tests_0-8/basic.py
  
      def test_consume_unique_consumers(self):
          """
+Index: tests_0-8/exchange.py
+===================================================================
+--- tests_0-8/exchange.py	(revision 906960)
++++ tests_0-8/exchange.py	(working copy)
+@@ -138,8 +138,6 @@
+         # Test automatic binding by queue name.
+         self.queue_declare(queue="d")
+         self.assertPublishConsume(queue="d", routing_key="d")
+-        # Test explicit bind to default queue
+-        self.verifyDirectExchange("")
+ 
+ 
+ # TODO aconway 2006-09-27: Fill in empty tests:
 Index: tests_0-8/queue.py
 ===================================================================
 --- tests_0-8/queue.py	(revision 906960)
