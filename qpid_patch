@@ -24,6 +24,15 @@ Index: tests_0-8/exchange.py
  
  
  # TODO aconway 2006-09-27: Fill in empty tests:
+@@ -318,7 +316,7 @@
+             self.channel.exchange_declare(exchange="test_different_declared_type_exchange", type="topic")
+             self.fail("Expected 530 for redeclaration of exchange with different type.")
+         except Closed, e:
+-            self.assertConnectionException(530, e.args[0])
++            self.assertChannelException(406, e.args[0])
+         #cleanup    
+         other = self.connect()
+         c2 = other.channel(1)
 Index: tests_0-8/queue.py
 ===================================================================
 --- tests_0-8/queue.py	(revision 906960)
