@@ -1,3 +1,4 @@
+tests_0-8.basic.BasicTests.test_ack
 tests_0-8.basic.BasicTests.test_consume_no_local
 tests_0-8.basic.BasicTests.test_qos_prefetch_size
 tests_0-8.tx.TxTests.test_auto_rollback
