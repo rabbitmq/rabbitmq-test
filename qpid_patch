@@ -30,7 +30,7 @@ Index: tests_0-8/exchange.py
          except Closed, e:
 -            self.assertConnectionException(530, e.args[0])
 +            self.assertChannelException(406, e.args[0])
-         #cleanup
+         #cleanup    
          other = self.connect()
          c2 = other.channel(1)
 Index: tests_0-8/queue.py
