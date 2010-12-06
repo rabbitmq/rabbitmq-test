@@ -34,8 +34,8 @@ SSL_VERIFY_OPTION :={verify_code,1}
 endif
 export SSL_CERTS_DIR := $(realpath certs)
 export PASSWORD := test
-RABBIT_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)]"
-HARE_SSL_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)]"
+RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
+HARE_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 
 all:
 	OK=true && \
@@ -81,12 +81,12 @@ prepare: create_ssl_certs
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(HARE_SSL_BROKER_OPTIONS) \
+		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		stop-node cleandb start-background-node
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
+		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
@@ -94,7 +94,7 @@ restart-app:
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
+		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-rabbit-on-node start-rabbit-on-node
 
 restart-secondary-node:
@@ -102,7 +102,7 @@ restart-secondary-node:
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(HARE_SSL_BROKER_OPTIONS) \
+		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		stop-node start-background-node
 	$(COVER_REENABLE_SECONDARY)
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
@@ -121,12 +121,12 @@ cleanup:
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(HARE_SSL_BROKER_OPTIONS) \
+		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		stop-rabbit-on-node stop-node
 	-$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
-		RABBITMQ_SERVER_START_ARGS=$(RABBIT_SSL_BROKER_OPTIONS) \
+		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 
 create_ssl_certs:
