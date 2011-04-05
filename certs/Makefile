@@ -29,7 +29,7 @@ target: $(DIR)/testca
 	mkdir $(DIR)/$(TARGET)
 	{ ( cd $(DIR)/$(TARGET) && \
 	    openssl req -newkey rsa:2048 -keyout key.pem -keyform PEM -out \
-	      req.pem -subj /CN=$$(hostname)_λ/O=$(TARGET)/L=$$$$/ -outform PEM \
+	      req.pem -subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -outform PEM \
 	      -nodes && \
 	    cd ../testca && \
 	    openssl ca -config openssl.cnf -in ../$(TARGET)/req.pem -out \
