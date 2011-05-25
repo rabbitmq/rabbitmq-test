@@ -28,9 +28,9 @@ p12pass:
 target: $(DIR)/testca
 	mkdir $(DIR)/$(TARGET)
 	{ ( cd $(DIR)/$(TARGET) && \
-	    openssl req -newkey rsa:2048 -keyout key.pem -keyform PEM -out \
-	      req.pem -subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -outform PEM \
-	      -nodes && \
+	    openssl genrsa -out key.pem 2048 &&\
+	    openssl req -new -key key.pem -out req.pem -outform PEM\
+		-subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -nodes &&\
 	    cd ../testca && \
 	    openssl ca -config openssl.cnf -in ../$(TARGET)/req.pem -out \
 	      ../$(TARGET)/cert.pem -notext -batch -extensions \
