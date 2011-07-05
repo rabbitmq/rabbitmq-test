@@ -16,6 +16,7 @@ endif
 all: client server
 
 client: p12pass
+	echo $(DIR)
 	$(MAKE) target DIR=$(DIR) TARGET=client EXTENSIONS=client_ca_extensions
 
 server: p12pass
@@ -24,12 +25,12 @@ server: p12pass
 p12pass:
 	$(P12PASS)
 
-target: testca
+target: $(DIR)/testca
 	mkdir $(DIR)/$(TARGET)
 	{ ( cd $(DIR)/$(TARGET) && \
-	    openssl req -newkey rsa:2048 -keyout key.pem -keyform PEM -out \
-	      req.pem -subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -outform PEM \
-	      -nodes && \
+	    openssl genrsa -out key.pem 2048 &&\
+	    openssl req -new -key key.pem -out req.pem -outform PEM\
+		-subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -nodes &&\
 	    cd ../testca && \
 	    openssl ca -config openssl.cnf -in ../$(TARGET)/req.pem -out \
 	      ../$(TARGET)/cert.pem -notext -batch -extensions \
@@ -38,7 +39,7 @@ target: testca
 	    openssl pkcs12 -export -out keycert.p12 -in cert.pem -inkey key.pem \
 	      -passout pass:$(PASSWORD) ) || (rm -rf $(DIR)/$(TARGET) && false); }
 
-testca:
+$(DIR)/testca:
 	mkdir $(DIR)/testca
 	cp openssl.cnf $(DIR)/testca/openssl.cnf
 	{ ( cd $(DIR)/testca && \

@@ -62,6 +62,41 @@ Index: tests_0-8/queue.py
  
          #cleanup    
          other = self.connect()
+Index: qpid/codec.py
+===================================================================
+--- qpid/codec.py	(revision 906960)
++++ qpid/codec.py	(working copy)
+@@ -76,6 +76,7 @@
+     if not self.types:
+       self.typecode(ord('S'), "longstr")
+       self.typecode(ord('I'), "long")
++      self.typecode(ord('t'), "bool")
+ 
+   def typecode(self, code, type):
+     self.types[code] = type
+@@ -206,6 +207,22 @@
+     """
+     return self.unpack("!B")
+ 
++  def encode_bool(self, b):
++    """
++    encodes bool (8 bits) data 't' in network byte order
++    """
++
++    if ((b is not True) and (b is not False)):
++        raise ValueError('Valid range of bool is True or False')
++
++    self.pack("!B", int(b))
++
++  def decode_bool(self):
++    """
++    decodes a bool (8 bits) encoded in network byte order
++    """
++    return bool(self.unpack("!B"))
++
+   def encode_short(self, o):
+     """
+     encodes short (16 bits) data 'o' in network byte order
 Index: qpid_config.py
 ===================================================================
 --- qpid_config.py	(revision 906960)
