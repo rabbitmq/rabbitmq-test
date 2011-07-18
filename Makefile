@@ -47,7 +47,7 @@ all:
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
 	{ ( cd $(TEST_DIR) && ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
-	$(MAKE) cleanup && $$OK
+	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
 lite:
 	OK=true && \
