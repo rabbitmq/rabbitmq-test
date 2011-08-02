@@ -1,6 +1,15 @@
-tests_0-8.basic.BasicTests.test_ack
+tests.spec.*
+tests.codec.*
+tests.connection.*
+tests.codec010.*
+tests.connection010.*
+tests.spec010.*
 tests_0-8.basic.BasicTests.test_consume_no_local
+<<<<<<< local
+tests_0-8.exchange.HeadersExchangeTests.*
+tests_0-8.exchange.RecommendedTypesRuleTests.testHeaders
+tests_0-8.exchange.RequiredInstancesRuleTests.testAmqMatch
+=======
+>>>>>>> other
 tests_0-8.basic.BasicTests.test_qos_prefetch_size
-tests_0-8.tx.TxTests.test_auto_rollback
-tests_0-8.tx.TxTests.test_rollback
-tests_0-9.query.*
+tests_0-8.tx.*
