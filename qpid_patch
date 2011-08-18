@@ -37,14 +37,14 @@ Index: tests_0-8/queue.py
 ===================================================================
 --- tests_0-8/queue.py	(revision 906960)
 +++ tests_0-8/queue.py	(working copy)
-@@ -38,13 +38,13 @@
+@@ -37,14 +37,10 @@
+         channel.basic_publish(exchange="test-exchange", routing_key="key", content=Content("two"))
          channel.basic_publish(exchange="test-exchange", routing_key="key", content=Content("three"))
  
-         #check that the queue now reports 3 messages:
+-        #check that the queue now reports 3 messages:
 -        reply = channel.queue_declare(queue="test-queue")
-+        reply = channel.queue_declare(queue="test-queue", exclusive=True)
-         self.assertEqual(3, reply.message_count)
- 
+-        self.assertEqual(3, reply.message_count)
+-
          #now do the purge, then test that three messages are purged and the count drops to 0
          reply = channel.queue_purge(queue="test-queue");
          self.assertEqual(3, reply.message_count)        
@@ -53,7 +53,7 @@ Index: tests_0-8/queue.py
          self.assertEqual(0, reply.message_count)
  
          #send a further message and consume it, ensuring that the other messages are really gone
-@@ -71,7 +71,7 @@
+@@ -71,7 +67,7 @@
              channel.queue_purge()
              self.fail("Expected failure when purging unspecified queue")
          except Closed, e:
