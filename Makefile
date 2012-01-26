@@ -1,13 +1,15 @@
 .PHONY: all lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app restart-secondary-node cleanup force-snapshot
+	prepare restart-app restart-secondary-nodes cleanup force-snapshot
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
 
 TEST_RABBIT_PORT=5672
 TEST_HARE_PORT=5673
+TEST_BUNNY_PORT=5674
 TEST_RABBIT_SSL_PORT=5671
 TEST_HARE_SSL_PORT=5670
+TEST_BUNNY_SSL_PORT=5669
 
 COVER=true
 
@@ -36,6 +38,7 @@ export SSL_CERTS_DIR := $(realpath certs)
 export PASSWORD := test
 RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 HARE_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
+BUNNY_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_BUNNY_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 
 TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
@@ -82,6 +85,12 @@ clean:
 
 prepare: create_ssl_certs
 	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODENAME=bunny \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_BUNNY_PORT} \
+		RABBITMQ_SERVER_START_ARGS=$(BUNNY_BROKER_OPTIONS) \
+		stop-node cleandb start-background-node
+	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
@@ -92,6 +101,7 @@ prepare: create_ssl_certs
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
+	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=bunny start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
 restart-app:
@@ -101,7 +111,13 @@ restart-app:
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-rabbit-on-node start-rabbit-on-node
 
-restart-secondary-node:
+restart-secondary-nodes:
+	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODENAME=bunny \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_BUNNY_PORT} \
+		RABBITMQ_SERVER_START_ARGS=$(BUNNY_BROKER_OPTIONS) \
+		stop-node start-background-node
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
@@ -109,6 +125,7 @@ restart-secondary-node:
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		stop-node start-background-node
 	$(COVER_REENABLE_SECONDARY)
+	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=bunny start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
 force-snapshot:
@@ -121,6 +138,12 @@ clear-memory-alarm:
 	$(MAKE) -C $(BROKER_DIR) clear-memory-alarm
 
 cleanup:
+	-$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODENAME=bunny \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_BUNNY_PORT} \
+		RABBITMQ_SERVER_START_ARGS=$(BUNNY_BROKER_OPTIONS) \
+		stop-rabbit-on-node stop-node
 	-$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
