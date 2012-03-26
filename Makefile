@@ -115,11 +115,11 @@ restart-secondary-node:
 force-snapshot:
 	$(MAKE) -C $(BROKER_DIR) force-snapshot
 
-set-memory-alarm:
-	$(MAKE) -C $(BROKER_DIR) set-memory-alarm
+set-resource-alarm:
+	$(MAKE) -C $(BROKER_DIR) set-resource-alarm SOURCE=$(SOURCE)
 
-clear-memory-alarm:
-	$(MAKE) -C $(BROKER_DIR) clear-memory-alarm
+clear-resource-alarm:
+	$(MAKE) -C $(BROKER_DIR) clear-resource-alarm SOURCE=$(SOURCE)
 
 cleanup:
 	-$(MAKE) -C $(BROKER_DIR) \
