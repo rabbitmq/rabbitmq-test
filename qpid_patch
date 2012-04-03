@@ -97,6 +97,20 @@ Index: qpid/codec.py
    def encode_short(self, o):
      """
      encodes short (16 bits) data 'o' in network byte order
+Index: qpid/testlib.py
+===================================================================
+--- qpid/testlib.py	(revision 906960)
++++ qpid/testlib.py	(working copy)
+@@ -67,8 +67,7 @@
+ 
+         if not self.client.closed:
+             self.client.channel(0).connection_close(reply_code=200)
+-        else:
+-            self.client.close()
++        self.client.close()
+ 
+     def connect(self, host=None, port=None, user=None, password=None, tune_params=None):
+         """Create a new connction, return the Client object"""
 Index: qpid_config.py
 ===================================================================
 --- qpid_config.py	(revision 906960)
