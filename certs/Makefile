@@ -25,7 +25,7 @@ server: p12pass
 p12pass:
 	$(P12PASS)
 
-target: $(DIR)/testca
+target: $(DIR)/testca $(DIR)/testca2
 	mkdir $(DIR)/$(TARGET)
 	{ ( cd $(DIR)/$(TARGET) && \
 	    openssl genrsa -out key.pem 2048 &&\
@@ -39,10 +39,10 @@ target: $(DIR)/testca
 	    openssl pkcs12 -export -out keycert.p12 -in cert.pem -inkey key.pem \
 	      -passout pass:$(PASSWORD) ) || (rm -rf $(DIR)/$(TARGET) && false); }
 
-$(DIR)/testca:
-	mkdir $(DIR)/testca
-	cp openssl.cnf $(DIR)/testca/openssl.cnf
-	{ ( cd $(DIR)/testca && \
+$(DIR)/testca $(DIR)/testca2: $(DIR)/%:
+	mkdir $@
+	cp openssl.cnf $@/openssl.cnf
+	{ ( cd $@ && \
 	    mkdir certs private && \
 	    chmod 700 private && \
 	    echo 01 > serial && \
@@ -53,6 +53,6 @@ $(DIR)/testca:
 	  || (rm -rf $@ && false); }
 
 clean:
-	rm -rf $(DIR)/testca
+	rm -rf $(DIR)/testca $(DIR)/testca2
 	rm -rf $(DIR)/server
 	rm -rf $(DIR)/client

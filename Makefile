@@ -33,8 +33,9 @@ else
 SSL_VERIFY_OPTION :={verify_code,1}
 endif
 export SSL_CERTS_DIR := $(realpath certs)
+TRUSTED := $(realpath trusted)
 export PASSWORD := test
-RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertdir,\\\"$(SSL_CERTS_DIR)/testca\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
+RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertdir,\\\"$(TRUSTED)\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 HARE_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 
 TESTS_FAILED := echo '\n============'\
@@ -80,8 +81,13 @@ run-qpid-testsuite: qpid_testsuite
 
 clean:
 	rm -rf qpid_testsuite
+	rm -rf $(TRUSTED)
 
 prepare: create_ssl_certs
+# We'll start with all the CA certs in place.
+	mkdir -p $(TRUSTED)
+	cp $(SSL_CERTS_DIR)/testca/cacert.pem $(TRUSTED)/ca.pem
+	cp $(SSL_CERTS_DIR)/testca2/cacert.pem $(TRUSTED)/ca2.pem
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
