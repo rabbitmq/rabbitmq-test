@@ -52,7 +52,8 @@ all:
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
 	{ ( cd $(TEST_DIR) && ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
-	{ $(MAKE) flip-certs } && \
+	$(MAKE) flip-certs && \
+	export SSL_CERTS_DIR=$(ALT_CERTS_DIR) && \
 	{ ( cd $(TEST_DIR) && ant test-ssl ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
@@ -145,6 +146,7 @@ cleanup:
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
+	rm -rf $(TRUSTED) $(SSL_CERTS_DIR) $(ALT_CERTS_DIR)
 
 create_ssl_certs: $(SSL_CERTS_DIR)
 	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
