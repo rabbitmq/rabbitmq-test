@@ -25,13 +25,13 @@ server: p12pass
 p12pass:
 	$(P12PASS)
 
-target: $(DIR)/testca $(DIR)/testca2
+target: $(DIR)/clientca $(DIR)/serverca
 	mkdir $(DIR)/$(TARGET)
 	{ ( cd $(DIR)/$(TARGET) && \
 	    openssl genrsa -out key.pem 2048 &&\
 	    openssl req -new -key key.pem -out req.pem -outform PEM\
 		-subj /CN=$$(hostname)/O=$(TARGET)/L=$$$$/ -nodes &&\
-	    cd ../testca && \
+	    cd ../$(TARGET)ca && \
 	    openssl ca -config openssl.cnf -in ../$(TARGET)/req.pem -out \
 	      ../$(TARGET)/cert.pem -notext -batch -extensions \
 	      $(EXTENSIONS) && \
@@ -39,7 +39,7 @@ target: $(DIR)/testca $(DIR)/testca2
 	    openssl pkcs12 -export -out keycert.p12 -in cert.pem -inkey key.pem \
 	      -passout pass:$(PASSWORD) ) || (rm -rf $(DIR)/$(TARGET) && false); }
 
-$(DIR)/testca $(DIR)/testca2: $(DIR)/%:
+$(DIR)/clientca $(DIR)/serverca: $(DIR)/%:
 	mkdir $@
 	cp openssl.cnf $@/openssl.cnf
 	{ ( cd $@ && \
@@ -53,6 +53,7 @@ $(DIR)/testca $(DIR)/testca2: $(DIR)/%:
 	  || (rm -rf $@ && false); }
 
 clean:
-	rm -rf $(DIR)/testca $(DIR)/testca2
+	rm -rf $(DIR)/clientca
+	rm -rf $(DIR)/serverca
 	rm -rf $(DIR)/server
 	rm -rf $(DIR)/client

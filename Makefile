@@ -1,5 +1,6 @@
 .PHONY: all lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app restart-secondary-node cleanup force-snapshot
+	prepare restart-app restart-secondary-node cleanup \
+	flip-certs force-snapshot
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
@@ -32,11 +33,14 @@ SSL_VERIFY_OPTION :={verify,verify_peer},{fail_if_no_peer_cert,false}
 else
 SSL_VERIFY_OPTION :={verify_code,1}
 endif
-export SSL_CERTS_DIR := $(realpath certs)
-TRUSTED := $(realpath trusted)
+
+TMPDIR ?= /tmp
+export SSL_CERTS_DIR := $(abspath $(TMPDIR)/certdir)
+ALT_CERTS_DIR := $(abspath $(TMPDIR)/certdiralt)
+TRUSTED := $(abspath $(TMPDIR)/trusted)
 export PASSWORD := test
-RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertdir,\\\"$(TRUSTED)\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
-HARE_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
+RABBIT_BROKER_OPTIONS = "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertdir,\\\"$(TRUSTED)\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
+HARE_BROKER_OPTIONS := "-rabbit -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 
 TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
@@ -48,6 +52,8 @@ all:
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
 	{ ( cd $(TEST_DIR) && ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
+	{ $(MAKE) flip-certs } && \
+	{ ( cd $(TEST_DIR) && ant test-ssl ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
 lite:
@@ -81,13 +87,13 @@ run-qpid-testsuite: qpid_testsuite
 
 clean:
 	rm -rf qpid_testsuite
-	rm -rf $(TRUSTED)
+	rm -rf $(TRUSTED) $(SSL_CERTS_DIR) $(ALT_CERTS_DIR)
 
-prepare: create_ssl_certs
-# We'll start with all the CA certs in place.
-	mkdir -p $(TRUSTED)
-	cp $(SSL_CERTS_DIR)/testca/cacert.pem $(TRUSTED)/ca.pem
-	cp $(SSL_CERTS_DIR)/testca2/cacert.pem $(TRUSTED)/ca2.pem
+$(TRUSTED) $(SSL_CERTS_DIR) $(ALT_CERTS_DIR):
+	mkdir -p $@
+
+prepare: create_ssl_certs $(TRUSTED)
+	cp $(SSL_CERTS_DIR)/clientca/cacert.pem $(TRUSTED)/clientca.pem
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
@@ -140,5 +146,17 @@ cleanup:
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 
-create_ssl_certs:
+create_ssl_certs: $(SSL_CERTS_DIR)
 	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
+
+# Change the CA certificates around so that we can test that a running
+# broker copes with changing CA certs
+flip-certs: $(ALT_CERTS_DIR)
+	$(MAKE) -C certs DIR=$(ALT_CERTS_DIR) all
+	# Keep the same server CA for the client
+	cp -R $(SSL_CERTS_DIR)/serverca $(ALT_CERTS_DIR)/
+	cp -R $(SSL_CERTS_DIR)/server $(ALT_CERTS_DIR)/
+	export SSL_CERTS_DIR=$(ALT_CERTS_DIR)
+	# Swap the server trusted certificates around
+	rm $(TRUSTED)/*.pem
+	cp $(SSL_CERTS_DIR)/clientca/cacert.pem $(TRUSTED)/
