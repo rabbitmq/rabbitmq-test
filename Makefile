@@ -34,7 +34,7 @@ SSL_VERIFY_OPTION :={verify_code,1}
 endif
 export SSL_CERTS_DIR := $(realpath certs)
 export PASSWORD := test
-# NB per-listener options
+# NB per-listener options, to test that the global opts get overridden by those given for the lister.
 RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [[{port,$(TEST_RABBIT_SSL_PORT)},{ssl_options,[{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"}]}]] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"/this/gets/overridden\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 HARE_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
 
