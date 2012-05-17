@@ -2,7 +2,11 @@
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 REBAR=rebar
 RETEST=retest
+
+ifndef SUITES
 SUITES=$(shell cd inttest && find . -mindepth 1 -type d)
+endif
+
 HOST_SHORTNAME=$(shell hostname -s)
 SCRATCH_DIR=$(abspath tmp)
 BIN_DIR=$(abspath bin)
@@ -73,8 +77,10 @@ $(SUITES): reset helpers retest
 $(EBIN_DIR)/%.beam: $(SOURCE_DIR)/%.erl
 	erlc -o ebin -pa $(BROKER_DIR)/ebin $<
 
+# TODO: consider whether patching or generating config would be
+# cleaner than maintaining 'rabbit' branches for these repos
 bin/%:
-	git clone https://github.com/hyperthunk/$*.git $*
+	git clone -b rabbit https://github.com/hyperthunk/$*.git $*
 	PATH="$(BIN_DIR):${PATH}" $(MAKE) -C $*
 	cp $*/$* bin/
 
