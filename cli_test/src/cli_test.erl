@@ -21,7 +21,12 @@ rabbit_pidfile() ->
     os:getenv("RABBITMQ_PID_FILE").
 
 rabbit_env() ->
-    [split(Env) || Env <- os:getenv()].
+    case get(rabbitmq_env) of
+        {env, Env} -> Env;
+        _Other     -> Env = [split(Env) || Env <- os:getenv()],
+                      put(rabbitmq_env, {env, Env}),
+                      Env
+    end.
 
 node_name(Name) ->
     rabbit_nodes:make({atom_to_list(Name), host_shortname()}).
@@ -31,4 +36,20 @@ host_shortname() ->
 
 split(Env) ->
     list_to_tuple(re:split(Env, "=", [{return,list},{parts,2}])).
+
+run_daemon() ->
+    Pid = spawn(fun() -> run_server(non_interactive(rabbit_env())) end),
+    timer:sleep(1000),
+    Pid.
+
+run_interactive() ->
+    Pid = spawn(fun() -> run_server(rabbit_env()) end),
+    timer:sleep(1000),
+    Pid.
+
+non_interactive(Env) ->
+    [{"RABBITMQ_ALLOW_INPUT", ""}|Env].
+
+run_server(Env) ->
+    retest:sh("scripts/rabbitmq-server", [{dir, "broker"}, {env, Env}]).
 

@@ -27,10 +27,8 @@ run(Dir) ->
     Env = cli_test:rabbit_env(),
     PidFile = cli_test:rabbit_pidfile(),
     Node = cli_test:node_name(rabbit),
-    retest:log(info, "Node = ~p~n", [Node]),
 
-    spawn(fun() -> run_server(Env) end),
-    timer:sleep(1000),
+    cli_test:run_daemon(),
 
     retest:log(info, "Wait for rabbit using ~s~n", [PidFile]),
     ?assertMatch({ok, _},
@@ -55,8 +53,4 @@ run(Dir) ->
     ?assertMatch({badrpc,nodedown},
                  rpc:call(Node, rabbit, is_running, [])),
     ok.
-
-run_server(Env) ->
-    retest:sh("scripts/rabbitmq-server",
-              [{dir, "broker"}, {env, [{"RABBITMQ_ALLOW_INPUT", ""}|Env]}]).
 

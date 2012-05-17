@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is VMware, Inc.
 %% Copyright (c) 2007-2012 VMware, Inc.  All rights reserved.
 %%
--module(startup_rt).
+-module(ctl_status_rt).
 
 -compile(export_all).
 
@@ -23,25 +23,35 @@
 files() ->
     [{copy, ?RABBITMQ_BROKER_DIR, "broker"}].
 
-run(Dir) ->
+run(_Dir) ->
     Env = cli_test:rabbit_env(),
     PidFile = cli_test:rabbit_pidfile(),
     Node = cli_test:node_name(rabbit),
 
-    Ref = retest:sh("scripts/rabbitmq-server",
-                    [{env, Env}, {dir, "broker"}, {async, true}]),
-
-    retest:sh_expect(Ref, ".*broker running"),
+    ServerPid = cli_test:run_interactive(),
 
     retest:log(info, "Wait for rabbit using ~s~n", [PidFile]),
     ?assertMatch({ok, _},
                  retest:sh("scripts/rabbitmqctl wait " ++ PidFile,
                            [{dir, "broker"}, {env, Env}])),
 
+    retest:log(info, "Checking status of ~p using rabbitmqctl~n", [Node]),
+    Ref = retest:sh("scripts/rabbitmqctl status",
+                    [{dir, "broker"}, {env, Env}, {async, true}]),
+
+    retest:sh_expect(Ref, "status of node .*"
+                          "{running_applications,\\[\\{rabbit,"
+                          "\"RabbitMQ\", .* done",
+                          [multiline, {newline, any}]),
+
     retest:log(info, "Shut down rabbit server...~n", []),
     ?assertMatch({ok, _}, retest:sh("scripts/rabbitmqctl stop",
                                     [{dir, "broker"}, {env, Env}])),
+    ?assertMatch({badrpc,nodedown},
+                 rpc:call(Node, rabbit, is_running, [])),
 
-    ?assertMatch(false, rabbit_nodes:is_running(Node, rabbit)),
+    retest:log(info, "Performing brutal (kill -9) shutdown~n", []),
+    retest_sh:kill_all(),
+    exit(ServerPid, kill),
     ok.
 
