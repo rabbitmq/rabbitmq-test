@@ -56,6 +56,9 @@ lite:
 	{ ( cd $(TEST_DIR) && ant test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
+cli:
+	$(MAKE) -C cli_test
+
 conformance16:
 	OK=true && \
 	$(MAKE) prepare && \
@@ -80,6 +83,7 @@ run-qpid-testsuite: qpid_testsuite
 
 clean:
 	rm -rf qpid_testsuite
+	$(MAKE) -C cli_test clean
 
 prepare: create_ssl_certs
 	$(MAKE) -C $(BROKER_DIR) \
