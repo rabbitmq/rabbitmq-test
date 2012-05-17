@@ -2,7 +2,7 @@
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 REBAR=rebar
 RETEST=retest
-SUITES=$(shell cd inttest && find . -type d -mindepth 1 -print)
+SUITES=$(shell cd inttest && find . -mindepth 1 -type d)
 HOST_SHORTNAME=$(shell hostname -s)
 SCRATCH_DIR=$(abspath tmp)
 BIN_DIR=$(abspath bin)
@@ -75,6 +75,6 @@ $(EBIN_DIR)/%.beam: $(SOURCE_DIR)/%.erl
 
 bin/%:
 	git clone https://github.com/hyperthunk/$*.git $*
-	$(MAKE) -C $*
+	PATH="$(BIN_DIR):${PATH}" $(MAKE) -C $*
 	cp $*/$* bin/
 
