@@ -1,0 +1,12 @@
+{application, rabbit_ha_test,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { rabbit_ha_test_app, []}},
+  {env, []}
+ ]}.
