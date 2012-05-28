@@ -26,21 +26,7 @@
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    [ {exports, Functions} | _ ] = ?MODULE:module_info(),
-    [ FName || {FName, _} <- lists:filter(
-                               fun ({module_info,_}) -> false;
-                                   ({all,_}) -> false;
-                                   ({init_per_suite,1}) -> false;
-                                   ({end_per_suite,1}) -> false;
-                                   ({_,1}) -> true;
-                                   ({_,_}) -> false
-                               end, Functions)].
-
-init_per_suite(Config) ->
-    systest:start_suite(?MODULE, Config).
-
-end_per_suite(Config) ->
-    systest:stop_suite(?MODULE, Config).
+    systest_suite:export_all(?MODULE).
 
 init_per_testcase(TestCase, Config) ->
     systest:start(TestCase, Config).
@@ -48,25 +34,11 @@ init_per_testcase(TestCase, Config) ->
 end_per_testcase(TestCase, Config) ->
     systest:stop(TestCase, Config).
 
-we_can_start_rabbit_nodes(Config) ->
+starting_rabbit_nodes(Config) ->
     Cluster = systest:active_cluster(Config),
     systest_cluster:print_status(Cluster),
-    [begin
-         Node = N#'systest.node_info'.id,
-         ?assertEqual(pong, net_adm:ping(Node)),
-
-         EbinPath = code:which(rabbit),
-         ?assertMatch(EbinPath,
-                      systest:interact(N, {code, which, [systest]})),
-
-         OsPid = N#'systest.node_info'.os_pid,
-         PidFile = filename:join(?config(priv_dir, Config),
-                                 OsPid ++ ".pid"),
-         ?assertEqual(true, filelib:is_regular(PidFile)),
-
-         {ok, Pid} = file:read_file(PidFile),
-         ?assertEqual(OsPid, binary_to_list(Pid))
-     end || N <- Cluster#'systest.cluster'.nodes],
+    % Cluster = starting_rabbit_nodes,
+    % ct:pal("~p~n", [systest_cluster:check_config(Cluster, Config)]),
     ok.
 
 
