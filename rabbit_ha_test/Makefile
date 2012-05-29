@@ -5,6 +5,8 @@ USER_SHORTNAME=$(shell whoami)
 LIB_DIR=$(abspath lib)
 BIN_DIR=$(abspath bin)
 TEMP_DIRS=lib bin ebin
+SYSTEST=lib/systest
+REBAR=bin/rebar
 
 SOURCE_DIR=src
 TEST_DIR=test
@@ -29,7 +31,7 @@ $(TEMP_DIRS): # TODO: don't create the directories unless they're missing
 
 .PHONY: escripts
 escripts: bin
-escripts: bin/$(REBAR)
+escripts: $(REBAR)
 
 BASIC_SCRIPT_ENVIRONMENT_SETTINGS=\
 	RABBITMQ_NODE_IP_ADDRESS="$(RABBITMQ_NODE_IP_ADDRESS)" \
@@ -48,10 +50,14 @@ ha-test:
 	RABBITMQ_PID_FILE=$(SCRATCH_DIR)/rabbitmq-rabbit-mnesia.pid \
 	RABBITMQ_PLUGINS_EXPAND_DIR=$(SCRATCH_DIR)/plugins \
 	HOST_SHORTNAME=$(HOST_SHORTNAME) \
-	rebar skip_deps=true -C test.config compile systest v4
+	rebar skip_deps=true -C test.config compile systest -v4
+
+.PHONY: lib/systest
+lib/systest: escripts
+	bin/$(REBAR)
 
 $(EBIN_DIR)/%.beam: $(SOURCE_DIR)/%.erl
-	./bin/rebar -j7 skip_deps=true compile
+	rebar -j7 skip_deps=true compile
 
 # TODO: consider whether patching or generating config would be
 # cleaner than maintaining 'rabbit' branches for these repos

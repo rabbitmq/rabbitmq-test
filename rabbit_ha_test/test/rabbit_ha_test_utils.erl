@@ -13,19 +13,17 @@
 %% The Initial Developer of the Original Code is VMware, Inc.
 %% Copyright (c) 2007-2012 VMware, Inc.  All rights reserved.
 %%
--module(rabbit_ha_test_app).
+-module(rabbit_ha_test_utils).
 
--behaviour(application).
+-compile(export_all).
 
-%% Application callbacks
--export([start/2, stop/1]).
-
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
-
-start(_StartType, _StartArgs) ->
-    rabbit_ha_test_sup:start_link().
-
-stop(_State) ->
-    ok.
+wait(Node) ->
+    NodeId  = systest_node:get_node_info(id, Node),
+    Flags   = systest_node:get_node_info(flags, Node),
+    ct:pal("Looking for pid file in ~p~n", [Flags]),
+    LogFun  = fun ct:pal/2,
+    case [V || {start, Start} <- Flags,
+               {environment, "RABBITMQ_PID_FILE", V} <- Start] of
+        [PF] -> rabbit_control:action(wait, NodeId, [PF], [], LogFun);
+        []  -> throw(no_pidfile)
+    end.
