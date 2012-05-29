@@ -16,9 +16,13 @@ LOGLEVEL ?= "4"
 all: $(SUITES)
 
 .PHONY: clean
-clean:
-	rm -dr bin ebin lib
-	rm test/*.beam
+clean: clean-logs
+	rm -drf bin ebin lib
+	rm -f test/*.beam
+
+.PHONY: clean-logs
+clean-logs:
+	rm -drf logs
 
 .PHONY: lib bin
 $(TEMP_DIRS): # TODO: don't create the directories unless they're missing
