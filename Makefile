@@ -78,6 +78,9 @@ run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
+run-ha-tests:
+	$(MAKE) -C rabbit_ha_test ha-test
+
 clean:
 	rm -rf qpid_testsuite
 
