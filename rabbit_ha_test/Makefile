@@ -17,12 +17,12 @@ all: $(SUITES)
 
 .PHONY: clean
 clean: clean-logs
-	rm -drf bin ebin lib
+	rm -rf bin ebin lib
 	rm -f test/*.beam
 
 .PHONY: clean-logs
 clean-logs:
-	rm -drf logs
+	rm -rf logs
 
 .PHONY: lib bin
 $(TEMP_DIRS): # TODO: don't create the directories unless they're missing
@@ -56,15 +56,15 @@ $(SYSTEST): escripts
 
 .PHONY: $(AMQP_CLIENT)
 $(AMQP_CLIENT):
-	ln -s $(CLIENT_DIR) $@
+	ln -fs $(CLIENT_DIR) $@
 
 .PHONY: $(RABBIT_COMMON)
 $(RABBIT_COMMON):
-	ln -s $(COMMON_DIR) $@
+	ln -fs $(COMMON_DIR) $@
 
 .PHONY: $(RABBIT_SERVER)
 $(RABBIT_SERVER):
-	ln -s $(BROKER_DIR) $@
+	ln -fs $(BROKER_DIR) $@
 
 # TODO: consider whether patching or generating config would be
 # cleaner than maintaining 'rabbit' branches for these repos

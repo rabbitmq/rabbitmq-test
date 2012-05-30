@@ -24,6 +24,6 @@ wait(Node) ->
     LogFun  = fun ct:pal/2,
     case [V || {start, Start} <- Flags,
                {environment, "RABBITMQ_PID_FILE", V} <- Start] of
-        [PF] -> rabbit_control:action(wait, NodeId, [PF], [], LogFun);
+        [PF] -> rabbit_control_main:action(wait, NodeId, [PF], [], LogFun);
         []  -> throw(no_pidfile)
     end.
