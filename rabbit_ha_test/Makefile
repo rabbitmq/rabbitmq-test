@@ -1,6 +1,6 @@
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
-COMMON_DIR=$(abspath $(CLIENT_DIR)/deps/rabbit_common-0.0.0)
+COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-0.0.0)
 LIB_DIR=$(abspath lib)
 BIN_DIR=$(abspath bin)
 TEMP_DIRS=lib bin ebin
@@ -17,12 +17,12 @@ all: $(SUITES)
 
 .PHONY: clean
 clean: clean-logs
-	rm -drf bin ebin lib
+	rm -rf bin ebin lib
 	rm -f test/*.beam
 
 .PHONY: clean-logs
 clean-logs:
-	rm -drf logs
+	rm -rf logs
 
 .PHONY: lib bin
 $(TEMP_DIRS): # TODO: don't create the directories unless they're missing
@@ -51,7 +51,7 @@ ha-test: $(SYSTEST) $(TESTLIBS)
 	HOST_SHORTNAME=$(HOST_SHORTNAME) \
 	$(REBAR) skip_deps=true -C test.config compile systest -v $(LOGLEVEL)
 
-$(SYSTEST): escripts
+$(SYSTEST): escripts $(AMQP_CLIENT) $(RABBIT_COMMON) $(RABBIT_SERVER)
 	$(REBAR) -C dependencies.config -j7 get-deps compile -v $(LOGLEVEL)
 
 .PHONY: $(AMQP_CLIENT)

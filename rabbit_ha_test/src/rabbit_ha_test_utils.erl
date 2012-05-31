@@ -29,8 +29,8 @@ wait(Node) ->
         []  -> throw(no_pidfile);
         Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
-                   {_, PF} -> rabbit_control:action(wait, NodeId,
-                                                    [PF], [], LogFun)
+                   {_, PF} -> rabbit_control_main:action(wait, NodeId,
+                                                         [PF], [], LogFun)
                end
     end.
 
