@@ -30,6 +30,8 @@ all() ->
 
 init_per_testcase(TestCase, Config) ->
     systest:start(TestCase, Config).
+    % ConnectedNodes = [rabbit_ha_test_utils:amqp_open(N) || N <- Nodes],
+
 
 end_per_testcase(TestCase, Config) ->
     systest:stop(TestCase, Config).

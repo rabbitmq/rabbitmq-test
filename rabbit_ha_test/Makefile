@@ -10,7 +10,7 @@ RABBIT_COMMON=lib/rabbit_common
 RABBIT_SERVER=lib/rabbit
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_COMMON) $(RABBIT_SERVER)
 REBAR=bin/rebar
-LOGLEVEL ?= "4"
+LOGLEVEL ?= "2"
 
 .PHONY: all
 all: $(SUITES)
@@ -49,22 +49,22 @@ ha-test: $(SYSTEST) $(TESTLIBS)
 	RABBITMQ_PID_FILE=$(SCRATCH_DIR)/rabbitmq-rabbit-mnesia.pid \
 	RABBITMQ_PLUGINS_EXPAND_DIR=$(SCRATCH_DIR)/plugins \
 	HOST_SHORTNAME=$(HOST_SHORTNAME) \
-	$(REBAR) skip_deps=true -C test.config compile systest -v$(LOGLEVEL)
+	$(REBAR) skip_deps=true -C test.config compile systest -v $(LOGLEVEL)
 
 $(SYSTEST): escripts
-	$(REBAR) -C dependencies.config -j7 get-deps compile -v$(LOGLEVEL)
+	$(REBAR) -C dependencies.config -j7 get-deps compile -v $(LOGLEVEL)
 
 .PHONY: $(AMQP_CLIENT)
 $(AMQP_CLIENT):
-	ln -s $(CLIENT_DIR) $@
+	ln -fs $(CLIENT_DIR) $@
 
 .PHONY: $(RABBIT_COMMON)
 $(RABBIT_COMMON):
-	ln -s $(COMMON_DIR) $@
+	ln -fs $(COMMON_DIR) $@
 
 .PHONY: $(RABBIT_SERVER)
 $(RABBIT_SERVER):
-	ln -s $(BROKER_DIR) $@
+	ln -fs $(BROKER_DIR) $@
 
 # TODO: consider whether patching or generating config would be
 # cleaner than maintaining 'rabbit' branches for these repos
