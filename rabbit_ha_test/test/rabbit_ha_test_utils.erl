@@ -27,3 +27,20 @@ wait(Node) ->
         [PF] -> rabbit_control_main:action(wait, NodeId, [PF], [], LogFun);
         []  -> throw(no_pidfile)
     end.
+
+control_action(Command, Node) ->
+    control_action(Command, Node, [], []).
+
+control_action(Command, Node, Args) ->
+    control_action(Command, Node, Args, []).
+
+control_action(Command, Node, Args, Opts) ->
+    rabbit_control_main:action(Command, Node, Args, Opts,
+                               fun (Format, Args1) ->
+                                       io:format(Format ++ " ...~n", Args1)
+                               end).
+
+cluster_status(Node) ->
+    {lists:sort(rpc:call(Node, rabbit_mnesia, all_clustered_nodes, [])),
+     lists:sort(rpc:call(Node, rabbit_mnesia, all_clustered_disc_nodes, [])),
+     lists:sort(rpc:call(Node, rabbit_mnesia, running_clustered_nodes, []))}.
