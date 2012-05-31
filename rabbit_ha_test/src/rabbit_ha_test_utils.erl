@@ -60,7 +60,7 @@ amqp_open(Node=#'systest.node_info'{user=UserData}) ->
     Channel = open_channel(Connection),
     AmqpData = [{amqp_connection, Connection},
                 {amqp_channel,    Channel}|UserData],
-    systest_node:set_node_info(user, AmqpData, Node).
+    systest_node:set_node_info([{user, AmqpData}], Node).
 
 open_channel(Connection) ->
     {ok, Channel} = amqp_connection:open_channel(Connection),

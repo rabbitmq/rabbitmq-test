@@ -19,7 +19,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("systest/include/systest.hrl").
 
--include_lib("amqp_client/include/amqp_client.hrl").
+%% include_lib("amqp_client/include/amqp_client.hrl").
 
 -compile(export_all).
 
@@ -32,7 +32,6 @@ init_per_testcase(TestCase, Config) ->
     systest:start(TestCase, Config).
     % ConnectedNodes = [rabbit_ha_test_utils:amqp_open(N) || N <- Nodes],
 
-
 end_per_testcase(TestCase, Config) ->
     systest:stop(TestCase, Config).
 
@@ -43,4 +42,8 @@ starting_rabbit_nodes(Config) ->
     % ct:pal("~p~n", [systest_cluster:check_config(Cluster, Config)]),
     ok.
 
+starting_connected_nodes(Config) ->
+    Cluster = systest:active_cluster(Config),
+    systest_cluster:print_status(Cluster),
+    ok.
 

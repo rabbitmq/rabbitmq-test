@@ -8,7 +8,9 @@
 {config, "{{ base_dir }}/resources/simple_ha_cluster.config"}.
 
 {alias, test, "{{ base_dir }}/test"}.
-{suites, test, all}.
+%% {suites, test, all}.
+{cases, test, simple_ha_cluster_SUITE,
+              [starting_connected_nodes]}.
 
 {include, "{{ base_dir }}/lib/rabbit/include"}.
 {include, "{{ base_dir }}/lib/rabbit_common/include"}.
