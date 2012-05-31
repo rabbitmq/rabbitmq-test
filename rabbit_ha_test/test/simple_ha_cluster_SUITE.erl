@@ -29,6 +29,8 @@ all() ->
     systest_suite:export_all(?MODULE).
 
 init_per_testcase(TestCase, Config) ->
+    ct:pal("config ~p~n", [Config]),
+    ct:pal("~s~n", [os:cmd("epmd -names")]),
     systest:start(TestCase, Config).
     % ConnectedNodes = [rabbit_ha_test_utils:amqp_open(N) || N <- Nodes],
 
@@ -46,4 +48,3 @@ starting_connected_nodes(Config) ->
     Cluster = systest:active_cluster(Config),
     systest_cluster:print_status(Cluster),
     ok.
-

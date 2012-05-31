@@ -18,7 +18,8 @@
 -include_lib("systest/include/systest.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([wait/1, mirror_args/1, amqp_open/1, amqp_close/1]).
+-export([wait/1, control_action/2, control_action/3, control_action/4,
+         cluster_status/1, mirror_args/1, amqp_open/1, amqp_close/1]).
 
 wait(Node) ->
     NodeId  = systest_node:get_node_info(id, Node),
@@ -33,6 +34,23 @@ wait(Node) ->
                                                          [PF], [], LogFun)
                end
     end.
+
+control_action(Command, Node) ->
+    control_action(Command, Node, [], []).
+
+control_action(Command, Node, Args) ->
+    control_action(Command, Node, Args, []).
+
+control_action(Command, Node, Args, Opts) ->
+    rabbit_control_main:action(Command, Node, Args, Opts,
+                               fun (Format, Args1) ->
+                                       io:format(Format ++ " ...~n", Args1)
+                               end).
+
+cluster_status(Node) ->
+    {lists:sort(rpc:call(Node, rabbit_mnesia, all_clustered_nodes, [])),
+     lists:sort(rpc:call(Node, rabbit_mnesia, all_clustered_disc_nodes, [])),
+     lists:sort(rpc:call(Node, rabbit_mnesia, running_clustered_nodes, []))}.
 
 %% TODO: this *really* belongs in SysTest, not here!!!
 node_eval(Key, Node) ->
@@ -73,4 +91,3 @@ close_connection(Connection) ->
 close_channel(Channel) ->
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
-
