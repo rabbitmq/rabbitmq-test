@@ -15,10 +15,11 @@
 %%
 -module(rabbit_ha_test_consumer).
 
--export(compile_all).
-
--include("rabbitmq_ha_test_cluster.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
+
+-export([wait_for_consumer_ok/1,
+         create_consumer/5,
+         consumer/6]).
 
 wait_for_consumer_ok(ConsumerPid) ->
     ok = receive
@@ -80,4 +81,26 @@ consumer(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
             consumer_reply(TestPid,
                            {error, {expecting_more_messages, MsgsToConsume}})
     end.
+
+resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
+    amqp_channel:subscribe(Channel,
+                           #'basic.consume'{queue    = Queue,
+                                            no_local = false,
+                                            no_ack   = NoAck},
+                           self()),
+
+    ok = receive #'basic.consume_ok'{} -> ok
+         after 200 -> missing_consume_ok
+         end,
+
+    consumer(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume).
+
+maybe_ack(_Delivery, _Channel, true) ->
+    ok;
+maybe_ack(#'basic.deliver'{delivery_tag = DeliveryTag}, Channel, false) ->
+    amqp_channel:call(Channel, #'basic.ack'{delivery_tag = DeliveryTag}),
+    ok.
+
+consumer_reply(TestPid, Reply) ->
+    TestPid ! {self(), Reply}.
 

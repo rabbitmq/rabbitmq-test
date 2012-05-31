@@ -15,9 +15,10 @@
 %%
 -module(rabbit_ha_test_producer).
 
--export(compile_all).
+-export([wait_for_producer_ok/1,
+         create_producer/5,
+         start_producer/5]).
 
--include("rabbitmq_ha_test_cluster.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 wait_for_producer_ok(ProducerPid) ->
@@ -42,8 +43,6 @@ create_producer(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
                                                   Confirm, MsgsToSend]),
     ok = wait_for_producer_start(ProducerPid),
     ProducerPid.
-
-
 
 start_producer(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
     ConfirmState =

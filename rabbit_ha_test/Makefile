@@ -51,7 +51,10 @@ ha-test: $(SYSTEST) $(TESTLIBS)
 	HOST_SHORTNAME=$(HOST_SHORTNAME) \
 	$(REBAR) skip_deps=true -C test.config compile systest -v $(LOGLEVEL)
 
-$(SYSTEST): escripts $(AMQP_CLIENT) $(RABBIT_COMMON) $(RABBIT_SERVER)
+.PHONY: test-compile
+test-compile: $(SYSTEST)
+
+$(SYSTEST): escripts $(TESTLIBS)
 	$(REBAR) -C dependencies.config -j7 get-deps compile -v $(LOGLEVEL)
 
 .PHONY: $(AMQP_CLIENT)
