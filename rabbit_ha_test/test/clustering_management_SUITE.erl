@@ -37,7 +37,7 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     systest:stop(clustering_management, Config).
 
-simple_cluster(Config) ->
+simple_cluster(_Config) ->
     Rabbit = rabbit_nodes:make("rabbit"),
     Hare = rabbit_nodes:make("hare"),
     Bunny = rabbit_nodes:make("bunny"),
@@ -80,7 +80,7 @@ check_cluster_status(Status0, Nodes) ->
     lists:foreach(
       fun (Node) ->
               ?assertEqual(
-                 true, rpc:call(Rabbit, rabbit_mnesia, is_clustered, [])),
+                 true, rpc:call(Node, rabbit_mnesia, is_clustered, [])),
               ?assertEqual(
                  Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
       end, Nodes).
