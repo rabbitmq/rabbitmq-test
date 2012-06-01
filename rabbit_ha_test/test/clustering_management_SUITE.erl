@@ -21,12 +21,15 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--compile(export_all).
+-export([suite/0, all/0, init_per_testcase/2, end_per_testcase/2,
+
+         simple_cluster/1
+        ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    systest_suite:export_all(?MODULE).
+    [simple_cluster].
 
 init_per_testcase(_TestCase, Config) ->
     systest:start(clustering_management, Config).
@@ -44,12 +47,9 @@ simple_cluster(Config) ->
                                         [atom_to_list(Bunny)]),
     rabbit_ha_test_utils:control_action(start_app, Rabbit),
 
-    ?assertEqual(true, rpc:call(Rabbit, rabbit_mnesia, is_clustered, [])),
-    ?assertEqual(true, rpc:call(Bunny, rabbit_mnesia, is_clustered, [])),
-    ?assertEqual({[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
-                 rabbit_ha_test_utils:cluster_status(Rabbit)),
-    ?assertEqual({[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
-                 rabbit_ha_test_utils:cluster_status(Bunny)),
+    check_cluster_status(
+      {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
+      [Rabbit, Bunny]),
 
     rabbit_ha_test_utils:control_action(stop_app, Hare),
     rabbit_ha_test_utils:control_action(
@@ -58,15 +58,9 @@ simple_cluster(Config) ->
 
     ?assertEqual(true, rpc:call(Hare, rabbit_mnesia, is_clustered, [])),
 
-    ?assertEqual(
-       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
-       rabbit_ha_test_utils:cluster_status(Rabbit)),
-    ?assertEqual(
-       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
-       rabbit_ha_test_utils:cluster_status(Hare)),
-    ?assertEqual(
-       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
-       rabbit_ha_test_utils:cluster_status(Bunny)),
+    check_cluster_status(
+      {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
+      [Rabbit, Hare, Bunny]),
 
     rabbit_ha_test_utils:control_action(stop_app, Rabbit),
     rabbit_ha_test_utils:control_action(reset, Rabbit),
@@ -76,3 +70,17 @@ simple_cluster(Config) ->
 
     rabbit_ha_test_utils:control_action(stop_app, Bunny),
     rabbit_ha_test_utils:control_action(reset, Bunny).
+
+check_cluster_status(Status0, Nodes) ->
+    SortStatus =
+        fun ({All, Disc, Running}) ->
+                {lists:sort(All), lists:sort(Disc), lists:sort(Running)}
+        end,
+    Status = SortStatus(Status0),
+    lists:foreach(
+      fun (Node) ->
+              ?assertEqual(
+                 true, rpc:call(Rabbit, rabbit_mnesia, is_clustered, [])),
+              ?assertEqual(
+                 Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
+      end, Nodes).

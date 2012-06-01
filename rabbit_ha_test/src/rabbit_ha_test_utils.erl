@@ -48,9 +48,9 @@ control_action(Command, Node, Args, Opts) ->
                                end).
 
 cluster_status(Node) ->
-    {lists:sort(rpc:call(Node, rabbit_mnesia, all_clustered_nodes, [])),
-     lists:sort(rpc:call(Node, rabbit_mnesia, all_clustered_disc_nodes, [])),
-     lists:sort(rpc:call(Node, rabbit_mnesia, running_clustered_nodes, []))}.
+    {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
+     rpc:call(Node, rabbit_mnesia, all_clustered_disc_nodes, []),
+     rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
 
 %% TODO: this *really* belongs in SysTest, not here!!!
 node_eval(Key, Node) ->
