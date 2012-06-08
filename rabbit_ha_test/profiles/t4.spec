@@ -7,7 +7,7 @@
 {config, "{{ base_dir }}/resources/rabbit_nodes.config"}.
 {config, "{{ base_dir }}/resources/simple_ha_cluster.config"}.
 
-{alias, test, "{{ base_dir }}/test"}.
+{alias, test, "{{ base_dir }}/test-ebin"}.
 %% {suites, test, all}.
 {cases, test, simple_ha_cluster_SUITE,
               [starting_connected_nodes]}.

@@ -25,11 +25,13 @@ wait(Node) ->
     % Flags   = systest_node:get_node_info(private, Node),
     ct:pal("Looking for pid file in ~p~n", [Node]),
     LogFun  = fun ct:pal/2,
-    case node_eval("node.private.env", [{node, Node}]) of
-        []  -> throw(no_pidfile);
-        Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
+    case node_eval("node.user.env", [{node, Node}]) of
+        not_found -> throw(no_pidfile);
+        Env -> ct:pal("env = ~p~n", [Env]),
+               case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
-                   {_, PF} -> rabbit_control_main:action(wait, NodeId,
+                   {_, PF} -> ct:pal("reading from ~s~n", [PF]),
+                              rabbit_control_main:action(wait, NodeId,
                                                          [PF], [], LogFun)
                end
     end.

@@ -49,7 +49,7 @@ ha-test: $(SYSTEST) $(TESTLIBS)
 	RABBITMQ_PID_FILE=$(SCRATCH_DIR)/rabbitmq-rabbit-mnesia.pid \
 	RABBITMQ_PLUGINS_EXPAND_DIR=$(SCRATCH_DIR)/plugins \
 	HOST_SHORTNAME=$(HOST_SHORTNAME) \
-	$(REBAR) skip_deps=true -C test.config compile systest -v $(LOGLEVEL)
+	$(REBAR) skip_deps=true -C test.config clean compile systest -v $(LOGLEVEL)
 
 .PHONY: test-compile
 test-compile: $(SYSTEST)
