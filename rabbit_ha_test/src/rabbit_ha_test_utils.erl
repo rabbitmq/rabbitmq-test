@@ -18,7 +18,11 @@
 -include_lib("systest/include/systest.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([wait/1, mirror_args/1, amqp_open/1, amqp_close/1]).
+-compile(export_all).
+
+%%
+%% systest_node on_start callbacks
+%%
 
 wait(Node) ->
     NodeId  = systest_node:get_node_info(id, Node),
@@ -27,20 +31,36 @@ wait(Node) ->
     LogFun  = fun ct:pal/2,
     case node_eval("node.user.env", [{node, Node}]) of
         not_found -> throw(no_pidfile);
-        Env -> ct:pal("env = ~p~n", [Env]),
-               case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
+        Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
-                   {_, PF} -> ct:pal("reading from ~s~n", [PF]),
+                   {_, PF} -> ct:pal("reading pid from ~s~n", [PF]),
                               rabbit_control_main:action(wait, NodeId,
                                                          [PF], [], LogFun)
                end
     end.
 
-%% TODO: this *really* belongs in SysTest, not here!!!
-node_eval(Key, Node) ->
-    systest_config:eval(Key, Node,
-                        [{callback,
-                            {node, fun systest_node:get_node_info/2}}]).
+%%
+%% Test Utility Functions
+%%
+
+await_response(Pid, Timeout) ->
+    receive
+        {Pid, Response} -> Response
+    after
+        Timeout ->
+            {error, timeout}
+    end.
+
+with_cluster(Config, TestFun) ->
+    Cluster = systest:active_cluster(Config),
+    systest_cluster:print_status(Cluster),
+    Nodes = systest:cluster_nodes(Cluster),
+    NodeConf = [begin
+                    systest_config:eval("user." ++ atom_to_list(Id),
+                                        systest_node:node_data(Ref),
+                                        [{return, key}])
+                end || {Id, Ref} <- Nodes],
+    TestFun(Cluster, NodeConf).
 
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
@@ -49,20 +69,29 @@ mirror_args(Nodes) ->
      {<<"x-ha-policy-params">>, array,
       [{longstr, list_to_binary(atom_to_list(N))} || N <- Nodes]}].
 
+%%
+%% Private API
+%%
+
+%% TODO: this *really* belongs in SysTest, not here!!!
+node_eval(Key, Node) ->
+    systest_config:eval(Key, Node,
+                        [{callback,
+                            {node, fun systest_node:get_node_info/2}}]).
+
 amqp_close(#'systest.node_info'{user=UserData}) ->
     Channel = ?CONFIG(amqp_channel, UserData, undefined),
     Connection = ?CONFIG(amqp_connection, UserData, undefined),
     close_channel(Channel),
     close_connection(Connection).
 
-amqp_open(Node=#'systest.node_info'{user=UserData}) ->
+amqp_open(Node=#'systest.node_info'{id=Id, user=UserData}) ->
     NodePort = ?REQUIRE(amqp_port, UserData),
     {ok, Connection} =
         amqp_connection:start(#amqp_params_network{port=NodePort}),
     Channel = open_channel(Connection),
-    AmqpData = [{amqp_connection, Connection},
-                {amqp_channel,    Channel}|UserData],
-    systest_node:set_node_info([{user, AmqpData}], Node).
+    AmqpData = [{Id, {Connection, Channel}} | UserData],
+    {write, user, AmqpData}.
 
 open_channel(Connection) ->
     {ok, Channel} = amqp_connection:open_channel(Connection),

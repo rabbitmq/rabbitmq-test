@@ -17,22 +17,17 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([wait_for_consumer_ok/1,
-         create_consumer/5,
-         consumer/6]).
+-export([await_response/1, create/5, start/6]).
 
-wait_for_consumer_ok(ConsumerPid) ->
-    ok = receive
-             {ConsumerPid, ok}    -> ok;
-             {ConsumerPid, Other} -> Other
-         after
-             60000 ->
-                 {error, lost_contact_with_consumer}
-         end.
+await_response(ConsumerPid) ->
+    case rabbit_ha_test_utils:await_response(ConsumerPid, 60000) of
+        {error, timeout} -> throw(lost_contact_with_consumer);
+        ok               -> ok
+    end.
 
-create_consumer(Channel, Queue, TestPid, NoAck, ExpectingMsgs) ->
-    ConsumerPid = spawn(?MODULE, consumer, [TestPid, Channel, Queue, NoAck,
-                                            ExpectingMsgs + 1, ExpectingMsgs]),
+create(Channel, Queue, TestPid, NoAck, ExpectingMsgs) ->
+    ConsumerPid = spawn(?MODULE, start, [TestPid, Channel, Queue, NoAck,
+                                         ExpectingMsgs + 1, ExpectingMsgs]),
     amqp_channel:subscribe(Channel,
                            #'basic.consume'{queue    = Queue,
                                             no_local = false,
@@ -40,13 +35,13 @@ create_consumer(Channel, Queue, TestPid, NoAck, ExpectingMsgs) ->
                            ConsumerPid),
     ConsumerPid.
 
-consumer(TestPid, _Channel, _Queue, _NoAck, _LowestSeen, 0) ->
+start(TestPid, _Channel, _Queue, _NoAck, _LowestSeen, 0) ->
     consumer_reply(TestPid, ok);
-consumer(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
+start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
     receive
         #'basic.consume_ok'{} ->
-            consumer(TestPid, Channel, Queue, NoAck,
-                     LowestSeen, MsgsToConsume);
+            start(TestPid, Channel, Queue, NoAck,
+                  LowestSeen, MsgsToConsume);
         {Delivery = #'basic.deliver'{ redelivered = Redelivered },
          #amqp_msg{payload = Payload}} ->
             MsgNum = list_to_integer(binary_to_list(Payload)),
@@ -60,11 +55,11 @@ consumer(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
             %% counter.
             if
                 MsgNum + 1 == LowestSeen ->
-                    consumer(TestPid, Channel, Queue,
+                    start(TestPid, Channel, Queue,
                              NoAck, MsgNum, MsgsToConsume - 1);
                 MsgNum >= LowestSeen ->
                     true = Redelivered, %% ASSERTION
-                    consumer(TestPid, Channel, Queue,
+                    start(TestPid, Channel, Queue,
                              NoAck, LowestSeen, MsgsToConsume);
                 true ->
                     %% We received a message we haven't seen before,
@@ -82,6 +77,10 @@ consumer(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                            {error, {expecting_more_messages, MsgsToConsume}})
     end.
 
+%%
+%% Private API
+%%
+
 resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
     amqp_channel:subscribe(Channel,
                            #'basic.consume'{queue    = Queue,
@@ -93,7 +92,7 @@ resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
          after 200 -> missing_consume_ok
          end,
 
-    consumer(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume).
+    start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume).
 
 maybe_ack(_Delivery, _Channel, true) ->
     ok;
@@ -103,4 +102,3 @@ maybe_ack(#'basic.deliver'{delivery_tag = DeliveryTag}, Channel, false) ->
 
 consumer_reply(TestPid, Reply) ->
     TestPid ! {self(), Reply}.
-

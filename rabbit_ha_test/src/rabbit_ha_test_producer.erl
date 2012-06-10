@@ -15,36 +15,26 @@
 %%
 -module(rabbit_ha_test_producer).
 
--export([wait_for_producer_ok/1,
-         create_producer/5,
-         start_producer/5]).
+-export([await_response/1, start/5, create/5]).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
-wait_for_producer_ok(ProducerPid) ->
-    ok = receive
-             {ProducerPid, ok}    -> ok;
-             {ProducerPid, Other} -> Other
-         after
-             60000 ->
-                 {error, lost_contact_with_producer}
-         end.
+await_response(ProducerPid) ->
+    case rabbit_ha_test_utils:await_response(ProducerPid, 60000) of
+        {error, timeout} -> throw(lost_contact_with_producer);
+        ok               -> ok
+    end.
 
-wait_for_producer_start(ProducerPid) ->
-    ok = receive
-             {ProducerPid, started} -> ok
-         after
-             10000 ->
-                 {error, producer_not_started}
-         end.
+create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
+    ProducerPid = spawn(?MODULE, start, [Channel, Queue, TestPid,
+                                         Confirm, MsgsToSend]),
+    StartTimeout = 10000,
+    case rabbit_ha_test_utils:await_response(ProducerPid, StartTimeout) of
+        ok    -> ProducerPid;
+        Other -> throw(producer_not_started)
+    end.
 
-create_producer(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
-    ProducerPid = spawn(?MODULE, start_producer, [Channel, Queue, TestPid,
-                                                  Confirm, MsgsToSend]),
-    ok = wait_for_producer_start(ProducerPid),
-    ProducerPid.
-
-start_producer(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
+start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
     ConfirmState =
         case Confirm of
             true ->
@@ -58,9 +48,19 @@ start_producer(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
     TestPid ! {self(), started},
     producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend).
 
+%%
+%% Private API
+%%
+
+wait_for_producer_start(ProducerPid) ->
+    receive
+        {ProducerPid, started} -> ok
+    after
+        10000 -> {error, producer_not_started}
+    end.
+
 producer(_Channel, _Queue, TestPid, ConfirmState, 0) ->
     ConfirmState1 = drain_confirms(ConfirmState),
-
     case ConfirmState1 of
         none -> TestPid ! {self(), ok};
         ok   -> TestPid ! {self(), ok};

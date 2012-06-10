@@ -19,31 +19,61 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("systest/include/systest.hrl").
 
-%% include_lib("amqp_client/include/amqp_client.hrl").
+-include_lib("amqp_client/include/amqp_client.hrl").
 
--compile(export_all).
+-export([suite/0, all/0, init_per_suite/1,
+         end_per_suite/1, send_and_consumer_around_cluster/1]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    systest_suite:export_all(?MODULE).
+    [send_and_consumer_around_cluster].
 
-init_per_testcase(TestCase, Config) ->
-    systest:start(TestCase, Config).
-    % ConnectedNodes = [rabbit_ha_test_utils:amqp_open(N) || N <- Nodes],
+init_per_suite(Config) ->
+    timer:start(),
+    Config.
 
-end_per_testcase(TestCase, Config) ->
-    systest:stop(TestCase, Config).
-
-starting_rabbit_nodes(Config) ->
-    Cluster = systest:active_cluster(Config),
-    systest_cluster:print_status(Cluster),
-    % Cluster = starting_rabbit_nodes,
-    % ct:pal("~p~n", [systest_cluster:check_config(Cluster, Config)]),
+end_per_suite(_Config) ->
     ok.
 
-starting_connected_nodes(Config) ->
-    Cluster = systest:active_cluster(Config),
+send_and_consumer_around_cluster(Config) ->
+    rabbit_ha_test_utils:with_cluster(Config, fun test_send_consume/2).
+
+test_send_consume(Cluster,
+                  [{Node1, {_Conn1, Channel1}},
+                   {Node2, {_Conn2, Channel2}},
+                   {Node3, {_Conn3, Channel3}}]) ->
+
+    %% a quick sanity in the logs/console
     systest_cluster:print_status(Cluster),
+
+    %% Test the nodes policy this time.
+    Nodes = [Node1, Node2, Node3],
+    MirrorArgs = rabbit_ha_test_utils:mirror_args(Nodes),
+
+    %% declare the queue on the master, mirrored to the two slaves
+    #'queue.declare_ok'{queue=Queue} =
+        amqp_channel:call(Channel1,
+                          #'queue.declare'{auto_delete = false,
+                                           arguments   = MirrorArgs}),
+
+    Msgs = 200,
+
+    %% start up a consumer
+    ConsumerPid = rabbit_ha_test_consumer:create(Channel2, Queue,
+                                                 self(), false, Msgs),
+
+    %% send a bunch of messages from the producer
+    ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
+                                                 self(), false, Msgs),
+
+    %% create a killer for the master - we send a brutal -9 (SIGKILL)
+    %% instruction, as that is how the previous implementation worked
+    systest_node:kill_after(50, Node1, sigkill),
+
+    %% verify that the consumer got all msgs, or die - the await_response
+    %% calls throw an exception if anything goes wrong....
+    rabbit_ha_test_consumer:await_response(ConsumerPid),
+    rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
