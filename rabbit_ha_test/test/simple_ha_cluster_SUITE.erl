@@ -22,12 +22,16 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([suite/0, all/0, init_per_suite/1,
-         end_per_suite/1, send_and_consumer_around_cluster/1]).
+         end_per_suite/1,
+         send_and_consumer_around_cluster/1,
+         killing_multiple_intermediate_nodes/1]).
 
-suite() -> [{timetrap, {seconds, 60}}].
+%% NB: it takes almost a minute to start and cluster 6 nodes
+%% used in this test case, so a 3 minute time trap seems reasonable
+suite() -> [{timetrap, {minutes, 3}}].
 
 all() ->
-    [send_and_consumer_around_cluster].
+    systest_suite:export_all(?MODULE).
 
 init_per_suite(Config) ->
     timer:start(),
@@ -38,6 +42,18 @@ end_per_suite(_Config) ->
 
 send_and_consumer_around_cluster(Config) ->
     rabbit_ha_test_utils:with_cluster(Config, fun test_send_consume/2).
+
+%% TODO: investigate *why* setting the timetrap here doesn't override
+%% a suite setting of {seconds, 60}, as we don't necessarily want all
+%% the test cases to be given so generous a limit
+
+killing_multiple_intermediate_nodes() ->
+    [{timetrap, {minutes, 3}}].
+
+killing_multiple_intermediate_nodes(Config) ->
+    rabbit_ha_test_utils:with_cluster(Config, fun test_multi_kill/2).
+
+%% Private Implementation
 
 test_send_consume(Cluster,
                   [{Node1, {_Conn1, Channel1}},
@@ -75,6 +91,49 @@ test_send_consume(Cluster,
 
     %% verify that the consumer got all msgs, or die - the await_response
     %% calls throw an exception if anything goes wrong....
+    rabbit_ha_test_consumer:await_response(ConsumerPid),
+    rabbit_ha_test_producer:await_response(ProducerPid),
+    ok.
+
+%% TODO: as per this afternoon's conversation with Simon, figure out
+%% how to rename the cluster members so as to avoid using the master/slave
+%% terminology where it doesn't belong...
+
+test_multi_kill(_Cluster,
+                [{Master, {_MasterConnection, MasterChannel}},
+                 {Slave1, {_Slave1Connection, _Slave1Channel}},
+                 {Slave2, {_Slave2Connection, _Slave2Channel}},
+                 {Slave3, {_Slave3Connection, _Slave3Channel}},
+                 {_Slave4, {_Slave4Connection, Slave4Channel}},
+                 {_Producer, {_ProducerConnection, ProducerChannel}}]) ->
+
+    #'queue.declare_ok'{queue = Queue} =
+        amqp_channel:call(MasterChannel,
+                #'queue.declare'{
+                    auto_delete = false,
+                    arguments   = [{<<"x-ha-policy">>, longstr, <<"all">>}]}),
+
+    %% REFACTOR: this seems *highly* timing dependant - the assumption is
+    %% that the kill will work quickly enough that there will still be
+    %% some messages in-flight the we *must* receive despite the intervening
+    %% node deaths. Personally, I'm not enthused by this testing methodology.
+
+    Msgs = 5000,
+
+    ConsumerPid = rabbit_ha_test_consumer:create(Slave4Channel,
+                                                 Queue, self(), false, Msgs),
+
+    ProducerPid = rabbit_ha_test_producer:create(ProducerChannel,
+                                                 Queue, self(), false, Msgs),
+
+              %% create a killer for the master and the first 3 slaves
+    [systest_node:kill_after(Time, Node) || {Node, Time} <-
+                                            [{Master, 50},
+                                             {Slave1, 100},
+                                             {Slave2, 200},
+                                             {Slave3, 300}]],
+
+    %% verify that the consumer got all msgs, or die
     rabbit_ha_test_consumer:await_response(ConsumerPid),
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
