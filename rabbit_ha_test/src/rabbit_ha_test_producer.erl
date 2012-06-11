@@ -30,8 +30,8 @@ create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
                                          Confirm, MsgsToSend]),
     StartTimeout = 10000,
     case rabbit_ha_test_utils:await_response(ProducerPid, StartTimeout) of
-        ok    -> ProducerPid;
-        Other -> throw(producer_not_started)
+        started -> ProducerPid;
+        Other   -> throw({producer_not_started, Other})
     end.
 
 start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->

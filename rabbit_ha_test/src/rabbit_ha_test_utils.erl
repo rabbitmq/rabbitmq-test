@@ -24,10 +24,15 @@
 %% systest_node on_start callbacks
 %%
 
+amqp_close(#'systest.node_info'{user=UserData}) ->
+    Channel = ?CONFIG(amqp_channel, UserData, undefined),
+    Connection = ?CONFIG(amqp_connection, UserData, undefined),
+    close_channel(Channel),
+    close_connection(Connection).
+
 wait(Node) ->
     NodeId  = systest_node:get_node_info(id, Node),
     % Flags   = systest_node:get_node_info(private, Node),
-    ct:pal("Looking for pid file in ~p~n", [Node]),
     LogFun  = fun ct:pal/2,
     case node_eval("node.user.env", [{node, Node}]) of
         not_found -> throw(no_pidfile);
@@ -51,17 +56,6 @@ await_response(Pid, Timeout) ->
             {error, timeout}
     end.
 
-with_cluster(Config, TestFun) ->
-    Cluster = systest:active_cluster(Config),
-    systest_cluster:print_status(Cluster),
-    Nodes = systest:cluster_nodes(Cluster),
-    NodeConf = [begin
-                    systest_config:eval("user." ++ atom_to_list(Id),
-                                        systest_node:node_data(Ref),
-                                        [{return, key}])
-                end || {Id, Ref} <- Nodes],
-    TestFun(Cluster, NodeConf).
-
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
 mirror_args(Nodes) ->
@@ -69,29 +63,48 @@ mirror_args(Nodes) ->
      {<<"x-ha-policy-params">>, array,
       [{longstr, list_to_binary(atom_to_list(N))} || N <- Nodes]}].
 
+with_cluster(Config, TestFun) ->
+    Cluster = systest:active_cluster(Config),
+    systest_cluster:print_status(Cluster),
+    Nodes = systest:cluster_nodes(Cluster),
+    Members = [Id || {Id, Ref} <- Nodes],
+    ct:pal("Clustering ~p~n", [Members]),
+    lists:foldl(fun cluster/2, [], Members),
+    NodeConf = [begin
+                    UserData = ?CONFIG(user, systest_node:node_data(Ref)),
+                    amqp_open(Id, UserData)
+                end || {Id, Ref} <- Nodes],
+    TestFun(Cluster, NodeConf).
+
 %%
 %% Private API
 %%
 
-%% TODO: this *really* belongs in SysTest, not here!!!
-node_eval(Key, Node) ->
-    systest_config:eval(Key, Node,
-                        [{callback,
-                            {node, fun systest_node:get_node_info/2}}]).
-
-amqp_close(#'systest.node_info'{user=UserData}) ->
-    Channel = ?CONFIG(amqp_channel, UserData, undefined),
-    Connection = ?CONFIG(amqp_connection, UserData, undefined),
-    close_channel(Channel),
-    close_connection(Connection).
-
-amqp_open(Node=#'systest.node_info'{id=Id, user=UserData}) ->
+amqp_open(Id, UserData) ->
     NodePort = ?REQUIRE(amqp_port, UserData),
     {ok, Connection} =
         amqp_connection:start(#amqp_params_network{port=NodePort}),
     Channel = open_channel(Connection),
-    AmqpData = [{Id, {Connection, Channel}} | UserData],
-    {write, user, AmqpData}.
+    {Id, {Connection, Channel}}.
+
+cluster(Node, []) ->
+    [atom_to_list(Node)];
+cluster(Node, Acc) ->
+    NodeS = atom_to_list(Node),
+    NewAcc = [NodeS|Acc],
+    ct:pal("connecting ~p with ~p~n", [Node, Acc]),
+    LogFn = fun ct:pal/2,
+    rabbit_control_main:action(stop_app, Node, [], [], LogFn),
+    rabbit_control_main:action(reset, Node, [], [], LogFn),
+    rabbit_control_main:action(cluster, Node, NewAcc, [], LogFn),
+    rabbit_control_main:action(start_app, Node, [], [], LogFn),
+    ok = rpc:call(Node, rabbit, await_startup, []),
+    NewAcc.
+
+node_eval(Key, Node) ->
+    systest_config:eval(Key, Node,
+                        [{callback,
+                            {node, fun systest_node:get_node_info/2}}]).
 
 open_channel(Connection) ->
     {ok, Channel} = amqp_connection:open_channel(Connection),

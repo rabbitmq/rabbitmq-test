@@ -44,11 +44,14 @@ test_send_consume(Cluster,
                    {Node2, {_Conn2, Channel2}},
                    {Node3, {_Conn3, Channel3}}]) ->
 
-    %% a quick sanity in the logs/console
-    systest_cluster:print_status(Cluster),
-
     %% Test the nodes policy this time.
     Nodes = [Node1, Node2, Node3],
+    ct:pal("reading status info.....~n"),
+    [ct:pal("~p: ~p~n", [P, R]) || {P, R} <- [begin
+                                                  {N,
+                                                   rpc:call(N, rabbit_mnesia,
+                                                            status, [])}
+                                              end || N <- Nodes]],
     MirrorArgs = rabbit_ha_test_utils:mirror_args(Nodes),
 
     %% declare the queue on the master, mirrored to the two slaves
@@ -56,7 +59,6 @@ test_send_consume(Cluster,
         amqp_channel:call(Channel1,
                           #'queue.declare'{auto_delete = false,
                                            arguments   = MirrorArgs}),
-
     Msgs = 200,
 
     %% start up a consumer
