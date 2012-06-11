@@ -19,6 +19,7 @@ all: $(SUITES)
 clean: clean-logs
 	rm -rf bin ebin lib
 	rm -f test/*.beam
+	rm -rf test-ebin
 
 .PHONY: clean-logs
 clean-logs:
@@ -41,7 +42,7 @@ BASIC_SCRIPT_ENVIRONMENT_SETTINGS=\
 
 .PHONY: ha-test
 ha-test: $(SYSTEST) $(TESTLIBS)
-	ERL_FLAGS="-pa lib/systest/ebin -pa $(BROKER_DIR)/ebin" \
+	ERL_FLAGS="-pa lib/systest/ebin -pa ebin -pa $(BROKER_DIR)/ebin" \
 	RABBITMQ_SCRATCH_DIR=$(SCRATCH_DIR) \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
 	RABBITMQ_LOG_BASE=$(SCRATCH_DIR) \

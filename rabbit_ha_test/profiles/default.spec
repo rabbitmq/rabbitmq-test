@@ -1,6 +1,4 @@
 
-{logdir, "{{ base_dir }}/logs"}.
-
 {config, "{{ base_dir }}/resources/rabbit_nodes.config"}.
 {config, "{{ base_dir }}/resources/simple_ha_cluster.config"}.
 
