@@ -56,6 +56,24 @@ await_response(Pid, Timeout) ->
             {error, timeout}
     end.
 
+control_action(Command, Node) ->
+    control_action(Command, Node, [], []).
+
+control_action(Command, Node, Args) ->
+    control_action(Command, Node, Args, []).
+
+control_action(Command, Node, Args, Opts) ->
+    rabbit_control_main:action(Command, Node, Args, Opts,
+                               fun (Format, Args1) ->
+                                       io:format(Format ++ " ...~n", Args1)
+                               end).
+
+cluster_status(Node) ->
+    {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
+     rpc:call(Node, rabbit_mnesia, all_clustered_disc_nodes, []),
+     rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
+
+
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
 mirror_args(Nodes) ->
@@ -117,4 +135,3 @@ close_connection(Connection) ->
 close_channel(Channel) ->
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
-
