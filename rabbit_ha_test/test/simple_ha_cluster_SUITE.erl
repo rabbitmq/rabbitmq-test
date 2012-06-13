@@ -24,11 +24,12 @@
 -export([suite/0, all/0, init_per_suite/1,
          end_per_suite/1,
          send_and_consumer_around_cluster/1,
-         killing_multiple_intermediate_nodes/1]).
+         killing_multiple_intermediate_nodes/1,
+         killing_multiple_intermediate_nodes/0]).
 
 %% NB: it takes almost a minute to start and cluster 6 nodes
 %% used in this test case, so a 3 minute time trap seems reasonable
-suite() -> [{timetrap, {minutes, 3}}].
+suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
     systest_suite:export_all(?MODULE).
