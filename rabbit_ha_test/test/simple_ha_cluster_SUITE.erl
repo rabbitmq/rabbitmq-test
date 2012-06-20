@@ -37,7 +37,6 @@ all() ->
 init_per_suite(Config) ->
     timer:start(),
     Config.
-
 end_per_suite(_Config) ->
     ok.
 
@@ -138,4 +137,3 @@ test_multi_kill(_Cluster,
     rabbit_ha_test_consumer:await_response(ConsumerPid),
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
-
