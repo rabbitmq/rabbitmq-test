@@ -4,7 +4,7 @@
 {config, "{{ base_dir }}/resources/clustering_management.config"}.
 
 {alias, test, "{{ base_dir }}/ebin"}.
-{suites, test, simple_ha_cluster_SUITE}.
+{suites, test, clustering_management_SUITE}.
 
 {include, "{{ base_dir }}/lib/rabbit/include"}.
 {include, "{{ base_dir }}/lib/rabbit_common/include"}.

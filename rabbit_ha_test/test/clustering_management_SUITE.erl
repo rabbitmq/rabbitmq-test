@@ -21,7 +21,7 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([suite/0, all/0, init_per_testcase/2, end_per_testcase/2,
+-export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
 
          simple_cluster/1
         ]).
@@ -31,16 +31,15 @@ suite() -> [{timetrap, {seconds, 60}}].
 all() ->
     [simple_cluster].
 
-init_per_testcase(_TestCase, Config) ->
-    systest:start(clustering_management, Config).
+init_per_suite(Config) ->
+    Config.
+end_per_suite(_Config) ->
+    ok.
 
-end_per_testcase(_TestCase, Config) ->
-    systest:stop(clustering_management, Config).
-
-simple_cluster(_Config) ->
-    Rabbit = rabbit_nodes:make("rabbit"),
-    Hare = rabbit_nodes:make("hare"),
-    Bunny = rabbit_nodes:make("bunny"),
+simple_cluster(Config) ->
+    Cluster = systest:active_cluster(Config),
+    systest_cluster:print_status(Cluster),
+    [{Rabbit, _}, {Hare, _}, {Bunny, _}] = systest:cluster_nodes(Cluster),
 
     rabbit_ha_test_utils:control_action(stop_app, Rabbit),
     rabbit_ha_test_utils:control_action(join_cluster, Rabbit,
