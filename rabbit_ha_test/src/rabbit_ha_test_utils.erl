@@ -31,6 +31,7 @@ amqp_close(#'systest.node_info'{user=UserData}) ->
     close_connection(Connection).
 
 wait(Node) ->
+    ct:pal("wait: ~p~n", [Node]),
     NodeId  = systest_node:get_node_info(id, Node),
     % Flags   = systest_node:get_node_info(private, Node),
     LogFun  = fun ct:pal/2,
@@ -71,8 +72,13 @@ with_cluster(Config, TestFun) ->
     ct:pal("Clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members),
     NodeConf = [begin
-                    UserData = ?CONFIG(user, systest_node:node_data(Ref)),
-                    amqp_open(Id, UserData)
+                    UserData = systest_node:user_data(Ref),
+                    AmqpProcs = amqp_open(Id, UserData),
+                    {Connection, Channel} = AmqpProcs,
+                    AmqpData = [{amqp_connection, Connection},
+                                {amqp_channel,    Channel}|UserData],
+                    ok = systest_node:user_data(Ref, AmqpData),
+                    {Id, AmqpProcs}
                 end || {Id, Ref} <- Nodes],
     TestFun(Cluster, NodeConf).
 
@@ -85,7 +91,7 @@ amqp_open(Id, UserData) ->
     {ok, Connection} =
         amqp_connection:start(#amqp_params_network{port=NodePort}),
     Channel = open_channel(Connection),
-    {Id, {Connection, Channel}}.
+    {Connection, Channel}.
 
 cluster(Node, []) ->
     [atom_to_list(Node)];
@@ -111,10 +117,12 @@ open_channel(Connection) ->
     Channel.
 
 close_connection(Connection) ->
+    ct:pal("closing connection ~p~n", [Connection]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_connection:close(Connection) end).
 
 close_channel(Channel) ->
+    ct:pal("closing channel ~p~n", [Channel]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
 
