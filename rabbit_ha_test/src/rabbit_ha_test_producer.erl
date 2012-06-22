@@ -126,5 +126,3 @@ multi_confirm(DeliveryTag, ConfirmState) ->
                     ConfirmState
             end
     end.
-
-

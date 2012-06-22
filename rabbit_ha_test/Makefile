@@ -10,7 +10,7 @@ RABBIT_SERVER=lib/rabbit
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_COMMON) $(RABBIT_SERVER)
 SYSTEST=bin/systest
 SYSTEST_URI="https://github.com/downloads/nebularis/systest/systest"
-SYSTEST_VERSION="0.4.0"
+SYSTEST_VERSION="0.4.1"
 LOGLEVEL ?= "2"
 
 .PHONY: all
@@ -36,7 +36,7 @@ BASIC_SCRIPT_ENVIRONMENT_SETTINGS=\
 	RABBITMQ_PLUGINS_EXPAND_DIR="$(RABBITMQ_PLUGINS_EXPAND_DIR)"
 
 .PHONY: ha-test
-ha-test: bin/systest lib $(TESTLIBS)
+ha-test: bin bin/systest lib $(TESTLIBS)
 	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin" \
 	RABBITMQ_SCRATCH_DIR=$(SCRATCH_DIR) \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
@@ -63,9 +63,7 @@ $(RABBIT_COMMON):
 $(RABBIT_SERVER):
 	ln -fs $(BROKER_DIR) $@
 
-bin/%: fetch-systest
-
-.PHONY: fetch-systest
-fetch-systest: bin
-	curl -L $(SYSTEST_URI)-$(SYSTEST_VERSION)-SNAPSHOT > bin/systest
-	chmod +x bin/systest
+bin/%:
+	mkdir -p bin
+	curl -L $(SYSTEST_URI)-$(SYSTEST_VERSION)-SNAPSHOT > $@
+	chmod +x $@
