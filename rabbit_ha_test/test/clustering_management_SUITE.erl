@@ -39,43 +39,47 @@ end_per_suite(_Config) ->
 join_and_part_cluster(Config) ->
     [Rabbit, Hare, Bunny] = cluster_nodes(Config),
 
+    %% Cluster Rabbit with Bunny
     rabbit_ha_test_utils:control_action(stop_app, Rabbit),
     rabbit_ha_test_utils:control_action(join_cluster, Rabbit,
                                         [atom_to_list(Bunny)]),
     rabbit_ha_test_utils:control_action(start_app, Rabbit),
 
-    check_if_clustered(Rabbit, true),
-    check_if_clustered(Bunny, true),
+    check_if_disc_node(Rabbit, true),
+    check_if_disc_node(Bunny, true),
     check_cluster_status(
       {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
       [Rabbit, Bunny]),
 
+    %% Cluster Hare with Rabbit and Bunny, via Bunny, as a Ram node
     rabbit_ha_test_utils:control_action(stop_app, Hare),
     rabbit_ha_test_utils:control_action(
       join_cluster, Hare, [atom_to_list(Bunny)], [{"--ram", true}]),
     rabbit_ha_test_utils:control_action(start_app, Hare),
 
-    check_if_clustered(Hare, true),
-
+    check_if_disc_node(Hare, false),
     check_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
+    %% Reset Rabbit, leaving the cluster
     rabbit_ha_test_utils:control_action(stop_app, Rabbit),
     rabbit_ha_test_utils:control_action(reset, Rabbit),
+    rabbit_ha_test_utils:control_action(start_app, Rabbit),
 
-    check_if_clustered(Rabbit, false),
+    check_if_disc_node(Rabbit, true),
     check_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
                          [Hare, Bunny]),
 
+    %% Reset Hare, no more cluster, Hare is a disc node again
     rabbit_ha_test_utils:control_action(stop_app, Hare),
     rabbit_ha_test_utils:control_action(reset, Hare),
+    rabbit_ha_test_utils:control_action(start_app, Hare),
 
-    check_if_clustered(Hare, false),
-    check_if_clustered(Bunny, false),
-
-    rabbit_ha_test_utils:control_action(stop_app, Bunny),
-    rabbit_ha_test_utils:control_action(reset, Bunny).
+    check_if_disc_node(Hare, true),
+    check_cluster_status({[Hare], [Hare], [Hare]}, [Hare]),
+    check_if_disc_node(Bunny, true),
+    check_cluster_status({[Bunny], [Bunny], [Bunny]}, [Bunny]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
@@ -90,14 +94,17 @@ check_cluster_status(Status0, Nodes) ->
         fun ({All, Disc, Running}) ->
                 {lists:sort(All), lists:sort(Disc), lists:sort(Running)}
         end,
-    Status = SortStatus(Status0),
+    Status = {AllNodes, _, _} = SortStatus(Status0),
     lists:foreach(
       fun (Node) ->
-              ?assertEqual(
-                 true, rpc:call(Node, rabbit_mnesia, is_clustered, [])),
+              ?assertEqual(AllNodes =/= [Node],
+                           rpc:call(Node, rabbit_mnesia, is_clustered, [])),
               ?assertEqual(
                  Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
       end, Nodes).
 
 check_if_clustered(Node, Clustered) ->
     ?assertEqual(Clustered, rpc:call(Node, rabbit_mnesia, is_clustered, [])).
+
+check_if_disc_node(Node, DiscNode) ->
+    ?assertEqual(DiscNode, rpc:call(Node, rabbit_mnesia, is_disc_node, [])).
