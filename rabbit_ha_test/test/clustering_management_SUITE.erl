@@ -44,8 +44,6 @@ join_and_part_cluster(Config) ->
                                         [atom_to_list(Bunny)]),
     rabbit_ha_test_utils:control_action(start_app, Rabbit),
 
-    check_if_clustered(Rabbit, true),
-    check_if_clustered(Bunny, true),
     check_cluster_status(
       {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
       [Rabbit, Bunny]),
@@ -55,27 +53,24 @@ join_and_part_cluster(Config) ->
       join_cluster, Hare, [atom_to_list(Bunny)], [{"--ram", true}]),
     rabbit_ha_test_utils:control_action(start_app, Hare),
 
-    check_if_clustered(Hare, true),
-
     check_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
     rabbit_ha_test_utils:control_action(stop_app, Rabbit),
     rabbit_ha_test_utils:control_action(reset, Rabbit),
+    rabbit_ha_test_utils:control_action(start_app, Rabbit),
 
-    check_if_clustered(Rabbit, false),
+    check_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
     check_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
                          [Hare, Bunny]),
 
     rabbit_ha_test_utils:control_action(stop_app, Hare),
     rabbit_ha_test_utils:control_action(reset, Hare),
+    rabbit_ha_test_utils:control_action(start_app, Hare),
 
-    check_if_clustered(Hare, false),
-    check_if_clustered(Bunny, false),
-
-    rabbit_ha_test_utils:control_action(stop_app, Bunny),
-    rabbit_ha_test_utils:control_action(reset, Bunny).
+    check_not_clustered(Hare),
+    check_not_clustered(Bunny).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
@@ -90,14 +85,14 @@ check_cluster_status(Status0, Nodes) ->
         fun ({All, Disc, Running}) ->
                 {lists:sort(All), lists:sort(Disc), lists:sort(Running)}
         end,
-    Status = SortStatus(Status0),
+    Status = {AllNodes, _, _} = SortStatus(Status0),
     lists:foreach(
       fun (Node) ->
-              ?assertEqual(
-                 true, rpc:call(Node, rabbit_mnesia, is_clustered, [])),
+              ?assertEqual(AllNodes =/= [Node],
+                           rpc:call(Node, rabbit_mnesia, is_clustered, [])),
               ?assertEqual(
                  Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
       end, Nodes).
 
-check_if_clustered(Node, Clustered) ->
-    ?assertEqual(Clustered, rpc:call(Node, rabbit_mnesia, is_clustered, [])).
+check_not_clustered(Node) ->
+    check_cluster_status({[Node], [Node], [Node]}, [Node]).
