@@ -24,11 +24,13 @@
 -export([suite/0, all/0, init_per_suite/1,
          end_per_suite/1,
          send_consume_survives_node_deaths/1,
-         producer_confirms_survive_death_of_master/1]).
+         producer_confirms_survive_death_of_master/1,
+         restarted_master_honours_declarations/0,
+         restarted_master_honours_declarations/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, {seconds, 120}}].
+suite() -> [{timetrap, {seconds, 100}}].
 
 all() ->
     systest_suite:export_all(?MODULE).
@@ -41,17 +43,11 @@ end_per_suite(_Config) ->
     ok.
 
 send_consume_survives_node_deaths(Config) ->
-    rabbit_ha_test_utils:with_cluster(Config, fun test_send_consume/2).
-
-producer_confirms_survive_death_of_master(Config) ->
-    rabbit_ha_test_utils:with_cluster(Config, fun test_producer_confirms/2).
-
-%% Private Implementation
-
-test_send_consume(Cluster,
-                  [{Node1, {_Conn1, Channel1}},
-                   {Node2, {_Conn2, Channel2}},
-                   {Node3, {_Conn3, Channel3}}]) ->
+    {_Cluster,
+      [{{Node1,_}, {_Conn1, Channel1}},
+       {{Node2,_}, {_Conn2, Channel2}},
+       {{Node3,_}, {_Conn3, Channel3}}
+            ]} = rabbit_ha_test_utils:cluster_members(Config),
 
     %% Test the nodes policy this time.
     Nodes = [Node1, Node2, Node3],
@@ -88,9 +84,11 @@ test_send_consume(Cluster,
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
-test_producer_confirms(_Cluster,
-        [{Master, {_MasterConnection, MasterChannel}},
-         {_Producer, {_ProducerConnection, ProducerChannel}}|_]) ->
+producer_confirms_survive_death_of_master(Config) ->
+    {_Cluster,
+        [{{Master, _}, {_MasterConnection, MasterChannel}},
+        {{_Producer,_},{_ProducerConnection, ProducerChannel}}|_]
+            } = rabbit_ha_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
     #'queue.declare_ok'{queue = Queue} = 
@@ -112,3 +110,47 @@ test_producer_confirms(_Cluster,
 
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
+
+restarted_master_honours_declarations() ->
+    %% NB: up to 1.5 mins to fully cluster the nodes
+    [{timetrap, {minutes, 5}}].
+
+restarted_master_honours_declarations(Config) ->
+    process_flag(trap_exit, true),
+    {Cluster,
+        [{{Master,   MRef},  {_MasterConnection,   MasterChannel}},
+         {{_Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
+         {{_Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}
+    ]} = rabbit_ha_test_utils:cluster_members(Config),
+    MasterNodeConfig = systest_node:user_data(MRef),
+    Queue = <<"ha-test-restarting-master">>,
+    #'queue.declare_ok'{} = 
+            amqp_channel:call(MasterChannel,
+                #'queue.declare'{queue       = Queue,
+                                 auto_delete = false,
+                                 arguments   = [{<<"x-ha-policy">>,
+                                                longstr, <<"all">>}]}),
+
+    %% restart master
+    {ok, {Master, NewMRef}} = systest_cluster:restart_node(Cluster, MRef),
+    %% start({Master#node.name, 5672}),
+    %% add_to_cluster(Master#node.name, rabbit_nodes:make(b)),
+
+    %% retire other members of the cluster
+    systest_node:stop_and_wait(PRef),
+    systest_node:stop_and_wait(SRef),
+
+    % MasterConnection1 = open_connection(#node{port = 5672}),
+    % MasterChannel1 = open_channel( MasterConnection1 ),
+    {_NewConn, NewChann} = rabbit_ha_test_utils:amqp_config(NewMRef),
+
+    %% the master must refuse redeclaration with different parameters
+    try
+      amqp_channel:call(NewChann, 
+                        #'queue.declare'{queue = Queue}) of
+      #'queue.declare_ok'{} -> ct:fail("Expected exception ~p wasn't thrown~n",
+                                       [?PRECONDITION_FAILED])
+    catch
+      exit:{{shutdown, {server_initiated_close,
+                        ?PRECONDITION_FAILED, _Bin}}, _Rest} -> ok
+    end.
