@@ -23,13 +23,13 @@
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
 
-         join_and_part_cluster/1
+         join_and_part_cluster/1, join_cluster_bad_operations/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    [join_and_part_cluster].
+    [join_and_part_cluster, join_cluster_bad_operations].
 
 init_per_suite(Config) ->
     Config.
@@ -39,38 +39,88 @@ end_per_suite(_Config) ->
 join_and_part_cluster(Config) ->
     [Rabbit, Hare, Bunny] = cluster_nodes(Config),
 
-    rabbit_ha_test_utils:control_action(stop_app, Rabbit),
-    rabbit_ha_test_utils:control_action(join_cluster, Rabbit,
-                                        [atom_to_list(Bunny)]),
-    rabbit_ha_test_utils:control_action(start_app, Rabbit),
+    stop_app(Rabbit),
+    join_cluster(Rabbit, Bunny),
+    start_app(Rabbit),
 
     check_cluster_status(
       {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
       [Rabbit, Bunny]),
 
-    rabbit_ha_test_utils:control_action(stop_app, Hare),
-    rabbit_ha_test_utils:control_action(
-      join_cluster, Hare, [atom_to_list(Bunny)], [{"--ram", true}]),
-    rabbit_ha_test_utils:control_action(start_app, Hare),
+    stop_app(Hare),
+    join_cluster(Hare, Bunny, true),
+    start_app(Hare),
 
     check_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
-    rabbit_ha_test_utils:control_action(stop_app, Rabbit),
-    rabbit_ha_test_utils:control_action(reset, Rabbit),
-    rabbit_ha_test_utils:control_action(start_app, Rabbit),
+    stop_app(Rabbit),
+    reset(Rabbit),
+    start_app(Rabbit),
 
     check_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
     check_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
                          [Hare, Bunny]),
 
-    rabbit_ha_test_utils:control_action(stop_app, Hare),
-    rabbit_ha_test_utils:control_action(reset, Hare),
-    rabbit_ha_test_utils:control_action(start_app, Hare),
+    stop_app(Hare),
+    reset(Hare),
+    start_app(Hare),
 
     check_not_clustered(Hare),
     check_not_clustered(Bunny).
+
+join_cluster_bad_operations(Config) ->
+    [Rabbit, Hare, Bunny] = cluster_nodes(Config),
+
+    %% Non-existant node
+    stop_app(Rabbit),
+    check_failure(fun () -> join_cluster(Rabbit, non@existant) end),
+    start_app(Rabbit),
+    check_not_clustered(Rabbit),
+
+    %% Trying to cluster with mnesia running
+    check_failure(fun () -> join_cluster(Rabbit, Bunny) end),
+    check_not_clustered(Rabbit),
+
+    %% Trying to cluster the node with itself
+    stop_app(Rabbit),
+    check_failure(fun () -> join_cluster(Rabbit, Rabbit) end),
+    start_app(Rabbit),
+    check_not_clustered(Rabbit),
+
+    %% Fail if trying to cluster with already clustered node
+    stop_app(Rabbit),
+    join_cluster(Rabbit, Hare),
+    start_app(Rabbit),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                         [Rabbit, Hare]),
+    stop_app(Rabbit),
+    check_failure(fun () -> join_cluster(Rabbit, Hare) end),
+    start_app(Rabbit),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                         [Rabbit, Hare]),
+
+    %% Cleanup
+    stop_app(Rabbit),
+    reset(Rabbit),
+    start_app(Rabbit),
+    check_not_clustered(Rabbit),
+    check_not_clustered(Hare),
+
+    %% Do not let the node leave the cluster or reset if it's the only
+    %% ram node
+    stop_app(Hare),
+    join_cluster(Hare, Rabbit, true),
+    start_app(Hare),
+    check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                         [Rabbit, Hare]),
+    stop_app(Hare),
+    check_failure(fun () -> join_cluster(Rabbit, Bunny) end),
+    check_failure(fun () -> reset(Rabbit) end),
+    start_app(Hare),
+    check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                         [Rabbit, Hare]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
@@ -96,3 +146,24 @@ check_cluster_status(Status0, Nodes) ->
 
 check_not_clustered(Node) ->
     check_cluster_status({[Node], [Node], [Node]}, [Node]).
+
+check_failure(Fun) ->
+    case catch Fun() of
+        {error, Reason} -> Reason
+    end.
+
+stop_app(Node) ->
+    rabbit_ha_test_utils:control_action(stop_app, Node).
+
+start_app(Node) ->
+    rabbit_ha_test_utils:control_action(start_app, Node).
+
+join_cluster(Node, To) ->
+    join_cluster(Node, To, false).
+
+join_cluster(Node, To, Ram) ->
+    rabbit_ha_test_utils:control_action(
+      join_cluster, Node, [atom_to_list(To)], [{"--ram", Ram}]).
+
+reset(Node) ->
+    rabbit_ha_test_utils:control_action(reset, Node).
