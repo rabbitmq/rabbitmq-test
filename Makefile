@@ -1,5 +1,5 @@
-.PHONY: all lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app restart-secondary-node cleanup force-snapshot
+.PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
+	prepare restart-app restart-secondary-node cleanup force-snapshot ha-tests
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
@@ -41,14 +41,15 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
-all:
+all: full ha-tests
+
+full:
 	OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
 	{ ( cd $(TEST_DIR) && ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
-	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && \
-	$(MAKE) rabbit_ha_test ha-test && { $$OK || $(TESTS_FAILED); } && $$OK
+	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
 lite:
 	OK=true && \
@@ -79,7 +80,7 @@ run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
-run-ha-tests:
+ha-tests: 
 	$(MAKE) -C rabbit_ha_test ha-test
 
 clean:
