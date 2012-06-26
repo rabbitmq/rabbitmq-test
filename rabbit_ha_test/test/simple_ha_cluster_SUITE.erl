@@ -38,7 +38,6 @@ all() ->
 init_per_suite(Config) ->
     timer:start(),
     Config.
-
 end_per_suite(_Config) ->
     ok.
 
