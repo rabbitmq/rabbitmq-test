@@ -23,13 +23,15 @@
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
 
-         join_and_part_cluster/1, join_cluster_bad_operations/1
+         join_and_part_cluster/1, join_cluster_bad_operations/1,
+         join_to_start_interval/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    [join_and_part_cluster, join_cluster_bad_operations].
+    [join_and_part_cluster, join_cluster_bad_operations,
+     join_to_start_interval].
 
 init_per_suite(Config) ->
     Config.
@@ -121,6 +123,22 @@ join_cluster_bad_operations(Config) ->
     start_app(Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                          [Rabbit, Hare]).
+
+%% This tests that the nodes in the cluster are notified immediately of a node
+%% join, and not just after the app is started.
+join_to_start_interval(Config) ->
+    [Rabbit, Hare, _Bunny] = cluster_nodes(Config),
+    check_not_clustered(Rabbit),
+    check_not_clustered(Hare),
+
+    stop_app(Rabbit),
+    join_cluster(Rabbit, Hare),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                         [Rabbit, Hare]),
+    start_app(Rabbit),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                         [Rabbit, Hare]).
+
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
