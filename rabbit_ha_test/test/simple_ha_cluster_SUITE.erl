@@ -16,7 +16,6 @@
 -module(simple_ha_cluster_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
--include_lib("eunit/include/eunit.hrl").
 -include_lib("systest/include/systest.hrl").
 
 -include_lib("amqp_client/include/amqp_client.hrl").
@@ -91,7 +90,7 @@ producer_confirms_survive_death_of_master(Config) ->
             } = rabbit_ha_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
-    #'queue.declare_ok'{queue = Queue} = 
+    #'queue.declare_ok'{queue = Queue} =
         amqp_channel:call(MasterChannel,
                           #'queue.declare'{
                               auto_delete = false,
@@ -116,41 +115,56 @@ restarted_master_honours_declarations() ->
     [{timetrap, {minutes, 5}}].
 
 restarted_master_honours_declarations(Config) ->
+    %% NB: this test case is not auto-clustered (we use a hook function in
+    %% the rabbit_ha_test_utils module), because we need to perform a very
+    %% closely controlled restart and rejoin procedure in this instance.
     process_flag(trap_exit, true),
-    {Cluster,
-        [{{Master,   MRef},  {_MasterConnection,   MasterChannel}},
-         {{_Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
-         {{_Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}
-    ]} = rabbit_ha_test_utils:cluster_members(Config),
-    MasterNodeConfig = systest_node:user_data(MRef),
-    Queue = <<"ha-test-restarting-master">>,
-    #'queue.declare_ok'{} = 
-            amqp_channel:call(MasterChannel,
-                #'queue.declare'{queue       = Queue,
-                                 auto_delete = false,
-                                 arguments   = [{<<"x-ha-policy">>,
-                                                longstr, <<"all">>}]}),
+    rabbit_ha_test_utils:with_cluster(
+        Config,
+        fun(Cluster,
+            [{{Master,   MRef}, {MasterConnection,    MasterChannel}},
+             {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
+             {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]) ->
 
-    %% restart master
-    {ok, {Master, NewMRef}} = systest_cluster:restart_node(Cluster, MRef),
-    %% start({Master#node.name, 5672}),
-    %% add_to_cluster(Master#node.name, rabbit_nodes:make(b)),
+            MasterNodeConfig = systest_node:user_data(MRef),
+            Queue = <<"ha-test-restarting-master">>,
+            MirrorArgs = rabbit_ha_test_utils:mirror_args([Master,
+                                                           Producer, Slave]),
+            #'queue.declare_ok'{} =
+                    amqp_channel:call(MasterChannel,
+                        #'queue.declare'{queue       = Queue,
+                                         auto_delete = false,
+                                         arguments   = MirrorArgs}),
 
-    %% retire other members of the cluster
-    systest_node:stop_and_wait(PRef),
-    systest_node:stop_and_wait(SRef),
+            %% restart master
+            rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
 
-    % MasterConnection1 = open_connection(#node{port = 5672}),
-    % MasterChannel1 = open_channel( MasterConnection1 ),
-    {_NewConn, NewChann} = rabbit_ha_test_utils:amqp_config(NewMRef),
+            {ok, {Master, NewMRef}} =
+                    systest_cluster:restart_node(Cluster, MRef),
+            rabbit_ha_test_utils:cluster_with(Master, [Producer]),
 
-    %% the master must refuse redeclaration with different parameters
-    try
-      amqp_channel:call(NewChann, 
+            %% retire other members of the cluster
+            systest_node:stop_and_wait(PRef),
+            systest_node:stop_and_wait(SRef),
+
+            NewConn = rabbit_ha_test_utils:open_connection(5672),
+            NewChann = rabbit_ha_test_utils:open_channel(NewConn),
+
+            rabbit_control_main:action(list_queues, Master,
+                                       [], [{"-p", "/"}], fun ct:pal/2),
+
+            %% the master must refuse redeclaration with different parameters
+            try
+                amqp_channel:call(NewChann,
                         #'queue.declare'{queue = Queue}) of
-      #'queue.declare_ok'{} -> ct:fail("Expected exception ~p wasn't thrown~n",
-                                       [?PRECONDITION_FAILED])
-    catch
-      exit:{{shutdown, {server_initiated_close,
+                    #'queue.declare_ok'{} ->
+                        ct:fail("Expected exception ~p wasn't thrown~n",
+                                [?PRECONDITION_FAILED])
+            catch
+                exit:{{shutdown, {server_initiated_close,
                         ?PRECONDITION_FAILED, _Bin}}, _Rest} -> ok
-    end.
+            after
+                rabbit_ha_test_utils:amqp_close(NewChann, NewConn)
+            end
+        end).
+

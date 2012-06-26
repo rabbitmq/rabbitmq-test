@@ -24,6 +24,18 @@
 %% systest_node callbacks
 %%
 
+amqp_open(Id, UserData) ->
+    NodePort = ?REQUIRE(amqp_port, UserData),
+    Connection = open_connection(NodePort),
+    Channel = open_channel(Connection),
+    {Connection, Channel}.
+
+open_connection(NodePort) ->
+    {ok, Connection} =
+        amqp_connection:start(#amqp_params_network{port=NodePort}),
+    Connection.
+
+
 %%
 %% @doc A systest_node 'on_stop' callback that closes a connection and channel
 %% which in the node's user data as <pre>amqp_connection</pre> and
@@ -33,6 +45,9 @@ amqp_close(Node) ->
     UserData = systest_node:get(user, Node),
     Channel = ?CONFIG(amqp_channel, UserData, undefined),
     Connection = ?CONFIG(amqp_connection, UserData, undefined),
+    amqp_close(Channel, Connection).
+
+amqp_close(Channel, Connection) ->
     close_channel(Channel),
     close_connection(Connection).
 
@@ -43,7 +58,7 @@ amqp_close(Node) ->
 %% (for details, see the systest_cli documentation).
 %%
 wait(Node) ->
-    %% passing the records around like this really sucks - if only we had 
+    %% passing the records around like this really sucks - if only we had
     %% coroutines we could do this far more cleanly... :/
     NodeId  = systest_node:get(id, Node),
     LogFun  = fun ct:pal/2,
@@ -73,7 +88,7 @@ make_cluster(Cluster) ->
 
 %%
 %% @doc This systest_cluster on_join callback sets up a single connection and
-%% a single channel (on it), which is stored in the node's user-state for 
+%% a single channel (on it), which is stored in the node's user-state for
 %% use by our various test case functions. We wait until the cluster on_join
 %% callback, because node on_start callbacks run *before* `make_cluster' could
 %% potentially restart the rabbit application on each node, killing off our
@@ -81,9 +96,9 @@ make_cluster(Cluster) ->
 %%
 on_join(Node, _ClusterRef, _Siblings) ->
     Id = systest_node:get(id, Node),
-    
+
     % ClusterMembers = cluster(Id, [atom_to_list(Id) || {Id, _} <- Siblings]),
-    
+
     %% at this point we've already been clustered with all the other nodes,
     %% so we're good to go - now we can open up the connection+channel...
     UserData = systest_node:get(user, Node),
@@ -139,16 +154,12 @@ with_cluster(Config, TestFun) ->
                 end || {Id, Ref} <- Nodes],
     TestFun(Cluster, NodeConf).
 
+cluster_with(Node, Nodes) ->
+    lists:foldl(fun cluster/2, [], [Node|Nodes]).
+
 %%
 %% Private API
 %%
-
-amqp_open(Id, UserData) ->
-    NodePort = ?REQUIRE(amqp_port, UserData),
-    {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{port=NodePort}),
-    Channel = open_channel(Connection),
-    {Connection, Channel}.
 
 cluster(Node, []) ->
     [atom_to_list(Node)];
