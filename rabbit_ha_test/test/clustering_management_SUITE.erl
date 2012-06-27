@@ -194,9 +194,8 @@ remove_node_and_recluster(Config) ->
 
     recluster(Rabbit, Bunny),
     start_app(Rabbit),
-    io:format("blabla ~p~n", [rabbit_ha_test_utils:cluster_status(Rabbit)]).
-    %% check_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
-    %%                      [Rabbit, Bunny]).
+    check_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
+                         [Rabbit, Bunny]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
