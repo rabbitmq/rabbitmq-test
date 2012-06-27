@@ -134,7 +134,7 @@ control_action(Command, Node, Args, Opts) ->
 
 cluster_status(Node) ->
     {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
-     rpc:call(Node, rabbit_mnesia, all_clustered_disc_nodes, []),
+     rpc:call(Node, rabbit_mnesia, clustered_disc_nodes, []),
      rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
 
 
