@@ -51,6 +51,12 @@ amqp_close(Channel, Connection) ->
     close_channel(Channel),
     close_connection(Connection).
 
+start_rabbit(Node) ->
+    NodeId = systest_node:get(id, Node),
+    LogFn = fun ct:pal/2,
+    rabbit_control_main:action(start_app, Node, [], [], LogFn),
+    ok = rpc:call(Node, rabbit, await_startup, []).
+
 %%
 %% @doc runs <pre>rabbitmqctl wait</pre> against the supplied Node.
 %% This is a systest_node 'on_start' callback, receiving a 'systest.node_info'

@@ -10,7 +10,7 @@ RABBIT_SERVER=lib/rabbit
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_COMMON) $(RABBIT_SERVER)
 SYSTEST=bin/systest
 SYSTEST_URI="https://github.com/downloads/nebularis/systest/systest"
-SYSTEST_VERSION="0.5.1"
+SYSTEST_VERSION="0.5.3"
 LOGLEVEL ?= "2"
 
 .PHONY: all
@@ -24,8 +24,7 @@ clean: clean-logs
 clean-logs:
 	rm -rf logs
 
-.PHONY: lib bin
-$(TEMP_DIRS): # TODO: don't create the directories unless they're missing
+$(TEMP_DIRS):
 	mkdir -p $@
 
 .PHONY: ha-test
