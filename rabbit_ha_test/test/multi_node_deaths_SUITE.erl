@@ -46,10 +46,10 @@ killing_multiple_intermediate_nodes(Config) ->
 %% terminology where it doesn't belong...
 
 test_multi_kill(_Cluster,
-                [{Master, {_MasterConnection, MasterChannel}},
-                 {Slave1, {_Slave1Connection, _Slave1Channel}},
-                 {Slave2, {_Slave2Connection, _Slave2Channel}},
-                 {Slave3, {_Slave3Connection, _Slave3Channel}},
+                [{{_, Master}, {_MasterConnection, MasterChannel}},
+                 {{_, Slave1}, {_Slave1Connection, _Slave1Channel}},
+                 {{_, Slave2}, {_Slave2Connection, _Slave2Channel}},
+                 {{_, Slave3}, {_Slave3Connection, _Slave3Channel}},
                  {_Slave4, {_Slave4Connection, Slave4Channel}},
                  {_Producer, {_ProducerConnection, ProducerChannel}}]) ->
 
