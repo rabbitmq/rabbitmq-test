@@ -24,16 +24,14 @@
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
 
          join_and_part_cluster/1, join_cluster_bad_operations/1,
-         join_to_start_interval/1, remove_offline_node/1,
-         remove_node_and_recluster/1
+         join_to_start_interval/1, remove_offline_node/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
     [join_and_part_cluster, join_cluster_bad_operations,
-     join_to_start_interval, remove_offline_node,
-     remove_node_and_recluster].
+     join_to_start_interval, remove_offline_node].
 
 init_per_suite(Config) ->
     Config.
@@ -165,37 +163,6 @@ remove_offline_node(Config) ->
     %% Now we can't start Rabbit since it thinks that it's still in the cluster
     %% with Hare, while Hare disagrees.
     check_failure(fun () -> start_app(Rabbit) end).
-
-remove_node_and_recluster(Config) ->
-    [Rabbit, Hare, Bunny] = cluster_nodes(Config),
-    check_not_clustered(Rabbit),
-    check_not_clustered(Hare),
-
-    stop_app(Rabbit),
-    join_cluster(Rabbit, Hare),
-    start_app(Rabbit),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]),
-
-    stop_app(Rabbit),
-    remove_node(Hare, Rabbit),
-    check_not_clustered(Hare),
-
-    stop_app(Bunny),
-    join_cluster(Bunny, Hare),
-    start_app(Bunny),
-    check_cluster_status({[Bunny, Hare], [Bunny, Hare], [Bunny, Hare]},
-                         [Bunny, Hare]),
-
-    stop_app(Hare),
-    reset(Hare),
-    check_not_clustered(Hare),
-    check_not_clustered(Bunny),
-
-    recluster(Rabbit, Bunny),
-    start_app(Rabbit),
-    check_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
-                         [Rabbit, Bunny]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
