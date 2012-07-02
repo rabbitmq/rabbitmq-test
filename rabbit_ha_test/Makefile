@@ -10,7 +10,7 @@ RABBIT_SERVER=lib/rabbit
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_COMMON) $(RABBIT_SERVER)
 SYSTEST=bin/systest
 SYSTEST_URI="https://github.com/downloads/nebularis/systest/systest"
-SYSTEST_VERSION="0.5.3"
+SYSTEST_VERSION="0.5.4"
 LOGLEVEL ?= "2"
 
 .PHONY: all

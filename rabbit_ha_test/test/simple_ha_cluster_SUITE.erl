@@ -50,7 +50,6 @@ send_consume_survives_node_deaths(Config) ->
 
     %% Test the nodes policy this time.
     Nodes = [Node1, Node2, Node3],
-    ct:pal("reading status info.....~n"),
     [ct:pal("~p: ~p~n", [P, R]) || {P, R} <- [begin
                                                   {N,
                                                    rpc:call(N, rabbit_mnesia,

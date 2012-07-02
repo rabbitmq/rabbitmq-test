@@ -22,6 +22,7 @@
 await_response(ConsumerPid) ->
     case rabbit_ha_test_utils:await_response(ConsumerPid, 60000) of
         {error, timeout} -> throw(lost_contact_with_consumer);
+        {error, Reason}  -> error(Reason);
         ok               -> ok
     end.
 
@@ -72,7 +73,7 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
             resubscribe(TestPid, Channel, Queue, NoAck,
                         LowestSeen, MsgsToConsume)
     after
-        2000 ->
+        10000 ->
             consumer_reply(TestPid,
                            {error, {expecting_more_messages, MsgsToConsume}})
     end.

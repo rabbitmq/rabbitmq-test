@@ -13,6 +13,7 @@
 {include, "{{ base_dir }}/lib/rabbit_common/include"}.
 {include, "{{ base_dir }}/lib/amqp_client/include"}.
 
+{event_handler, systest_event}.
 {ct_hooks, [cth_log_redirect,
             {systest_cth, [], 0}]}.
 {enable_builtin_hooks, true}.

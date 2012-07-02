@@ -53,7 +53,7 @@ amqp_close(Channel, Connection) ->
 
 start_rabbit(Node) ->
     NodeId = systest_node:get(id, Node),
-    LogFn = fun ct:pal/2,
+    LogFn = fun ct:log/2,
     rabbit_control_main:action(start_app, Node, [], [], LogFn),
     ok = rpc:call(Node, rabbit, await_startup, []).
 
@@ -67,12 +67,12 @@ wait(Node) ->
     %% passing the records around like this really sucks - if only we had
     %% coroutines we could do this far more cleanly... :/
     NodeId  = systest_node:get(id, Node),
-    LogFun  = fun ct:pal/2,
+    LogFun  = fun ct:log/2,
     case node_eval("node.user.env", [{node, Node}]) of
         not_found -> throw(no_pidfile);
         Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
-                   {_, PF} -> ct:pal("reading pid from ~s~n", [PF]),
+                   {_, PF} -> ct:log("reading pid from ~s~n", [PF]),
                               rabbit_control_main:action(wait, NodeId,
                                                          [PF], [], LogFun)
                end
@@ -89,7 +89,7 @@ wait(Node) ->
 %%
 make_cluster(Cluster) ->
     Members = systest_cluster:node_names(Cluster),
-    ct:pal("Clustering ~p~n", [Members]),
+    ct:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members).
 
 %%
@@ -147,7 +147,7 @@ with_cluster(Config, TestFun) ->
     systest_cluster:print_status(Cluster),
     Nodes = systest:cluster_nodes(Cluster),
     Members = [Id || {Id, Ref} <- Nodes],
-    ct:pal("Clustering ~p~n", [Members]),
+    ct:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members),
     NodeConf = [begin
                     UserData = systest_node:user_data(Ref),
@@ -172,8 +172,8 @@ cluster(Node, []) ->
 cluster(Node, Acc) ->
     NodeS = atom_to_list(Node),
     NewAcc = [NodeS|Acc],
-    ct:pal("clustering ~p with ~p~n", [Node, Acc]),
-    LogFn = fun ct:pal/2,
+    ct:log("clustering ~p with ~p~n", [Node, Acc]),
+    LogFn = fun ct:log/2,
     rabbit_control_main:action(stop_app, Node, [], [], LogFn),
     rabbit_control_main:action(reset, Node, [], [], LogFn),
     rabbit_control_main:action(cluster, Node, NewAcc, [], LogFn),
@@ -191,11 +191,11 @@ open_channel(Connection) ->
     Channel.
 
 close_connection(Connection) ->
-    ct:pal("closing connection ~p~n", [Connection]),
+    ct:log("closing connection ~p~n", [Connection]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_connection:close(Connection) end).
 
 close_channel(Channel) ->
-    ct:pal("closing channel ~p~n", [Channel]),
+    ct:log("closing channel ~p~n", [Channel]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
