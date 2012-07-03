@@ -50,7 +50,7 @@ send_consume_survives_node_deaths(Config) ->
 
     %% Test the nodes policy this time.
     Nodes = [Node1, Node2, Node3],
-    [ct:pal("~p: ~p~n", [P, R]) || {P, R} <- [begin
+    [ct:log("~p: ~p~n", [P, R]) || {P, R} <- [begin
                                                   {N,
                                                    rpc:call(N, rabbit_mnesia,
                                                             status, [])}
@@ -150,7 +150,7 @@ restarted_master_honours_declarations(Config) ->
             NewChann = rabbit_ha_test_utils:open_channel(NewConn),
 
             rabbit_control_main:action(list_queues, Master,
-                                       [], [{"-p", "/"}], fun ct:pal/2),
+                                       [], [{"-p", "/"}], fun ct:log/2),
 
             %% the master must refuse redeclaration with different parameters
             try
