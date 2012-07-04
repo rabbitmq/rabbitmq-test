@@ -25,14 +25,16 @@
 
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, remove_offline_node/1,
-         change_node_type_test/1
+         change_node_type_test/1, change_cluster_when_node_offline/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
-     remove_offline_node, change_node_type_test].
+    %% [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
+    %%  remove_offline_node, change_node_type_test,
+    %%  change_cluster_when_node_offline].
+    [change_cluster_when_node_offline].
 
 init_per_suite(Config) ->
     Config.
@@ -41,6 +43,9 @@ end_per_suite(_Config) ->
 
 join_and_part_cluster(Config) ->
     [Rabbit, Hare, Bunny] = cluster_nodes(Config),
+    check_not_clustered(Rabbit),
+    check_not_clustered(Hare),
+    check_not_clustered(Bunny),
 
     ok = stop_app(Rabbit),
     ok = join_cluster(Rabbit, Bunny),
@@ -129,8 +134,6 @@ join_cluster_bad_operations(Config) ->
 %% join, and not just after the app is started.
 join_to_start_interval(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_nodes(Config),
-    check_not_clustered(Rabbit),
-    check_not_clustered(Hare),
 
     ok = stop_app(Rabbit),
     ok = join_cluster(Rabbit, Hare),
@@ -142,8 +145,6 @@ join_to_start_interval(Config) ->
 
 remove_offline_node(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_nodes(Config),
-    check_not_clustered(Rabbit),
-    check_not_clustered(Hare),
 
     %% Trying to remove a node not in the cluster should fail
     check_failure(fun () -> remove_node(Hare, Rabbit) end),
@@ -172,8 +173,6 @@ remove_offline_node(Config) ->
 
 change_node_type_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_nodes(Config),
-    check_not_clustered(Rabbit),
-    check_not_clustered(Hare),
 
     %% Trying to change the ram node when not clustered should always fail
     ok = stop_app(Rabbit),
@@ -200,6 +199,66 @@ change_node_type_test(Config) ->
     ok = stop_app(Hare),
     check_failure(fun () -> change_node_type(Hare, ram) end),
     ok = start_app(Hare).
+
+change_cluster_when_node_offline(Config) ->
+    [Rabbit, Hare, Bunny] = cluster_nodes(Config),
+
+    %% Cluster the three notes
+    ok = stop_app(Rabbit),
+    join_cluster(Rabbit, Hare),
+    ok = start_app(Rabbit),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
+                         [Rabbit, Hare]),
+
+    ok = stop_app(Bunny),
+    join_cluster(Bunny, Hare),
+    ok = start_app(Bunny),
+    check_cluster_status(
+      {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
+      [Rabbit, Hare, Bunny]),
+
+    %% Bring down Rabbit, and remove Bunny from the cluster while
+    %% Rabbit is offline
+    ok = stop_app(Rabbit),
+    ok = stop_app(Bunny),
+    ok = reset(Bunny),
+    check_cluster_status({[Bunny], [Bunny], []}, [Bunny]),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]}, [Hare]),
+    check_cluster_status(
+      {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Hare, Bunny]},
+      [Rabbit]),
+
+    %% Bring Rabbit back up
+    ok = start_app(Rabbit),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                         [Rabbit, Hare]),
+    ok = start_app(Bunny),
+    check_not_clustered(Bunny),
+
+    %% Now the same, but Rabbit is a RAM node, and we bring up Bunny
+    %% before
+    ok = stop_app(Rabbit),
+    ok = change_node_type(Rabbit, ram),
+    ok = start_app(Rabbit),
+    ok = stop_app(Bunny),
+    ok = join_cluster(Bunny, Hare),
+    ok = start_app(Bunny),
+    check_cluster_status(
+      {[Rabbit, Hare, Bunny], [Hare, Bunny], [Rabbit, Hare, Bunny]},
+      [Rabbit, Hare, Bunny]),
+    ok = stop_app(Rabbit),
+    ok = stop_app(Bunny),
+    ok = reset(Bunny),
+    ok = start_app(Bunny),
+    check_not_clustered(Bunny),
+    check_cluster_status({[Rabbit, Hare], [Hare], [Hare]}, [Hare]),
+    check_cluster_status(
+      {[Rabbit, Hare, Bunny], [Hare, Bunny], [Hare, Bunny]},
+      [Rabbit]),
+    ok = start_app(Rabbit),
+    check_cluster_status({[Rabbit, Hare], [Hare], [Rabbit, Hare]},
+                         [Rabbit, Hare]),
+    check_not_clustered(Bunny).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
