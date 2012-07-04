@@ -44,6 +44,8 @@ $(AMQP_CLIENT):
 $(RABBIT_COMMON):
 	ln -fs $(COMMON_DIR) $@
 
+# NB: the cover server needs sources for rabbit_common too,
+# so we copy the broker's sources across so it can find them
 $(COMMON_SRC):
 	cp -R $(RABBIT_SERVER)/src $(RABBIT_COMMON)
 
