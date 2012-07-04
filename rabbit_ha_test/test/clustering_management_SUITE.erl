@@ -30,8 +30,8 @@
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    [join_and_part_cluster, join_cluster_bad_operations,
-     join_to_start_interval, remove_offline_node].
+    [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
+     remove_offline_node].
 
 init_per_suite(Config) ->
     Config.
@@ -41,33 +41,33 @@ end_per_suite(_Config) ->
 join_and_part_cluster(Config) ->
     [Rabbit, Hare, Bunny] = cluster_nodes(Config),
 
-    stop_app(Rabbit),
-    join_cluster(Rabbit, Bunny),
-    start_app(Rabbit),
+    ok = stop_app(Rabbit),
+    ok = join_cluster(Rabbit, Bunny),
+    ok = start_app(Rabbit),
 
     check_cluster_status(
       {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
       [Rabbit, Bunny]),
 
-    stop_app(Hare),
-    join_cluster(Hare, Bunny, true),
-    start_app(Hare),
+    ok = stop_app(Hare),
+    ok = join_cluster(Hare, Bunny, true),
+    ok = start_app(Hare),
 
     check_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
-    stop_app(Rabbit),
-    reset(Rabbit),
-    start_app(Rabbit),
+    ok = stop_app(Rabbit),
+    ok = reset(Rabbit),
+    ok = start_app(Rabbit),
 
     check_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
     check_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
                          [Hare, Bunny]),
 
-    stop_app(Hare),
-    reset(Hare),
-    start_app(Hare),
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = start_app(Hare),
 
     check_not_clustered(Hare),
     check_not_clustered(Bunny).
@@ -76,9 +76,9 @@ join_cluster_bad_operations(Config) ->
     [Rabbit, Hare, Bunny] = cluster_nodes(Config),
 
     %% Non-existant node
-    stop_app(Rabbit),
+    ok = stop_app(Rabbit),
     check_failure(fun () -> join_cluster(Rabbit, non@existant) end),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
     check_not_clustered(Rabbit),
 
     %% Trying to cluster with mnesia running
@@ -86,41 +86,41 @@ join_cluster_bad_operations(Config) ->
     check_not_clustered(Rabbit),
 
     %% Trying to cluster the node with itself
-    stop_app(Rabbit),
+    ok = stop_app(Rabbit),
     check_failure(fun () -> join_cluster(Rabbit, Rabbit) end),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
     check_not_clustered(Rabbit),
 
     %% Fail if trying to cluster with already clustered node
-    stop_app(Rabbit),
+    ok = stop_app(Rabbit),
     join_cluster(Rabbit, Hare),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
                          [Rabbit, Hare]),
-    stop_app(Rabbit),
+    ok = stop_app(Rabbit),
     check_failure(fun () -> join_cluster(Rabbit, Hare) end),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
                          [Rabbit, Hare]),
 
     %% Cleanup
-    stop_app(Rabbit),
+    ok = stop_app(Rabbit),
     reset(Rabbit),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
     check_not_clustered(Rabbit),
     check_not_clustered(Hare),
 
     %% Do not let the node leave the cluster or reset if it's the only
     %% ram node
-    stop_app(Hare),
-    join_cluster(Hare, Rabbit, true),
-    start_app(Hare),
+    ok = stop_app(Hare),
+    ok = join_cluster(Hare, Rabbit, true),
+    ok = start_app(Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                          [Rabbit, Hare]),
-    stop_app(Hare),
+    ok = stop_app(Hare),
     check_failure(fun () -> join_cluster(Rabbit, Bunny) end),
     check_failure(fun () -> reset(Rabbit) end),
-    start_app(Hare),
+    ok = start_app(Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                          [Rabbit, Hare]).
 
@@ -131,11 +131,11 @@ join_to_start_interval(Config) ->
     check_not_clustered(Rabbit),
     check_not_clustered(Hare),
 
-    stop_app(Rabbit),
-    join_cluster(Rabbit, Hare),
+    ok = stop_app(Rabbit),
+    ok = join_cluster(Rabbit, Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
                          [Rabbit, Hare]),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
                          [Rabbit, Hare]).
 
@@ -147,22 +147,27 @@ remove_offline_node(Config) ->
     %% Trying to remove a node not in the cluster should fail
     check_failure(fun () -> remove_node(Hare, Rabbit) end),
 
-    stop_app(Rabbit),
+    ok = stop_app(Rabbit),
     join_cluster(Rabbit, Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
                          [Rabbit, Hare]),
-    start_app(Rabbit),
+    ok = start_app(Rabbit),
 
     %% Trying to remove an online node should fail
     check_failure(fun () -> remove_node(Hare, Rabbit) end),
 
-    stop_app(Rabbit),
-    remove_node(Hare, Rabbit),
+    ok = stop_app(Rabbit),
+    ok = remove_node(Hare, Rabbit),
     check_not_clustered(Hare),
+    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                         [Rabbit]),
 
     %% Now we can't start Rabbit since it thinks that it's still in the cluster
     %% with Hare, while Hare disagrees.
-    check_failure(fun () -> start_app(Rabbit) end).
+    check_failure(fun () -> start_app(Rabbit) end),
+
+    ok = reset(Rabbit),
+    ok = start_app(Rabbit).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
@@ -191,7 +196,8 @@ check_not_clustered(Node) ->
 
 check_failure(Fun) ->
     case catch Fun() of
-        {error, Reason} -> Reason
+        {error, Reason}            -> Reason;
+        {badrpc, {'EXIT', Reason}} -> Reason
     end.
 
 stop_app(Node) ->
@@ -213,7 +219,3 @@ reset(Node) ->
 remove_node(Node, Removee) ->
     rabbit_ha_test_utils:control_action(remove_node, Node,
                                         [atom_to_list(Removee)]).
-
-recluster(Node, DiscoveryNode) ->
-    rabbit_ha_test_utils:control_action(remove_node, Node,
-                                        [atom_to_list(DiscoveryNode)]).
