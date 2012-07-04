@@ -5,6 +5,7 @@
 {config, "{{ base_dir }}/resources/rabbit_nodes.config"}.
 {config, "{{ base_dir }}/resources/simple_ha_cluster.config"}.
 {config, "{{ base_dir }}/resources/multi_node_deaths.config"}.
+{config, "{{ base_dir }}/resources/clustering_management.config"}.
 
 {alias, test, "{{ base_dir }}/ebin"}.
 {suites, test, all}.
