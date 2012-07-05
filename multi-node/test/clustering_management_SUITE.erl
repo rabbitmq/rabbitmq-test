@@ -25,16 +25,16 @@
 
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, remove_offline_node/1,
-         change_node_type_test/1, change_cluster_when_node_offline/1
+         change_node_type_test/1, change_cluster_when_node_offline/1,
+         recluster_test/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
-    %% [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
-    %%  remove_offline_node, change_node_type_test,
-    %%  change_cluster_when_node_offline].
-    [change_cluster_when_node_offline].
+    [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
+     remove_offline_node, change_node_type_test,
+     change_cluster_when_node_offline, recluster_test].
 
 init_per_suite(Config) ->
     Config.
@@ -260,6 +260,31 @@ change_cluster_when_node_offline(Config) ->
                          [Rabbit, Hare]),
     check_not_clustered(Bunny).
 
+recluster_test(Config) ->
+    [Rabbit, Hare, Bunny] = cluster_nodes(Config),
+
+    %% Mnesia is running...
+    check_failure(fun () -> recluster(Rabbit, Hare) end),
+
+    ok = stop_app(Rabbit),
+    ok = join_cluster(Rabbit, Hare),
+    ok = stop_app(Bunny),
+    ok = join_cluster(Bunny, Hare),
+    ok = start_app(Bunny),
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = start_app(Hare),
+    check_failure(fun () -> start_app(Rabbit) end),
+    %% Bogus node
+    check_failure(fun () -> recluster(Rabbit, non@existant) end),
+    %% Inconsisent node
+    check_failure(fun () -> recluster(Rabbit, Hare) end),
+    ok = recluster(Rabbit, Bunny),
+    ok = start_app(Rabbit),
+    check_not_clustered(Hare),
+    check_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
+                         [Rabbit, Bunny]).
+
 %% ----------------------------------------------------------------------------
 %% Internal utils
 
@@ -314,3 +339,7 @@ remove_node(Node, Removee) ->
 change_node_type(Node, Type) ->
     rabbit_ha_test_utils:control_action(change_node_type, Node,
                                         [atom_to_list(Type)]).
+
+recluster(Node, DiscoveryNode) ->
+    rabbit_ha_test_utils:control_action(recluster, Node,
+                                        [atom_to_list(DiscoveryNode)]).
