@@ -15,12 +15,15 @@
 %%
 -module(rabbit_ha_test_producer).
 
--export([await_response/1, start/5, create/5]).
+-export([await_response/1, await_response/2, start/5, create/5]).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 await_response(ProducerPid) ->
-    case rabbit_ha_test_utils:await_response(ProducerPid, 60000) of
+    await_response(ProducerPid, 60000).
+
+await_response(ProducerPid, Timeout) ->
+    case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
         {error, timeout} -> throw(lost_contact_with_producer);
         ok               -> ok
     end.
