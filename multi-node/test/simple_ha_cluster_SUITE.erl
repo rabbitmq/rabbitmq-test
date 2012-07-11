@@ -74,7 +74,7 @@ send_consume_survives_node_deaths(Config) ->
 
     %% create a killer for the master - we send a brutal -9 (SIGKILL)
     %% instruction, as that is how the previous implementation worked
-    systest_node:kill_after(50, Node1, sigkill),
+    systest:kill_after(50, Node1, sigkill),
 
     %% verify that the consumer got all msgs, or die - the await_response
     %% calls throw an exception if anything goes wrong....
@@ -104,7 +104,7 @@ producer_confirms_survive_death_of_master(Config) ->
                                                  self(), true, Msgs),
 
     %% create a killer for the master
-    systest_node:kill_after(50, Master),
+    systest:kill_after(50, Master),
 
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
@@ -125,7 +125,7 @@ restarted_master_honours_declarations(Config) ->
              {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
              {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]) ->
 
-            MasterNodeConfig = systest_node:user_data(MRef),
+            MasterNodeConfig = systest:read_process_user_data(MRef),
             Queue = <<"ha-test-restarting-master">>,
             MirrorArgs = rabbit_ha_test_utils:mirror_args([Master,
                                                            Producer, Slave]),
@@ -139,12 +139,12 @@ restarted_master_honours_declarations(Config) ->
             rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
 
             {ok, {Master, NewMRef}} =
-                    systest_cluster:restart_node(Cluster, MRef),
+                    systest:restart(Cluster, MRef),
             rabbit_ha_test_utils:cluster_with(Master, [Producer]),
 
             %% retire other members of the cluster
-            systest_node:stop_and_wait(PRef),
-            systest_node:stop_and_wait(SRef),
+            systest:stop_and_wait(PRef),
+            systest:stop_and_wait(SRef),
 
             NewConn = rabbit_ha_test_utils:open_connection(5672),
             NewChann = rabbit_ha_test_utils:open_channel(NewConn),

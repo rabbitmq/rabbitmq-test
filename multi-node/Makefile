@@ -4,22 +4,30 @@ COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/
 COMMON_SRC=$(COMMON_DIR)/src
 LIB_DIR=$(abspath lib)
 BIN_DIR=$(abspath bin)
-TEMP_DIRS=lib bin ebin
+TEMP_DIRS=lib test-lib bin ebin test-ebin
 AMQP_CLIENT=lib/amqp_client
 RABBIT_COMMON=lib/rabbit_common
 RABBIT_SERVER=lib/rabbit
-TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON)
-SYSTEST=bin/systest
-SYSTEST_URI="https://github.com/downloads/nebularis/systest/systest"
-SYSTEST_VERSION="0.5.4"
-LOGLEVEL ?= "2"
+REBAR=bin/rebar
+SYSTEST=test-lib/systest/priv/bin/systest
+SYSTEST_LIB=test-lib/systest
+TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
+SYSTEST_VERSION="0.7.0"
+LOGLEVEL ?= "0"
+SYSTEST_VERBOSE ?= 'false'
+
+ifneq ($(SYSTEST_VERBOSE), 'false')
+NOISE=-L framework -L sut -L process
+else
+NOISE=""
+endif
 
 .PHONY: all
 all: $(SUITES)
 
 .PHONY: clean
 clean: clean-logs
-	rm -rf bin ebin lib
+	rm -rf $(TEMP_DIRS)
 
 .PHONY: clean-logs
 clean-logs:
@@ -29,14 +37,15 @@ $(TEMP_DIRS):
 	mkdir -p $@
 
 .PHONY: ha-test
-ha-test: bin bin/systest lib $(TESTLIBS) $(COMMON_SRC)
-	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin" \
+ha-test: $(SYSTEST) test-compile
+	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-	$(SYSTEST) -C -v $(LOGLEVEL)
+		$(SYSTEST) -P $@ $(NOISE)
 
 .PHONY: test-compile
-test-compile: $(SYSTEST)
-	$(SYSTEST) -C -n
+test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) $(COMMON_SRC) test-ebin
+	$(REBAR) -C systest.config skip_deps=true compile -v $(LOGLEVEL)
+	cp -R ebin test-ebin
 
 $(AMQP_CLIENT):
 	ln -fs $(CLIENT_DIR) $@
@@ -52,7 +61,14 @@ $(COMMON_SRC):
 $(RABBIT_SERVER):
 	ln -fs $(BROKER_DIR) $@
 
-bin/%:
-	mkdir -p bin
-	curl -L $(SYSTEST_URI)-$(SYSTEST_VERSION)-SNAPSHOT > $@
-	chmod +x $@
+test-lib/%: test-lib
+	git clone https://github.com/nebularis/$*.git test-lib/$*
+
+$(SYSTEST): $(SYSTEST_LIB)
+	PATH="bin:${PATH}" $(MAKE) -C test-lib/systest
+
+bin/%: bin
+	git clone -b rabbit https://github.com/hyperthunk/$*.git lib/$*
+	PATH="bin:${PATH}" $(MAKE) -C lib/$*
+	cp lib/$*/$* bin/$*
+

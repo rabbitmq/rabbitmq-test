@@ -42,7 +42,7 @@ open_connection(NodePort) ->
 %% <pre>amqp_channel</pre> respectively.
 %%
 amqp_close(Node) ->
-    UserData = systest_node:get(user, Node),
+    UserData = systest:process_data(user, Node),
     Channel = ?CONFIG(amqp_channel, UserData, undefined),
     Connection = ?CONFIG(amqp_connection, UserData, undefined),
     amqp_close(Channel, Connection).
@@ -52,10 +52,10 @@ amqp_close(Channel, Connection) ->
     close_connection(Connection).
 
 start_rabbit(Node) ->
-    NodeId = systest_node:get(id, Node),
+    NodeId = systest:process_data(id, Node),
     LogFn = fun ct:log/2,
-    rabbit_control_main:action(start_app, Node, [], [], LogFn),
-    ok = rpc:call(Node, rabbit, await_startup, []).
+    rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
+    ok = rpc:call(NodeId, rabbit, await_startup, []).
 
 %%
 %% @doc runs <pre>rabbitmqctl wait</pre> against the supplied Node.
@@ -66,7 +66,7 @@ start_rabbit(Node) ->
 wait(Node) ->
     %% passing the records around like this really sucks - if only we had
     %% coroutines we could do this far more cleanly... :/
-    NodeId  = systest_node:get(id, Node),
+    NodeId  = systest:process_data(id, Node),
     LogFun  = fun ct:log/2,
     case node_eval("node.user.env", [{node, Node}]) of
         not_found -> throw(no_pidfile);
@@ -79,35 +79,36 @@ wait(Node) ->
     end.
 
 %%
-%% systest_cluster callbacks
+%% systest_sut callbacks
 %%
 
 %%
-%% @doc The systest_cluster on_start callback ensures that all our nodes are
+%% @doc The systest_sut on_start callback ensures that all our nodes are
 %% properly clustered before we start testing. The return value of this
 %% callback is ignored.
 %%
 make_cluster(Cluster) ->
-    Members = systest_cluster:node_names(Cluster),
+    Nodes = systest:list_processes(Cluster),
+    Members = [Id || {Id, _Ref} <- Nodes],
     ct:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members).
 
 %%
-%% @doc This systest_cluster on_join callback sets up a single connection and
+%% @doc This systest_sut on_join callback sets up a single connection and
 %% a single channel (on it), which is stored in the node's user-state for
-%% use by our various test case functions. We wait until the cluster on_join
-%% callback, because node on_start callbacks run *before* `make_cluster' could
+%% use by our various test case functions. We wait until the SUT on_join
+%% callback, because proc on_start callbacks run *before* `make_cluster' could
 %% potentially restart the rabbit application on each node, killing off our
 %% connections and channels in the process.
 %%
 on_join(Node, _ClusterRef, _Siblings) ->
-    Id = systest_node:get(id, Node),
+    Id = systest:process_data(id, Node),
 
     % ClusterMembers = cluster(Id, [atom_to_list(Id) || {Id, _} <- Siblings]),
 
     %% at this point we've already been clustered with all the other nodes,
     %% so we're good to go - now we can open up the connection+channel...
-    UserData = systest_node:get(user, Node),
+    UserData = systest:process_data(user, Node),
     {Connection, Channel} = amqp_open(Id, UserData),
     AmqpData = [{amqp_connection, Connection},
                 {amqp_channel,    Channel}],
@@ -134,28 +135,28 @@ mirror_args(Nodes) ->
       [{longstr, list_to_binary(atom_to_list(N))} || N <- Nodes]}].
 
 cluster_members(Config) ->
-    Cluster = systest:active_cluster(Config),
+    Cluster = systest:active_sut(Config),
     {Cluster, [{{Id, Ref}, amqp_config(Ref)} ||
-                            {Id, Ref} <- systest:cluster_nodes(Cluster)]}.
+                            {Id, Ref} <- systest:list_processes(Cluster)]}.
 
 amqp_config(NodeRef) ->
-    UserData = systest_node:user_data(NodeRef),
+    UserData = systest:read_process_user_data(NodeRef),
     {?REQUIRE(amqp_connection, UserData), ?REQUIRE(amqp_channel, UserData)}.
 
 with_cluster(Config, TestFun) ->
-    Cluster = systest:active_cluster(Config),
-    systest_cluster:print_status(Cluster),
-    Nodes = systest:cluster_nodes(Cluster),
-    Members = [Id || {Id, Ref} <- Nodes],
+    Cluster = systest:active_sut(Config),
+    % systest_sut:print_status(Cluster),
+    Nodes = systest:list_processes(Cluster),
+    Members = [Id || {Id, _Ref} <- Nodes],
     ct:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members),
     NodeConf = [begin
-                    UserData = systest_node:user_data(Ref),
+                    UserData = systest:read_process_user_data(Ref),
                     AmqpProcs = amqp_open(Id, UserData),
                     {Connection, Channel} = AmqpProcs,
                     AmqpData = [{amqp_connection, Connection},
                                 {amqp_channel,    Channel}|UserData],
-                    ok = systest_node:user_data(Ref, AmqpData),
+                    ok = systest:write_process_user_data(Ref, AmqpData),
                     {{Id, Ref}, AmqpProcs}
                 end || {Id, Ref} <- Nodes],
     TestFun(Cluster, NodeConf).
@@ -184,7 +185,7 @@ cluster(Node, Acc) ->
 node_eval(Key, Node) ->
     systest_config:eval(Key, Node,
                         [{callback,
-                            {node, fun systest_node:get/2}}]).
+                            {proc, fun systest_proc:get/2}}]).
 
 open_channel(Connection) ->
     {ok, Channel} = amqp_connection:open_channel(Connection),
