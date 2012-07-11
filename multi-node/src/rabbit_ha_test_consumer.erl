@@ -17,10 +17,13 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([await_response/1, create/5, start/6]).
+-export([await_response/1, await_response/2, create/5, start/6]).
 
 await_response(ConsumerPid) ->
-    case rabbit_ha_test_utils:await_response(ConsumerPid, 60000) of
+    await_response(ConsumerPid, 60000).
+
+await_response(ConsumerPid, Timeout) ->
+    case rabbit_ha_test_utils:await_response(ConsumerPid, Timeout) of
         {error, timeout} -> throw(lost_contact_with_consumer);
         {error, Reason}  -> error(Reason);
         ok               -> ok

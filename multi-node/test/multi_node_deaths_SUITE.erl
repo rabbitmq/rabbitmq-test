@@ -81,7 +81,7 @@ test_multi_kill(_Cluster,
                                              {Slave3, 300}]],
 
     %% verify that the consumer got all msgs, or die
-    rabbit_ha_test_consumer:await_response(ConsumerPid),
-    rabbit_ha_test_producer:await_response(ProducerPid),
+    rabbit_ha_test_consumer:await_response(ConsumerPid, 60000 * 3),
+    rabbit_ha_test_producer:await_response(ProducerPid, 60000 * 3),
     ok.
 
