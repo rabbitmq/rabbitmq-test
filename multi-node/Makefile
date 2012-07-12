@@ -15,6 +15,7 @@ TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
 SYSTEST_VERSION="0.7.0"
 LOGLEVEL ?= "0"
 SYSTEST_VERBOSE ?= 'false'
+SYSTEST_DUMP ?= 'false'
 
 ifneq ($(SYSTEST_VERBOSE), 'false')
 NOISE=-L framework -L sut -L process
