@@ -19,7 +19,13 @@ SYSTEST_VERBOSE ?= 'false'
 ifneq ($(SYSTEST_VERBOSE), 'false')
 NOISE=-L framework -L sut -L process
 else
-NOISE=""
+NOISE=
+endif
+
+ifneq ($(SYSTEST_DUMP), 'false')
+DUMP=-X
+else
+DUMP=
 endif
 
 .PHONY: all
@@ -40,7 +46,7 @@ $(TEMP_DIRS):
 ha-test: $(SYSTEST) test-compile
 	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) -P $@ $(NOISE)
+		$(SYSTEST) -P $@ $(NOISE) $(DUMP)
 
 .PHONY: test-compile
 test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) $(COMMON_SRC) test-ebin

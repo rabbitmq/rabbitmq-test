@@ -39,7 +39,6 @@ killing_multiple_intermediate_nodes() ->
     [{timetrap, {minutes, 3}}].
 
 killing_multiple_intermediate_nodes(Config) ->
-    ct:pal("code:which(rabbit_ha_test_utils) = ~p~n", [code:which(rabbit_ha_test_utils)]),
     rabbit_ha_test_utils:with_cluster(Config, fun test_multi_kill/2).
 
 %% TODO: as per this afternoon's conversation with Simon, figure out
@@ -74,11 +73,11 @@ test_multi_kill(_Cluster,
                                                  Queue, self(), false, Msgs),
 
     %% create a killer for the master and the first 3 slaves
-    [systest_proc:kill_after(Time, Node) || {Node, Time} <-
-                                            [{Master, 50},
-                                             {Slave1, 100},
-                                             {Slave2, 200},
-                                             {Slave3, 300}]],
+    [systest:kill_after(Time, Node) || {Node, Time} <-
+                                        [{Master, 50},
+                                         {Slave1, 100},
+                                         {Slave2, 200},
+                                         {Slave3, 300}]],
 
     %% verify that the consumer got all msgs, or die
     rabbit_ha_test_consumer:await_response(ConsumerPid, 60000 * 3),

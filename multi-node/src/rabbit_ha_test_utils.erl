@@ -21,7 +21,7 @@
 -compile(export_all).
 
 %%
-%% systest_node callbacks
+%% systest_proc callbacks
 %%
 
 amqp_open(Id, UserData) ->
@@ -87,8 +87,8 @@ wait(Node) ->
 %% properly clustered before we start testing. The return value of this
 %% callback is ignored.
 %%
-make_cluster(Cluster) ->
-    Nodes = systest:list_processes(Cluster),
+make_cluster(SUT) ->
+    Nodes = systest:list_processes(SUT),
     Members = [Id || {Id, _Ref} <- Nodes],
     ct:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members).
@@ -103,9 +103,6 @@ make_cluster(Cluster) ->
 %%
 on_join(Node, _ClusterRef, _Siblings) ->
     Id = systest:process_data(id, Node),
-
-    % ClusterMembers = cluster(Id, [atom_to_list(Id) || {Id, _} <- Siblings]),
-
     %% at this point we've already been clustered with all the other nodes,
     %% so we're good to go - now we can open up the connection+channel...
     UserData = systest:process_data(user, Node),
