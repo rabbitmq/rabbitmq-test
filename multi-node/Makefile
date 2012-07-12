@@ -12,8 +12,8 @@ REBAR=bin/rebar
 SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_LIB=test-lib/systest
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
-SYSTEST_VERSION="0.7.0"
 LOGLEVEL ?= "0"
+SYSTEST_VERSION=v0.7.0
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
 
@@ -69,7 +69,8 @@ $(RABBIT_SERVER):
 	ln -fs $(BROKER_DIR) $@
 
 test-lib/%: test-lib
-	git clone https://github.com/nebularis/$*.git test-lib/$*
+	git clone -b stable https://github.com/nebularis/$*.git test-lib/$*
+	git --git-dir=test-lib/$*/.git checkout $(SYSTEST_VERSION)
 
 $(SYSTEST): $(SYSTEST_LIB)
 	PATH="bin:${PATH}" $(MAKE) -C test-lib/systest
