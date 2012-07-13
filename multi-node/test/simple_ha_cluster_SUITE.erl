@@ -103,7 +103,6 @@ producer_confirms_survive_death_of_master(Config) ->
     ProducerPid = rabbit_ha_test_producer:create(ProducerChannel, Queue,
                                                  self(), true, Msgs),
 
-    %% create a killer for the master
     systest:kill_after(50, Master),
 
     rabbit_ha_test_producer:await_response(ProducerPid),
@@ -111,59 +110,67 @@ producer_confirms_survive_death_of_master(Config) ->
 
 restarted_master_honours_declarations() ->
     %% NB: up to 1.5 mins to fully cluster the nodes
-    [{timetrap, {minutes, 5}}].
+    [{timetrap, {minutes, 4}}].
 
 restarted_master_honours_declarations(Config) ->
     %% NB: this test case is not auto-clustered (we use a hook function in
     %% the rabbit_ha_test_utils module), because we need to perform a very
     %% closely controlled restart and rejoin procedure in this instance.
-    process_flag(trap_exit, true),
-    rabbit_ha_test_utils:with_cluster(
-        Config,
-        fun(Cluster,
-            [{{Master,   MRef}, {MasterConnection,    MasterChannel}},
-             {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
-             {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]) ->
+    {Cluster,
+        [{{Master,   MRef}, {MasterConnection,    MasterChannel}},
+         {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
+         {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]
+        } = rabbit_ha_test_utils:cluster_members(Config),
 
-            MasterNodeConfig = systest:read_process_user_data(MRef),
-            Queue = <<"ha-test-restarting-master">>,
-            MirrorArgs = rabbit_ha_test_utils:mirror_args([Master,
-                                                           Producer, Slave]),
-            #'queue.declare_ok'{} =
-                    amqp_channel:call(MasterChannel,
+    MasterNodeConfig = systest:read_process_user_data(MRef),
+    Queue = <<"ha-test-restarting-master">>,
+    MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Producer, Slave]),
+    #'queue.declare_ok'{} = amqp_channel:call(MasterChannel,
                         #'queue.declare'{queue       = Queue,
                                          auto_delete = false,
                                          arguments   = MirrorArgs}),
 
-            %% restart master
-            rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
+    systest:log("restarting node a~n"),
+    %% restart master - we close the connections only to avoid a lot
+    %% of noisey sasl logs breaking out in the console! :)
+    rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
 
-            {ok, {Master, NewMRef}} =
-                    systest:restart(Cluster, MRef),
-            rabbit_ha_test_utils:cluster_with(Master, [Producer]),
+    {ok, {Master, NewMRef}} = systest:restart_process(Cluster, MRef),
+    systest:log("restart complete, re-clustering!~n"),
 
-            %% retire other members of the cluster
-            systest:stop_and_wait(PRef),
-            systest:stop_and_wait(SRef),
+    %% NB: when a process restarts, the SUT does *NOT* re-run on_start
+    %% hooks for the system as a whole, but it does run on_start, followed
+    %% by on_join hooks for the individual process being restarted.
+    %% As such, we need to 're-cluster' here, as the clustering operation
+    %% run by the framework is attached to the SUT as a whole, so as to ensure
+    %% that the cluster is not set up until *after* all the processes
+    %% (i.e., nodes) have come online
+    rabbit_ha_test_utils:cluster_with(Producer, [Master]),
 
-            NewConn = rabbit_ha_test_utils:open_connection(5672),
-            NewChann = rabbit_ha_test_utils:open_channel(NewConn),
+    systest:log("re-clustering complete!~n"),
 
-            rabbit_control_main:action(list_queues, Master,
-                                       [], [{"-p", "/"}], fun ct:log/2),
+    %% retire other members of the cluster
+    systest:log("terminating node b...~n"),
+    systest:stop_and_wait(PRef),
 
-            %% the master must refuse redeclaration with different parameters
-            try
-                amqp_channel:call(NewChann,
-                        #'queue.declare'{queue = Queue}) of
-                    #'queue.declare_ok'{} ->
-                        ct:fail("Expected exception ~p wasn't thrown~n",
-                                [?PRECONDITION_FAILED])
-            catch
-                exit:{{shutdown, {server_initiated_close,
-                        ?PRECONDITION_FAILED, _Bin}}, _Rest} -> ok
-            after
-                rabbit_ha_test_utils:amqp_close(NewChann, NewConn)
-            end
-        end).
+    systest:log("terminating node c...~n"),
+    systest:stop_and_wait(SRef),
+
+    NewConn = rabbit_ha_test_utils:open_connection(5672),
+    NewChann = rabbit_ha_test_utils:open_channel(NewConn),
+
+    rabbit_control_main:action(list_queues, Master,
+                                [], [{"-p", "/"}], fun systest:log/2),
+
+    %% the master must refuse redeclaration with different parameters
+    try amqp_channel:call(NewChann, #'queue.declare'{queue = Queue}) of
+        #'queue.declare_ok'{} ->
+            ct:fail("Expected exception ~p wasn't thrown~n",
+                    [?PRECONDITION_FAILED])
+    catch
+        exit:{{shutdown, {server_initiated_close,
+                ?PRECONDITION_FAILED, _Bin}}, _Rest} -> ok
+    after
+        rabbit_ha_test_utils:amqp_close(NewChann, NewConn)
+    end.
 

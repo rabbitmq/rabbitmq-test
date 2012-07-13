@@ -13,9 +13,16 @@ SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_LIB=test-lib/systest
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
 LOGLEVEL ?= "0"
-SYSTEST_VERSION=v0.7.1
+SYSTEST_VERSION=v0.7.3
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
+SYSTEST_LOG ?= 'false'
+
+ifneq ($(SYSTEST_LOG), 'false')
+OPERATOR_LOG=-L operator
+else
+OPERATOR_LOG=
+endif
 
 ifneq ($(SYSTEST_VERBOSE), 'false')
 NOISE=-L framework -L sut -L process
@@ -47,7 +54,10 @@ $(TEMP_DIRS):
 ha-test: $(SYSTEST) test-compile
 	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) -P $@ $(NOISE) $(DUMP)
+		$(SYSTEST) -P $@ $(NOISE) $(OPERATOR_LOG) $(DUMP) \
+			--cover-dir=ebin \
+			--cover-dir=$(BROKER_DIR)/ebin \
+			--cover-dir=$(CLIENT_DIR)/ebin
 
 .PHONY: test-compile
 test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) $(COMMON_SRC) test-ebin

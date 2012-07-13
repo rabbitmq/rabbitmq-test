@@ -41,7 +41,7 @@ open_connection(NodePort) ->
 %% which in the node's user data as <pre>amqp_connection</pre> and
 %% <pre>amqp_channel</pre> respectively.
 %%
-amqp_close(Node) ->
+disconnect_from_node(Node) ->
     UserData = systest:process_data(user, Node),
     Channel = ?CONFIG(amqp_channel, UserData, undefined),
     Connection = ?CONFIG(amqp_connection, UserData, undefined),
@@ -53,7 +53,7 @@ amqp_close(Channel, Connection) ->
 
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    LogFn = fun ct:log/2,
+    LogFn = fun systest:log/2,
     rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
     ok = rpc:call(NodeId, rabbit, await_startup, []).
 
@@ -67,12 +67,12 @@ wait(Node) ->
     %% passing the records around like this really sucks - if only we had
     %% coroutines we could do this far more cleanly... :/
     NodeId  = systest:process_data(id, Node),
-    LogFun  = fun ct:log/2,
+    LogFun  = fun systest:log/2,
     case node_eval("node.user.env", [{node, Node}]) of
         not_found -> throw(no_pidfile);
         Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
-                   {_, PF} -> ct:log("reading pid from ~s~n", [PF]),
+                   {_, PF} -> systest:log("reading pid from ~s~n", [PF]),
                               rabbit_control_main:action(wait, NodeId,
                                                          [PF], [], LogFun)
                end
@@ -90,7 +90,7 @@ wait(Node) ->
 make_cluster(SUT) ->
     Nodes = systest:list_processes(SUT),
     Members = [Id || {Id, _Ref} <- Nodes],
-    ct:log("clustering ~p~n", [Members]),
+    systest:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members).
 
 %%
@@ -101,11 +101,13 @@ make_cluster(SUT) ->
 %% potentially restart the rabbit application on each node, killing off our
 %% connections and channels in the process.
 %%
-on_join(Node, _ClusterRef, _Siblings) ->
+connect_to_node(Node, _ClusterRef, _Siblings) ->
     Id = systest:process_data(id, Node),
+    systest:log("connecting to ~p~n", [Id]),
     %% at this point we've already been clustered with all the other nodes,
     %% so we're good to go - now we can open up the connection+channel...
     UserData = systest:process_data(user, Node),
+    systest:log("opening AMQP connection + channel~n", []),
     {Connection, Channel} = amqp_open(Id, UserData),
     AmqpData = [{amqp_connection, Connection},
                 {amqp_channel,    Channel}],
@@ -145,7 +147,7 @@ with_cluster(Config, TestFun) ->
     % systest_sut:print_status(Cluster),
     Nodes = systest:list_processes(Cluster),
     Members = [Id || {Id, _Ref} <- Nodes],
-    ct:log("clustering ~p~n", [Members]),
+    systest:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members),
     NodeConf = [begin
                     UserData = systest:read_process_user_data(Ref),
@@ -170,8 +172,10 @@ cluster(Node, []) ->
 cluster(Node, Acc) ->
     NodeS = atom_to_list(Node),
     NewAcc = [NodeS|Acc],
-    ct:log("clustering ~p with ~p~n", [Node, Acc]),
-    LogFn = fun ct:log/2,
+    systest:log("clustering ~p with ~p~n", [Node, Acc]),
+    LogFn = fun(Fmt, Args) ->
+                systest:log(Fmt ++ "~n", Args)
+            end,
     rabbit_control_main:action(stop_app, Node, [], [], LogFn),
     rabbit_control_main:action(reset, Node, [], [], LogFn),
     rabbit_control_main:action(cluster, Node, NewAcc, [], LogFn),
@@ -189,11 +193,11 @@ open_channel(Connection) ->
     Channel.
 
 close_connection(Connection) ->
-    ct:log("closing connection ~p~n", [Connection]),
+    systest:log("closing connection ~p~n", [Connection]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_connection:close(Connection) end).
 
 close_channel(Channel) ->
-    ct:log("closing channel ~p~n", [Channel]),
+    systest:log("closing channel ~p~n", [Channel]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
