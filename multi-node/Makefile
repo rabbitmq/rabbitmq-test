@@ -72,6 +72,8 @@ $(RABBIT_COMMON):
 
 # NB: the cover server needs sources for rabbit_common too,
 # so we copy the broker's sources across so it can find them
+# this is *only* so that -include_lib directives work, and 
+# at runtime only the broker's beam files are considered
 $(COMMON_SRC):
 	cp -R $(RABBIT_SERVER)/src $(RABBIT_COMMON)
 
