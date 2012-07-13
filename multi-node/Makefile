@@ -12,11 +12,12 @@ REBAR=bin/rebar
 SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_LIB=test-lib/systest
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
-LOGLEVEL ?= "0"
-SYSTEST_VERSION=v0.7.3
+REBAR_LOG ?= "0"
+SYSTEST_VERSION=v0.7.4
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
 SYSTEST_LOG ?= 'false'
+SYSTEST_PROFILE ?= ''
 
 ifneq ($(SYSTEST_LOG), 'false')
 OPERATOR_LOG=-L operator
@@ -50,6 +51,25 @@ clean-logs:
 $(TEMP_DIRS):
 	mkdir -p $@
 
+.PHONY: test-all
+test-all: $(SYSTEST) test-compile
+	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
+	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
+		$(SYSTEST) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
+			--cover-dir=ebin \
+			--cover-dir=$(BROKER_DIR)/ebin \
+			--cover-dir=$(CLIENT_DIR)/ebin
+
+.PHONY: dry-run
+ifneq ($(SYSTEST_PROFILE), '')
+dry-run: $(SYSTEST) test-compile
+	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
+		$(SYSTEST) -P $(SYSTEST_PROFILE) -n
+else
+dry-run:
+	$(info set the SYSTEST_PROFILE variable first)
+endif
+
 .PHONY: ha-test
 ha-test: $(SYSTEST) test-compile
 	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
@@ -61,7 +81,7 @@ ha-test: $(SYSTEST) test-compile
 
 .PHONY: test-compile
 test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) $(COMMON_SRC) test-ebin
-	$(REBAR) -C systest.config skip_deps=true compile -v $(LOGLEVEL)
+	$(REBAR) -C systest.config skip_deps=true compile -v $(REBAR_LOG)
 	cp -R ebin test-ebin
 
 $(AMQP_CLIENT):

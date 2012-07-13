@@ -41,7 +41,7 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
-all: full ha-tests
+all: full multi-node-tests
 
 full:
 	OK=true && \
@@ -79,6 +79,9 @@ prepare-qpid-patch:
 run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
+
+multi-node-tests:
+	$(MAKE) -C multi-node test-all
 
 ha-tests: 
 	$(MAKE) -C multi-node ha-test
