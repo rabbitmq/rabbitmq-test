@@ -1,0 +1,56 @@
+NOTES
+-----
+
+Tests incorporated into this directory can be executed using the
+either the supplied ./Makefile or the top-level one (../Makefile).
+
+By default the logging levels are very quiet. To turn these up, you
+may set one of the following variables when executing make:
+
+1. REBAR_LOG - takes a number from 0 (default) to 4
+2. SYSTEST_VERBOSE - active when set to any value apart from 'false'
+
+Adding new test suites
+----------------------
+
+Test suites should be added to the ./test directory and must adhere
+to the common_test OTP framework guidelines. In addition to this,
+some configuration is required in order for systest to pick up
+your suite(s):
+
+You must provide a valid systest profile. This consists of a set of
+targets (i.e., the names of the suite modules you wish to run when
+executing this profile) and wildcard(s) used to locate 'resources',
+which are the configuration files systest uses to bootstrap your
+rabbit cluster/nodes before running tests.
+
+The default resource(s) already provide some common configurations
+that can be re-used. The ./resources/rabbit-nodes.config file
+provides two 'test process stereotypes' that can be used when
+configuring your rabbit test cluster:
+
+1. rabbit_node - executes rabbitmq-server with a clean environment
+2. connected - creates an AMQP connection+channel for the duration
+    of your test (case, group or suite) and tears it down after.
+
+The 'connected' configuration requires that your cluster defines
+'user_data' for each node, specifying the AMQP port on which the
+broker should listen. See ./resources/simple_ha_cluster.config for
+an example of how to set this up.
+
+Running a systest profile via the Makefile
+------------------------------------------
+
+The systest executable, which is automatically installed if your
+target depends on $(SYSTEST), will run the profile indicated with
+the -P command line argument. See the ha-test target for an 
+example of how this works.
+
+Figuring out which profile you want to run
+------------------------------------------
+
+A dry-run target exists in the Makefile in this directory, which
+prints out useful information about which test suites will be
+invoked for a specified profile. You need to set the SYSTEST_PROFILE
+variable for the makefile to execute this target successfully.
+
