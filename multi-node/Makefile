@@ -1,6 +1,7 @@
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
-COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-0.0.0)
+COMMON_LN=$(shell find ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps -type d -d 1)
+COMMON_DIR=$(abspath $(COMMON_LN))
 COMMON_SRC=$(COMMON_DIR)/src
 LIB_DIR=$(abspath lib)
 BIN_DIR=$(abspath bin)
@@ -63,11 +64,13 @@ test-all: $(SYSTEST) test-compile
 .PHONY: dry-run
 ifneq ($(SYSTEST_PROFILE), '')
 dry-run: $(SYSTEST) test-compile
+	$(info test libraries: $(TESTLIBS))
+	$(info $(shell $(REBAR) -V))
 	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
 		$(SYSTEST) -P $(SYSTEST_PROFILE) -n
 else
 dry-run:
-	$(info set the SYSTEST_PROFILE variable first)
+	$(info set the SYSTEST_PROFILE variable in order to do a dry run)
 endif
 
 .PHONY: ha-test

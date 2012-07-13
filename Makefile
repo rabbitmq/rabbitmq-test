@@ -83,9 +83,6 @@ run-qpid-testsuite: qpid_testsuite
 multi-node-tests:
 	$(MAKE) -C multi-node test-all
 
-ha-tests: 
-	$(MAKE) -C multi-node ha-test
-
 clean:
 	rm -rf qpid_testsuite
 	$(MAKE) -C multi-node clean
