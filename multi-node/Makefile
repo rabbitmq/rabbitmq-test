@@ -1,7 +1,6 @@
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
-COMMON_LN=$(shell find ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps -type d -d 1)
-COMMON_DIR=$(abspath $(COMMON_LN))
+COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-0.0.0)
 COMMON_SRC=$(COMMON_DIR)/src
 LIB_DIR=$(abspath lib)
 BIN_DIR=$(abspath bin)
