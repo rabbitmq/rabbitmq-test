@@ -13,7 +13,7 @@ SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_LIB=test-lib/systest
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
 REBAR_LOG ?= "0"
-SYSTEST_VERSION=v0.7.4
+SYSTEST_VERSION=v0.7.5
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
 SYSTEST_LOG ?= 'false'
@@ -94,8 +94,6 @@ $(RABBIT_COMMON):
 
 # NB: the cover server needs sources for rabbit_common too,
 # so we copy the broker's sources across so it can find them
-# this is *only* so that -include_lib directives work, and 
-# at runtime only the broker's beam files are considered
 $(COMMON_SRC):
 	cp -R $(RABBIT_SERVER)/src $(RABBIT_COMMON)
 
