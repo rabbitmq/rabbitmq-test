@@ -55,13 +55,6 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
 %% Private API
 %%
 
-wait_for_producer_start(ProducerPid) ->
-    receive
-        {ProducerPid, started} -> ok
-    after
-        10000 -> {error, producer_not_started}
-    end.
-
 producer(_Channel, _Queue, TestPid, ConfirmState, 0) ->
     ConfirmState1 = drain_confirms(ConfirmState),
     case ConfirmState1 of

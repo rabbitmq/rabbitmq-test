@@ -130,7 +130,7 @@ restarted_master_honours_declarations(Config) ->
     %% of noisey sasl logs breaking out in the console! :)
     rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
 
-    {ok, {Master, NewMRef}} = systest:restart_process(Cluster, MRef),
+    {ok, {Master, _NewMRef}} = systest:restart_process(Cluster, MRef),
 
     %% NB: when a process restarts, the SUT does *NOT* re-run on_start
     %% hooks for the system as a whole, but it does run on_start, followed

@@ -24,7 +24,7 @@
 %% systest_proc callbacks
 %%
 
-amqp_open(Id, UserData) ->
+amqp_open(_Id, UserData) ->
     NodePort = ?REQUIRE(amqp_port, UserData),
     Connection = open_connection(NodePort),
     Channel = open_channel(Connection),
