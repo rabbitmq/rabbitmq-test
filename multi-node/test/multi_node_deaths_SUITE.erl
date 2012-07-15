@@ -59,10 +59,11 @@ test_multi_kill(_Cluster,
                     auto_delete = false,
                     arguments   = [{<<"x-ha-policy">>, longstr, <<"all">>}]}),
 
-    %% REFACTOR: this seems *highly* timing dependant - the assumption is
+    %% TODO: this seems *highly* timing dependant - the assumption being
     %% that the kill will work quickly enough that there will still be
-    %% some messages in-flight the we *must* receive despite the intervening
-    %% node deaths. Personally, I'm not enthused by this testing methodology.
+    %% some messages in-flight that we *must* receive despite the intervening
+    %% node deaths. It would be nice if we could find a means to do this
+    %% in a way that is not actually timing dependent.
 
     Msgs = 5000,
 
