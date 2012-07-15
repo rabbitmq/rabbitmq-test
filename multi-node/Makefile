@@ -89,19 +89,23 @@ test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) $(COMMON_SRC) test-ebin
 	$(REBAR) -C systest.config skip_deps=true compile -v $(REBAR_LOG)
 	cp -R ebin test-ebin
 
-$(AMQP_CLIENT):
+$(AMQP_CLIENT): lib deps
 	ln -fs $(CLIENT_DIR) $@
 
-$(RABBIT_COMMON):
+$(RABBIT_COMMON): lib deps
 	ln -fs $(COMMON_DIR) $@
 
 # NB: the cover server needs sources for rabbit_common too,
 # so we copy the broker's sources across so it can find them
-$(COMMON_SRC):
+$(COMMON_SRC): deps
 	cp -R $(RABBIT_SERVER)/src $(RABBIT_COMMON)
 
-$(RABBIT_SERVER):
+$(RABBIT_SERVER): deps
 	ln -fs $(BROKER_DIR) $@
+
+deps:
+	$(MAKE) -C $(BROKER_DIR)
+	$(MAKE) -C $(CLIENT_DIR)
 
 test-lib/%: test-lib
 	git clone -b stable https://github.com/nebularis/$*.git test-lib/$*
