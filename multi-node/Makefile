@@ -1,6 +1,9 @@
+# NB: VERSION *might* be passed down from another makefile, otherwise we
+# will take it from the user - in CI in seems this will always be 0.0.0 
+VERSION ?= 0.0.0
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
-COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-0.0.0)
+COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-$(VERSION))
 COMMON_SRC=$(COMMON_DIR)/src
 LIB_DIR=$(abspath lib)
 BIN_DIR=$(abspath bin)
