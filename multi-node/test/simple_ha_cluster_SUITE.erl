@@ -113,16 +113,12 @@ restarted_master_honours_declarations() ->
     [{timetrap, {minutes, 4}}].
 
 restarted_master_honours_declarations(Config) ->
-    %% NB: this test case is not auto-clustered (we use a hook function in
-    %% the rabbit_ha_test_utils module), because we need to perform a very
-    %% closely controlled restart and rejoin procedure in this instance.
     {Cluster,
         [{{Master,   MRef}, {MasterConnection,    MasterChannel}},
          {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
          {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]
         } = rabbit_ha_test_utils:cluster_members(Config),
 
-    MasterNodeConfig = systest:read_process_user_data(MRef),
     Queue = <<"ha-test-restarting-master">>,
     MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Producer, Slave]),
     #'queue.declare_ok'{} = amqp_channel:call(MasterChannel,
@@ -130,13 +126,11 @@ restarted_master_honours_declarations(Config) ->
                                          auto_delete = false,
                                          arguments   = MirrorArgs}),
 
-    systest:log("restarting node a~n"),
     %% restart master - we close the connections only to avoid a lot
     %% of noisey sasl logs breaking out in the console! :)
     rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
 
     {ok, {Master, NewMRef}} = systest:restart_process(Cluster, MRef),
-    systest:log("restart complete, re-clustering!~n"),
 
     %% NB: when a process restarts, the SUT does *NOT* re-run on_start
     %% hooks for the system as a whole, but it does run on_start, followed
@@ -147,20 +141,12 @@ restarted_master_honours_declarations(Config) ->
     %% (i.e., nodes) have come online
     rabbit_ha_test_utils:cluster_with(Producer, [Master]),
 
-    systest:log("re-clustering complete!~n"),
-
     %% retire other members of the cluster
-    systest:log("terminating node b...~n"),
     systest:stop_and_wait(PRef),
-
-    systest:log("terminating node c...~n"),
     systest:stop_and_wait(SRef),
 
     NewConn = rabbit_ha_test_utils:open_connection(5672),
     NewChann = rabbit_ha_test_utils:open_channel(NewConn),
-
-    rabbit_control_main:action(list_queues, Master,
-                                [], [{"-p", "/"}], fun systest:log/2),
 
     %% the master must refuse redeclaration with different parameters
     try amqp_channel:call(NewChann, #'queue.declare'{queue = Queue}) of
