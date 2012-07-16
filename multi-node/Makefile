@@ -1,7 +1,7 @@
 # NB: VERSION *might* be passed down from another makefile, otherwise we
 # will take it from the user - in CI in seems this will always be 0.0.0 
 VERSION ?= 0.0.0
-BROKER_DIR=$(abspath ../../rabbitmq-server)
+BROKER_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
 COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-$(VERSION))
 COMMON_SRC=$(COMMON_DIR)/src
@@ -56,19 +56,20 @@ $(TEMP_DIRS):
 
 .PHONY: test-all
 test-all: $(SYSTEST) test-compile
-	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
+	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
+	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
 		$(SYSTEST) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
 			--cover-dir=ebin \
-			--cover-dir=$(BROKER_DIR)/ebin \
-			--cover-dir=$(CLIENT_DIR)/ebin
+			--cover-dir=$(RABBIT_SERVER)/ebin \
+			--cover-dir=$(AMQP_CLIENT)/ebin
 
 .PHONY: dry-run
 ifneq ($(SYSTEST_PROFILE), '')
 dry-run: $(SYSTEST) test-compile
 	$(info test libraries: $(TESTLIBS))
 	$(info $(shell $(REBAR) -V))
-	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
+	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
 		$(SYSTEST) -P $(SYSTEST_PROFILE) -n
 else
 dry-run:
@@ -77,34 +78,28 @@ endif
 
 .PHONY: ha-test
 ha-test: $(SYSTEST) test-compile
-	ERL_FLAGS="-pa lib -pa ebin -pa $(BROKER_DIR)/ebin -pa test-ebin" \
+	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
 		$(SYSTEST) -P $@ $(NOISE) $(OPERATOR_LOG) $(DUMP) \
 			--cover-dir=ebin \
-			--cover-dir=$(BROKER_DIR)/ebin \
-			--cover-dir=$(CLIENT_DIR)/ebin
+			--cover-dir=$(RABBIT_SERVER)/ebin \
+			--cover-dir=$(AMQP_CLIENT)/ebin
 
 .PHONY: test-compile
-test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) $(COMMON_SRC) test-ebin
+test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) test-ebin
 	$(REBAR) -C systest.config skip_deps=true compile -v $(REBAR_LOG)
 	cp -R ebin test-ebin
 
-$(AMQP_CLIENT): lib deps
-	ln -fs $(CLIENT_DIR) $@
+$(AMQP_CLIENT): deps
+	ln -fs $(CLIENT_DIR)/dist/amqp_client-$(VERSION) $@
 
-$(RABBIT_COMMON): lib deps
-	ln -fs $(COMMON_DIR) $@
-
-# NB: the cover server needs sources for rabbit_common too,
-# so we copy the broker's sources across so it can find them
-$(COMMON_SRC): deps
-	cp -R $(RABBIT_SERVER)/src $(RABBIT_COMMON)
+$(RABBIT_COMMON): deps
+	ln -fs $(CLIENT_DIR)/dist/rabbit_common-$(VERSION) $@
 
 $(RABBIT_SERVER): deps
 	ln -fs $(BROKER_DIR) $@
 
 deps:
-	$(MAKE) -C $(BROKER_DIR)
 	$(MAKE) -C $(CLIENT_DIR)
 
 test-lib/%: test-lib
