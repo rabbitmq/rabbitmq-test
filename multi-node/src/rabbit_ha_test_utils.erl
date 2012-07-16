@@ -91,7 +91,7 @@ make_cluster(SUT) ->
     Nodes = systest:list_processes(SUT),
     Members = [Id || {Id, _Ref} <- Nodes],
     systest:log("clustering ~p~n", [Members]),
-    lists:foldl(fun cluster/2, [], Members).
+    cluster(Members).
 
 %%
 %% @doc This systest_sut on_join callback sets up a single connection and
@@ -126,6 +126,24 @@ await_response(Pid, Timeout) ->
             {error, timeout}
     end.
 
+control_action(Command, Node) ->
+    control_action(Command, Node, [], []).
+
+control_action(Command, Node, Args) ->
+    control_action(Command, Node, Args, []).
+
+control_action(Command, Node, Args, Opts) ->
+    rabbit_control_main:action(Command, Node, Args, Opts,
+                               fun (Format, Args1) ->
+                                       io:format(Format ++ " ...~n", Args1)
+                               end).
+
+cluster_status(Node) ->
+    {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
+     rpc:call(Node, rabbit_mnesia, clustered_disc_nodes, []),
+     rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
+
+
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
 mirror_args(Nodes) ->
@@ -148,7 +166,7 @@ with_cluster(Config, TestFun) ->
     Nodes = systest:list_processes(Cluster),
     Members = [Id || {Id, _Ref} <- Nodes],
     systest:log("clustering ~p~n", [Members]),
-    lists:foldl(fun cluster/2, [], Members),
+    cluster(Members),
     NodeConf = [begin
                     UserData = systest:read_process_user_data(Ref),
                     AmqpProcs = amqp_open(Id, UserData),
@@ -160,28 +178,26 @@ with_cluster(Config, TestFun) ->
                 end || {Id, Ref} <- Nodes],
     TestFun(Cluster, NodeConf).
 
-cluster_with(Node, Nodes) ->
-    lists:foldl(fun cluster/2, [], [Node|Nodes]).
+cluster_with(ClusterTo, Nodes) ->
+    lists:foreach(
+      fun (Node) ->
+              systest:log("clustering ~p with ~p~n", [Node, ClusterTo]),
+              LogFn = fun systest:log/2,
+              rabbit_control_main:action(stop_app, Node, [], [], LogFn),
+              rabbit_control_main:action(join_cluster, Node,
+                                         [atom_to_list(ClusterTo)], [], LogFn),
+              rabbit_control_main:action(start_app, Node, [], [], LogFn),
+              ok = rpc:call(Node, rabbit, await_startup, [])
+      end, Nodes).
 
 %%
 %% Private API
 %%
 
-cluster(Node, []) ->
-    [atom_to_list(Node)];
-cluster(Node, Acc) ->
-    NodeS = atom_to_list(Node),
-    NewAcc = [NodeS|Acc],
-    systest:log("clustering ~p with ~p~n", [Node, Acc]),
-    LogFn = fun(Fmt, Args) ->
-                systest:log(Fmt ++ "~n", Args)
-            end,
-    rabbit_control_main:action(stop_app, Node, [], [], LogFn),
-    rabbit_control_main:action(reset, Node, [], [], LogFn),
-    rabbit_control_main:action(cluster, Node, NewAcc, [], LogFn),
-    rabbit_control_main:action(start_app, Node, [], [], LogFn),
-    ok = rpc:call(Node, rabbit, await_startup, []),
-    NewAcc.
+cluster([ClusterTo | Nodes]) ->
+    cluster_with(ClusterTo, Nodes);
+cluster([_]) ->
+    ok.
 
 node_eval(Key, Node) ->
     systest_config:eval(Key, Node,
