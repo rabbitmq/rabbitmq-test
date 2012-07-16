@@ -69,6 +69,7 @@ ifneq ($(SYSTEST_PROFILE), '')
 dry-run: $(SYSTEST) test-compile
 	$(info test libraries: $(TESTLIBS))
 	$(info $(shell $(REBAR) -V))
+	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
 		$(SYSTEST) -P $(SYSTEST_PROFILE) -n
 else
@@ -78,6 +79,7 @@ endif
 
 .PHONY: ha-test
 ha-test: $(SYSTEST) test-compile
+	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
 		$(SYSTEST) -P $@ $(NOISE) $(OPERATOR_LOG) $(DUMP) \
