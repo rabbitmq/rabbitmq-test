@@ -21,7 +21,7 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([all/0, init_per_suite/1, end_per_suite/1,
+-export([all/0, init_per_suite/1, end_per_suite/1, end_per_testcase/2,
          killing_multiple_intermediate_nodes/0,
          killing_multiple_intermediate_nodes/1]).
 
@@ -33,6 +33,9 @@ init_per_suite(Config) ->
     Config.
 
 end_per_suite(_Config) ->
+    ok.
+
+end_per_testcase(_TC, _Config) ->
     ok.
 
 killing_multiple_intermediate_nodes() ->

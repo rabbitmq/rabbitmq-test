@@ -53,7 +53,7 @@ amqp_close(Channel, Connection) ->
 
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    LogFn = fun systest:log/2,
+    LogFn = fun clean_log/2,
     rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
     ok = rpc:call(NodeId, rabbit, await_startup, []).
 
@@ -134,15 +134,15 @@ control_action(Command, Node, Args) ->
 
 control_action(Command, Node, Args, Opts) ->
     rabbit_control_main:action(Command, Node, Args, Opts,
-                               fun (Format, Args1) ->
-                                       io:format(Format ++ " ...~n", Args1)
-                               end).
+                               fun clean_log/2).
 
 cluster_status(Node) ->
     {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
      rpc:call(Node, rabbit_mnesia, clustered_disc_nodes, []),
      rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
 
+clean_log(Format, Args1) ->
+    systest:log(Format ++ " ...~n", Args1).
 
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
@@ -182,7 +182,7 @@ cluster_with(ClusterTo, Nodes) ->
     lists:foreach(
       fun (Node) ->
               systest:log("clustering ~p with ~p~n", [Node, ClusterTo]),
-              LogFn = fun systest:log/2,
+              LogFn = fun clean_log/2,
               rabbit_control_main:action(stop_app, Node, [], [], LogFn),
               rabbit_control_main:action(join_cluster, Node,
                                          [atom_to_list(ClusterTo)], [], LogFn),
@@ -194,10 +194,10 @@ cluster_with(ClusterTo, Nodes) ->
 %% Private API
 %%
 
-cluster([ClusterTo | Nodes]) ->
-    cluster_with(ClusterTo, Nodes);
 cluster([_]) ->
-    ok.
+    ok;
+cluster([ClusterTo | Nodes]) ->
+    cluster_with(ClusterTo, Nodes).
 
 node_eval(Key, Node) ->
     systest_config:eval(Key, Node,

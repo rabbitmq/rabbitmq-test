@@ -113,17 +113,18 @@ restarted_master_honours_declarations() ->
 
 restarted_master_honours_declarations(Config) ->
     {Cluster,
-        [{{Master,   MRef}, {MasterConnection,    MasterChannel}},
-         {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
-         {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]
+        [{{Master,   MRef},  {MasterConnection,    MasterChannel}},
+         {{Producer, _PRef}, {_ProducerConnection, _ProducerChannel}},
+         {{_Slave,  _SRef},  {_SlaveConnection,    _SlaveChannel}}]
         } = rabbit_ha_test_utils:cluster_members(Config),
 
     Queue = <<"ha-test-restarting-master">>,
-    MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Producer, Slave]),
+    % MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Producer, Slave]),
     #'queue.declare_ok'{} = amqp_channel:call(MasterChannel,
                         #'queue.declare'{queue       = Queue,
                                          auto_delete = false,
-                                         arguments   = MirrorArgs}),
+                                         arguments   = [{<<"x-ha-policy">>,
+                                                        longstr, <<"all">>}]}),
 
     %% restart master - we close the connections only to avoid a lot
     %% of noisey sasl logs breaking out in the console! :)
@@ -138,11 +139,21 @@ restarted_master_honours_declarations(Config) ->
     %% run by the framework is attached to the SUT as a whole, so as to ensure
     %% that the cluster is not set up until *after* all the processes
     %% (i.e., nodes) have come online
-    rabbit_ha_test_utils:cluster_with(Producer, [Master]),
+
+    % rabbit_ha_test_utils:cluster_with(Producer, [Master]),
+    rabbit_ha_test_utils:control_action(
+        join_cluster, Producer, [atom_to_list(Master)], []),
+
+    % this log statement makes the [operator] output on the console more
+    % readable when sifting through the states to understand where we get to
+    systest:log("Re-Clustering Succeeded!~n"),
+
+    %% NB: I've removed the statement on line 155 to prove that even with
+    %% these nodes up and running, the expected behaviour isn't taking place
 
     %% retire other members of the cluster
-    systest:stop_and_wait(PRef),
-    systest:stop_and_wait(SRef),
+    % systest:stop_and_wait(PRef),
+    % systest:stop_and_wait(SRef),
 
     NewConn = rabbit_ha_test_utils:open_connection(5672),
     NewChann = rabbit_ha_test_utils:open_channel(NewConn),

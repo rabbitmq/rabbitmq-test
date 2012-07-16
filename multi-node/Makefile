@@ -1,7 +1,7 @@
 # NB: VERSION *might* be passed down from another makefile, otherwise we
 # will take it from the user - in CI in seems this will always be 0.0.0 
 VERSION ?= 0.0.0
-BROKER_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-server)
+BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
 COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-$(VERSION))
 COMMON_SRC=$(COMMON_DIR)/src
@@ -16,13 +16,13 @@ SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_LIB=test-lib/systest
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
 REBAR_LOG ?= "0"
-SYSTEST_VERSION=v0.7.5
+SYSTEST_VERSION=v0.7.7
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
-SYSTEST_LOG ?= 'false'
+SYSTEST_LOGGING ?= 'false'
 SYSTEST_PROFILE ?= ''
 
-ifneq ($(SYSTEST_LOG), 'false')
+ifneq ($(SYSTEST_LOGGING), 'false')
 OPERATOR_LOG=-L operator
 else
 OPERATOR_LOG=
@@ -64,28 +64,20 @@ test-all: $(SYSTEST) test-compile
 			--cover-dir=$(RABBIT_SERVER)/ebin \
 			--cover-dir=$(AMQP_CLIENT)/ebin
 
-.PHONY: dry-run
+.PHONY: test-profile
 ifneq ($(SYSTEST_PROFILE), '')
-dry-run: $(SYSTEST) test-compile
-	$(info test libraries: $(TESTLIBS))
-	$(info $(shell $(REBAR) -V))
-	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
-	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
-		$(SYSTEST) -P $(SYSTEST_PROFILE) -n
-else
-dry-run:
-	$(info set the SYSTEST_PROFILE variable in order to do a dry run)
-endif
-
-.PHONY: ha-test
-ha-test: $(SYSTEST) test-compile
+test-profile: $(SYSTEST) test-compile
 	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) -P $@ $(NOISE) $(OPERATOR_LOG) $(DUMP) \
+		$(SYSTEST) -P $(SYSTEST_PROFILE) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
 			--cover-dir=ebin \
 			--cover-dir=$(RABBIT_SERVER)/ebin \
 			--cover-dir=$(AMQP_CLIENT)/ebin
+else
+test-profile:
+	$(error you need to specify a SYSTEST_PROFILE to run this target)
+endif
 
 .PHONY: test-compile
 test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) test-ebin
@@ -102,6 +94,7 @@ $(RABBIT_SERVER): deps
 	ln -fs $(BROKER_DIR) $@
 
 deps:
+	$(MAKE) -C $(BROKER_DIR)
 	$(MAKE) -C $(CLIENT_DIR)
 
 test-lib/%: test-lib
