@@ -1,9 +1,9 @@
 {clustering_management_cluster, [
-    {cluster, [{localhost, [rabbit, hare, bunny]}]},
-    {nodes, [
-        {rabbit, [rabbit_node]},
-        {hare, [rabbit_node]},
-        {bunny, [rabbit_node]}
+    {sut, [{localhost, [rabbit, hare, bunny]}]},
+    {processes, [
+        {rabbit, [rabbit_node, connected]},
+        {hare, [rabbit_node, connected]},
+        {bunny, [rabbit_node, connected]}
     ]},
     {user_data, [
         {rabbit, [{amqp_port, 5672}]},
