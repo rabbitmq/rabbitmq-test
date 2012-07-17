@@ -40,15 +40,11 @@ DUMP=
 endif
 
 .PHONY: all
-all: $(SUITES)
+all: test-all
 
 .PHONY: clean
-clean: clean-logs
+clean:
 	rm -rf $(TEMP_DIRS)
-
-.PHONY: clean-logs
-clean-logs:
-	rm -rf logs
 
 $(TEMP_DIRS):
 	mkdir -p $@
@@ -88,10 +84,6 @@ $(RABBIT_SERVER): $(CLIENT_DIR)/dist lib
 	ln -fs $(BROKER_DIR) $@
 
 $(CLIENT_DIR)/dist:
-	$(MAKE) -C $(CLIENT_DIR)
-
-deps:
-	$(MAKE) -C $(BROKER_DIR)
 	$(MAKE) -C $(CLIENT_DIR)
 
 test-lib/%: test-lib
