@@ -42,6 +42,8 @@ create(Channel, Queue, TestPid, NoAck, ExpectingMsgs) ->
 start(TestPid, _Channel, _Queue, _NoAck, _LowestSeen, 0) ->
     consumer_reply(TestPid, ok);
 start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
+    systest:log("consumer ~p still expects ~p messages~n",
+                [self(), MsgsToConsume]),
     receive
         #'basic.consume_ok'{} ->
             start(TestPid, Channel, Queue, NoAck,
@@ -86,6 +88,8 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
 %%
 
 resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
+    systest:log("consumer ~p resubscribes for ~p remaining messages~n",
+                [self(), MsgsToConsume]),
     amqp_channel:subscribe(Channel,
                            #'basic.consume'{queue    = Queue,
                                             no_local = false,

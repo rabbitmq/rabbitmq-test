@@ -10,11 +10,16 @@
         {n6, [rabbit_node, connected]}
     ]},
     {user_data, [
-        {n1, [{amqp_port, 5672}]},
-        {n2, [{amqp_port, 5673}]},
-        {n3, [{amqp_port, 5674}]},
-        {n4, [{amqp_port, 5675}]},
-        {n5, [{amqp_port, 5676}]},
-        {n6, [{amqp_port, 5677}]}
+        {n1, [{amqp_port, 10672}]},
+        {n2, [{amqp_port, 10673}]},
+        {n3, [{amqp_port, 10674}]},
+        {n4, [{amqp_port, 10675}]},
+        {n5, [{amqp_port, 10676}]},
+        {n6, [{amqp_port, 10677}]}
+    ]},
+    {on_start, [
+        %% NB: cluster on_start callbacks execute once *all* our nodes
+        %% are up and running, so at this point we can cluster them...
+        {local, rabbit_ha_test_utils, make_cluster, []}
     ]}
 ]}.

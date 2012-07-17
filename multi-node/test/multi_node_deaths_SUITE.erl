@@ -39,22 +39,17 @@ end_per_testcase(_TC, _Config) ->
     ok.
 
 killing_multiple_intermediate_nodes() ->
-    [{timetrap, {minutes, 3}}].
+    [{timetrap, {minutes, 10}}].
 
 killing_multiple_intermediate_nodes(Config) ->
-    rabbit_ha_test_utils:with_cluster(Config, fun test_multi_kill/2).
-
-%% TODO: as per this afternoon's conversation with Simon, figure out
-%% how to rename the cluster members so as to avoid using the master/slave
-%% terminology where it doesn't belong...
-
-test_multi_kill(_Cluster,
-                [{{_, Master}, {_MasterConnection, MasterChannel}},
-                 {{_, Slave1}, {_Slave1Connection, _Slave1Channel}},
-                 {{_, Slave2}, {_Slave2Connection, _Slave2Channel}},
-                 {{_, Slave3}, {_Slave3Connection, _Slave3Channel}},
-                 {_Slave4, {_Slave4Connection, Slave4Channel}},
-                 {_Producer, {_ProducerConnection, ProducerChannel}}]) ->
+    {_Cluster,
+        [{{_, Master}, {_MasterConnection, MasterChannel}},
+         {{_, Slave1}, {_Slave1Connection, _Slave1Channel}},
+         {{_, Slave2}, {_Slave2Connection, _Slave2Channel}},
+         {{_, Slave3}, {_Slave3Connection, _Slave3Channel}},
+         {_Slave4, {_Slave4Connection, Slave4Channel}},
+         {_Producer, {_ProducerConnection, ProducerChannel}}]
+         } = rabbit_ha_test_utils:cluster_members(Config),
 
     #'queue.declare_ok'{queue = Queue} =
         amqp_channel:call(MasterChannel,
@@ -68,7 +63,7 @@ test_multi_kill(_Cluster,
     %% node deaths. It would be nice if we could find a means to do this
     %% in a way that is not actually timing dependent.
 
-    Msgs = 5000,
+    Msgs = 2000,
 
     ConsumerPid = rabbit_ha_test_consumer:create(Slave4Channel,
                                                  Queue, self(), false, Msgs),
@@ -84,7 +79,7 @@ test_multi_kill(_Cluster,
                                          {Slave3, 300}]],
 
     %% verify that the consumer got all msgs, or die
-    rabbit_ha_test_consumer:await_response(ConsumerPid, 60000 * 3),
-    rabbit_ha_test_producer:await_response(ProducerPid, 60000 * 3),
+    rabbit_ha_test_consumer:await_response(ConsumerPid, 60000 * 10),
+    rabbit_ha_test_producer:await_response(ProducerPid, 60000 * 10),
     ok.
 

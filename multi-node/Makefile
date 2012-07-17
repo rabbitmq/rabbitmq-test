@@ -1,7 +1,7 @@
 # NB: VERSION *might* be passed down from another makefile, otherwise we
 # will take it from the user - in CI in seems this will always be 0.0.0 
 VERSION ?= 0.0.0
-BROKER_DIR=$(abspath ../../rabbitmq-server)
+BROKER_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
 COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-$(VERSION))
 COMMON_SRC=$(COMMON_DIR)/src
@@ -56,8 +56,8 @@ $(TEMP_DIRS):
 
 .PHONY: test-all
 test-all: $(SYSTEST) test-compile
-	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
-	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
+	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
+	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
 		$(SYSTEST) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
 			--cover-dir=ebin \
@@ -67,8 +67,8 @@ test-all: $(SYSTEST) test-compile
 .PHONY: test-profile
 ifneq ($(SYSTEST_PROFILE), '')
 test-profile: $(SYSTEST) test-compile
-	ERL_LIBS="$(LIB_DIR):${ERL_LIBS}" \
-	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(AMQP_CLIENT)/ebin -pa test-ebin" \
+	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
+	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
 		$(SYSTEST) -P $(SYSTEST_PROFILE) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
 			--cover-dir=ebin \
@@ -80,21 +80,15 @@ test-profile:
 endif
 
 .PHONY: test-compile
-test-compile: $(REBAR) $(SYSTEST) $(TESTLIBS) test-ebin
+test-compile: $(REBAR) $(SYSTEST) $(RABBIT_SERVER) test-ebin
+	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 	$(REBAR) -C systest.config skip_deps=true compile -v $(REBAR_LOG)
 	cp -R ebin test-ebin
 
-$(AMQP_CLIENT): deps
-	ln -fs $(CLIENT_DIR)/dist/amqp_client-$(VERSION) $@
-
-$(RABBIT_COMMON): deps
-	ln -fs $(CLIENT_DIR)/dist/rabbit_common-$(VERSION) $@
-
-$(RABBIT_SERVER): deps
+$(RABBIT_SERVER): $(CLIENT_DIR)/dist
 	ln -fs $(BROKER_DIR) $@
 
-deps:
-	$(MAKE) -C $(BROKER_DIR)
+$(CLIENT_DIR)/dist:
 	$(MAKE) -C $(CLIENT_DIR)
 
 test-lib/%: test-lib
