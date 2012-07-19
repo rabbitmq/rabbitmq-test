@@ -32,9 +32,8 @@
             {args, ["stop", "-n", "${proc.id}"]}
         ]}
     ]},
-    {on_start, [
-        {local, rabbit_ha_test_utils, start_rabbit, []}
-    ]}
+    {on_start, [{local, rabbit_ha_test_utils, start_rabbit, []}]},
+    {on_stop,  [{local, rabbit_ha_test_utils, stop_rabbit, []}]}
 ]}.
 
 {connected, [

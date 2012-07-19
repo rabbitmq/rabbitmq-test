@@ -24,38 +24,38 @@
 %% systest_proc callbacks
 %%
 
-amqp_open(_Id, UserData) ->
-    NodePort = ?REQUIRE(amqp_port, UserData),
-    Connection = open_connection(NodePort),
-    Channel = open_channel(Connection),
-    {Connection, Channel}.
-
-open_connection(NodePort) ->
-    {ok, Connection} =
-        amqp_connection:start(#amqp_params_network{port=NodePort}),
-    Connection.
-
-
 %%
 %% @doc A systest_node 'on_stop' callback that closes a connection and channel
 %% which in the node's user data as <pre>amqp_connection</pre> and
-%% <pre>amqp_channel</pre> respectively.
-%%
+%% <pre>amqp_channel</pre> respectively. We also stop rabbit, so that the
+%% cover-stop hooks do not break the behaviour of the remote nodes in the
+%% many (and spectacular) ways we've seen in the past (e.g., bug25070).
+%% @end
 disconnect_from_node(Node) ->
     UserData = systest:process_data(user, Node),
     Channel = ?CONFIG(amqp_channel, UserData, undefined),
     Connection = ?CONFIG(amqp_connection, UserData, undefined),
     amqp_close(Channel, Connection).
 
-amqp_close(Channel, Connection) ->
-    close_channel(Channel),
-    close_connection(Connection).
-
+%%
+%% @doc A systest 'on_start' callback that starts up the rabbit application
+%% on the target node. We do this *after* the node is up an running to ensure
+%% that code coverage is already started prior to doing any actual work 
+%% @end
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
     LogFn = fun systest:log/2,
     rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
     ok = rpc:call(NodeId, rabbit, await_startup, []).
+
+%%
+%% @doc A systest 'on_stop' callback that stops the rabbit application
+%% on the target node. SysTest runs these hooks *before* code coverage is
+%% stopped on the node, which prevents the behaviour we saw in bug25070.
+stop_rabbit(Node) ->
+    NodeId = systest:process_data(id, Node),
+    LogFn = fun systest:log/2,
+    rabbit_control_main:action(stop_app, NodeId, [], [], LogFn).
 
 %%
 %% @doc runs <pre>rabbitmqctl wait</pre> against the supplied Node.
@@ -163,9 +163,24 @@ with_cluster(Config, TestFun) ->
 cluster_with(Node, Nodes) ->
     lists:foldl(fun cluster/2, [], [Node|Nodes]).
 
+amqp_open(_Id, UserData) ->
+    NodePort = ?REQUIRE(amqp_port, UserData),
+    Connection = open_connection(NodePort),
+    Channel = open_channel(Connection),
+    {Connection, Channel}.
+
+open_connection(NodePort) ->
+    {ok, Connection} =
+        amqp_connection:start(#amqp_params_network{port=NodePort}),
+    Connection.
+
 %%
 %% Private API
 %%
+
+amqp_close(Channel, Connection) ->
+    close_channel(Channel),
+    close_connection(Connection).
 
 cluster(Node, []) ->
     [atom_to_list(Node)];
