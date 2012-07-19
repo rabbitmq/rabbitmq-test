@@ -37,9 +37,6 @@ event_log_failure_during_shutdown(Config) ->
          {{_, N3}, {_, _}}] } =
                         rabbit_ha_test_utils:cluster_members(Config),
 
-    %% declare some queues on the master, mirrored to the two slaves
-    [declare_ha(MasterChannel) || _ <- lists:seq(1, 4)],
-
     %% now cleanly shut the nodes down in sequence...
     systest:stop_and_wait(N3),
     systest:stop_and_wait(N2),
