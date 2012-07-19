@@ -25,21 +25,18 @@
          bug25059_safely_shutdown/0,
          bug25059_safely_shutdown/1]).
 
-all() -> systest_suite:export_all(?MODULE).
+all() -> [event_log_failure_during_shutdown].
 
 init_per_suite(Config) -> Config.
 
 end_per_suite(_Config) -> ok.
 
 event_log_failure_during_shutdown(Config) ->
-    {_, [{{_, N1}, {_, MasterChannel}},
-         {{_, N2}, {_, _}},
-         {{_, N3}, {_, _}}] } =
-                        rabbit_ha_test_utils:cluster_members(Config),
+
+    Cluster = systest:active_sut(Config),
+    [{_, N1}] = systest:list_processes(Cluster),
 
     %% now cleanly shut the nodes down in sequence...
-    systest:stop_and_wait(N3),
-    systest:stop_and_wait(N2),
     systest:stop_and_wait(N1),
 
     %% the logs should now contain traces of event publication failures
