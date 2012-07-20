@@ -21,26 +21,14 @@
 
 -export([all/0, init_per_suite/1,
          end_per_suite/1,
-         event_log_failure_during_shutdown/1,
          bug25059_safely_shutdown/0,
          bug25059_safely_shutdown/1]).
 
-all() -> [event_log_failure_during_shutdown].
+all() -> systest_suite:export_all(?MODULE).
 
 init_per_suite(Config) -> Config.
 
 end_per_suite(_Config) -> ok.
-
-event_log_failure_during_shutdown(Config) ->
-
-    Cluster = systest:active_sut(Config),
-    [{_, N1}] = systest:list_processes(Cluster),
-
-    %% now cleanly shut the nodes down in sequence...
-    systest:stop_and_wait(N1),
-
-    %% the logs should now contain traces of event publication failures
-    ok.
 
 bug25059_safely_shutdown() ->
     [{timetrap, {minutes, 2}}].
@@ -60,6 +48,11 @@ bug25059_safely_shutdown(Config) ->
     systest:stop_and_wait(N1),
     systest:stop_and_wait(N2),
     systest:stop_and_wait(N3),
+
+    %% inspecting the logs before and after the broker has the changes
+    %% for bug25059 applied should demonstrate that the logs no longer
+    %% contain any failures in rabbit_amqqueue due to erlang:is_process_alive/1
+    %% calls made with pids residing on remote nodes
     ok.
 
 declare(Channel) ->
