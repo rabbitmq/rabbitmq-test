@@ -15,20 +15,28 @@ SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_LIB=test-lib/systest
 TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
 REBAR_LOG ?= "0"
-SYSTEST_VERSION=v0.7.10
+SYSTEST_VERSION=v0.7.11
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
 SYSTEST_LOGGING ?= 'false'
 SYSTEST_PROFILE ?= ''
 
+ifneq (,$(findstring s,$(MAKEFLAGS)))
+SYSTEST_QUIET=-q
+else
+SYSTEST_QUIET=
+endif
+
 ifneq ($(SYSTEST_LOGGING), 'false')
 OPERATOR_LOG=-L operator
+SYSTEST_QUIET=
 else
 OPERATOR_LOG=
 endif
 
 ifneq ($(SYSTEST_VERBOSE), 'false')
 NOISE=-L framework -L sut -L process
+SYSTEST_QUIET=
 else
 NOISE=
 endif
@@ -39,13 +47,11 @@ else
 DUMP=
 endif
 
-# Generate a rule to compile .erl files from the directory $(1) into
-# directory $(2), taking extra erlc options from $(3)
 define systest
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) \
+		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) \
 			--cover-dir=ebin \
 			--cover-dir=$(RABBIT_SERVER)/ebin \
 			--cover-dir=$(AMQP_CLIENT)/ebin
@@ -68,7 +74,7 @@ test-all: $(SYSTEST) test-compile
 .PHONY: test-profile
 ifneq ($(SYSTEST_PROFILE), '')
 test-profile: $(SYSTEST) test-compile
-	$(call, systest,$(SYSTEST_PROFILE))
+	$(call systest,-P $(SYSTEST_PROFILE))
 else
 test-profile:
 	$(error you need to specify a SYSTEST_PROFILE to run this target)
