@@ -39,6 +39,18 @@ else
 DUMP=
 endif
 
+# Generate a rule to compile .erl files from the directory $(1) into
+# directory $(2), taking extra erlc options from $(3)
+define systest
+	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
+	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
+	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
+		$(SYSTEST) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) \
+			--cover-dir=ebin \
+			--cover-dir=$(RABBIT_SERVER)/ebin \
+			--cover-dir=$(AMQP_CLIENT)/ebin
+endef
+
 .PHONY: all
 all: test-all
 
@@ -51,24 +63,12 @@ $(TEMP_DIRS):
 
 .PHONY: test-all
 test-all: $(SYSTEST) test-compile
-	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
-	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
-	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
-			--cover-dir=ebin \
-			--cover-dir=$(RABBIT_SERVER)/ebin \
-			--cover-dir=$(AMQP_CLIENT)/ebin
+	$(call systest,'')
 
 .PHONY: test-profile
 ifneq ($(SYSTEST_PROFILE), '')
 test-profile: $(SYSTEST) test-compile
-	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
-	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
-	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) -P $(SYSTEST_PROFILE) $(NOISE) $(OPERATOR_LOG) $(DUMP) \
-			--cover-dir=ebin \
-			--cover-dir=$(RABBIT_SERVER)/ebin \
-			--cover-dir=$(AMQP_CLIENT)/ebin
+	$(call, systest,$(SYSTEST_PROFILE))
 else
 test-profile:
 	$(error you need to specify a SYSTEST_PROFILE to run this target)
