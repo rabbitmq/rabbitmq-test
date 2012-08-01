@@ -16,5 +16,10 @@
         {n4, [{amqp_port, 5675}]},
         {n5, [{amqp_port, 5676}]},
         {n6, [{amqp_port, 5677}]}
+    ]},
+    {on_start, [
+        %% NB: cluster on_start callbacks execute once *all* our nodes
+        %% are up and running, so at this point we can cluster them...
+        {local, rabbit_ha_test_utils, make_cluster, []}
     ]}
 ]}.

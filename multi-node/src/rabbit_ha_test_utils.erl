@@ -40,7 +40,7 @@ disconnect_from_node(Node) ->
 %%
 %% @doc A systest 'on_start' callback that starts up the rabbit application
 %% on the target node. We do this *after* the node is up an running to ensure
-%% that code coverage is already started prior to doing any actual work 
+%% that code coverage is already started prior to doing any actual work
 %% @end
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
@@ -141,24 +141,6 @@ cluster_members(Config) ->
 amqp_config(NodeRef) ->
     UserData = systest:read_process_user_data(NodeRef),
     {?REQUIRE(amqp_connection, UserData), ?REQUIRE(amqp_channel, UserData)}.
-
-with_cluster(Config, TestFun) ->
-    Cluster = systest:active_sut(Config),
-    % systest_sut:print_status(Cluster),
-    Nodes = systest:list_processes(Cluster),
-    Members = [Id || {Id, _Ref} <- Nodes],
-    systest:log("clustering ~p~n", [Members]),
-    lists:foldl(fun cluster/2, [], Members),
-    NodeConf = [begin
-                    UserData = systest:read_process_user_data(Ref),
-                    AmqpProcs = amqp_open(Id, UserData),
-                    {Connection, Channel} = AmqpProcs,
-                    AmqpData = [{amqp_connection, Connection},
-                                {amqp_channel,    Channel}|UserData],
-                    ok = systest:write_process_user_data(Ref, AmqpData),
-                    {{Id, Ref}, AmqpProcs}
-                end || {Id, Ref} <- Nodes],
-    TestFun(Cluster, NodeConf).
 
 cluster_with(Node, Nodes) ->
     lists:foldl(fun cluster/2, [], [Node|Nodes]).
