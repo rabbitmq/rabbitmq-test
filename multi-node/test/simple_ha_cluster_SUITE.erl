@@ -29,7 +29,7 @@
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, {seconds, 100}}].
+suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
 all() ->
     systest_suite:export_all(?MODULE).
@@ -111,7 +111,7 @@ producer_confirms_survive_death_of_master(Config) ->
 
 restarted_master_honours_declarations() ->
     %% NB: up to 1.5 mins to fully cluster the nodes
-    [{timetrap, {minutes, 4}}].
+    [{timetrap, systest:settings("time_traps.restarted_master")}].
 
 restarted_master_honours_declarations(Config) ->
     {Cluster,

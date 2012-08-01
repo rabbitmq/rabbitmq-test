@@ -36,7 +36,7 @@ end_per_suite(_Config) ->
     ok.
 
 killing_multiple_intermediate_nodes() ->
-    [{timetrap, {minutes, 3}}].
+    [{timetrap, systest:settings("time_traps.kill_multi")}].
 
 killing_multiple_intermediate_nodes(Config) ->
     {_Cluster,

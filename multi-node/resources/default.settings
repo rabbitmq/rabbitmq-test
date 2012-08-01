@@ -5,3 +5,9 @@
     {producer_confirms, 2000}
 ]}.
 
+{time_traps, [
+    {kill_multi, {minutes, 3}},
+    {restarted_master, {minutes, 4}},
+    {ha_cluster_SUITE, {seconds, 100}}
+]}.
+
