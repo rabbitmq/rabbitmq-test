@@ -60,7 +60,7 @@ killing_multiple_intermediate_nodes(Config) ->
     %% node deaths. It would be nice if we could find a means to do this
     %% in a way that is not actually timing dependent.
 
-    Msgs = 5000,
+    Msgs = systest:settings("message_volumes.kill_multi"),
 
     ConsumerPid = rabbit_ha_test_consumer:create(Slave4Channel,
                                                  Queue, self(), false, Msgs),

@@ -62,7 +62,8 @@ send_consume_survives_node_deaths(Config) ->
         amqp_channel:call(Channel1,
                           #'queue.declare'{auto_delete = false,
                                            arguments   = MirrorArgs}),
-    Msgs = 200,
+
+    Msgs = systest:settings("message_volumes.send_consume"),
 
     %% start up a consumer
     ConsumerPid = rabbit_ha_test_consumer:create(Channel2, Queue,
@@ -97,7 +98,7 @@ producer_confirms_survive_death_of_master(Config) ->
                               arguments   = [{<<"x-ha-policy">>,
                                                 longstr, <<"all">>}]}),
 
-    Msgs = 2000,
+    Msgs = systest:settings("message_volumes.producer_confirms"),
 
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(ProducerChannel, Queue,

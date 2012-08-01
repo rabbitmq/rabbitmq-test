@@ -1,0 +1,7 @@
+
+{message_volumes, [
+    {kill_multi, 5000},
+    {send_consume, 200},
+    {producer_confirms, 2000}
+]}.
+
