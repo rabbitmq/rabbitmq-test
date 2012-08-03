@@ -54,7 +54,7 @@ define systest
 		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) \
 			--cover-dir=ebin \
 			--cover-dir=$(RABBIT_SERVER)/ebin \
-			--cover-dir=$(AMQP_CLIENT)/ebin
+			--cover-dir=$(CLIENT_DIR)/ebin
 endef
 
 .PHONY: all
@@ -93,10 +93,7 @@ $(CLIENT_DIR)/dist:
 	$(MAKE) -C $(CLIENT_DIR)
 
 test-lib/%: test-lib
-	git clone https://github.com/nebularis/$*.git test-lib/$*
-	git --git-dir=test-lib/$*/.git \
-		--work-tree=test-lib/$* \
- 		checkout -b stable origin/stable
+	git clone -b stable https://github.com/nebularis/$*.git test-lib/$*
 	git --git-dir=test-lib/$*/.git \
 		--work-tree=test-lib/$* \
 		checkout $(SYSTEST_VERSION)
