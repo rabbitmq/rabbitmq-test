@@ -75,9 +75,8 @@ killing_multiple_intermediate_nodes(Config) ->
                                          {Slave2, 200},
                                          {Slave3, 300}]],
 
-    %% verify that the consumer got all msgs, or die
-    TimeTrap = systest:settings("time_traps.kill_multi"),
-    rabbit_ha_test_consumer:await_response(ConsumerPid, 60000 * TimeTrap),
-    rabbit_ha_test_producer:await_response(ProducerPid, 60000 * TimeTrap),
+    %% verify that the consumer got all msgs, or die, or time out
+    rabbit_ha_test_consumer:await_response(ConsumerPid),
+    rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 

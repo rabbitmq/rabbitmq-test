@@ -20,7 +20,7 @@
 -export([await_response/1, await_response/2, create/5, start/6]).
 
 await_response(ConsumerPid) ->
-    await_response(ConsumerPid, 60000).
+    await_response(ConsumerPid, infinity).
 
 await_response(ConsumerPid, Timeout) ->
     case rabbit_ha_test_utils:await_response(ConsumerPid, Timeout) of
@@ -75,10 +75,6 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
         #'basic.cancel'{} ->
             resubscribe(TestPid, Channel, Queue, NoAck,
                         LowestSeen, MsgsToConsume)
-    after
-        10000 ->
-            consumer_reply(TestPid,
-                           {error, {expecting_more_messages, MsgsToConsume}})
     end.
 
 %%
@@ -93,7 +89,6 @@ resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                            self()),
 
     ok = receive #'basic.consume_ok'{} -> ok
-         after 200 -> missing_consume_ok
          end,
 
     start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume).

@@ -126,6 +126,13 @@ await_response(Pid, Timeout) ->
             {error, timeout}
     end.
 
+read_timeout(SettingsKey) ->
+    case systest:settings(SettingsKey) of
+        {minutes, M} -> M * 60000;
+        {seconds, S} -> S * 1000;
+        Other        -> throw({illegal_timetrap, Other})
+    end.
+
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
 mirror_args(Nodes) ->
