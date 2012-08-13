@@ -3,22 +3,17 @@
 VERSION ?= 0.0.0
 BROKER_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
-COMMON_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client/deps/rabbit_common-$(VERSION))
-COMMON_SRC=$(COMMON_DIR)/src
-LIB_DIR=$(abspath lib)
-BIN_DIR=$(abspath bin)
 TEMP_DIRS=lib test-lib bin ebin test-ebin
-AMQP_CLIENT=$(CLIENT_DIR)/dist/amqp_client-$(VERSION)
 RABBIT_SERVER=$(abspath lib/rabbit)
 REBAR=bin/rebar
 SYSTEST=test-lib/systest/priv/bin/systest
-SYSTEST_LIB=test-lib/systest
-TESTLIBS=$(AMQP_CLIENT) $(RABBIT_SERVER) $(RABBIT_COMMON) $(SYSTEST_LIB)
+SYSTEST_GIT=test-lib/systest
 REBAR_LOG ?= "0"
 SYSTEST_VERSION=v0.8.0
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
 SYSTEST_LOGGING ?= 'false'
+SYSTEST_NO_COVER ?= 'false'
 SYSTEST_PROFILE ?= ''
 
 ifneq (,$(findstring s,$(MAKEFLAGS)))
@@ -47,14 +42,19 @@ else
 DUMP=
 endif
 
+ifneq ($(SYSTEST_NO_COVER), 'false')
+SYSTEST_COVER=-w
+else
+SYSTEST_COVER=--cover-dir=ebin \
+			  --cover-dir=$(RABBIT_SERVER)/ebin \
+			  --cover-dir=$(CLIENT_DIR)/ebin
+endif
+
 define systest
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) \
-			--cover-dir=ebin \
-			--cover-dir=$(RABBIT_SERVER)/ebin \
-			--cover-dir=$(CLIENT_DIR)/ebin
+		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) $(SYSTEST_COVER)
 endef
 
 .PHONY: all
@@ -92,15 +92,21 @@ $(RABBIT_SERVER): $(CLIENT_DIR)/dist lib
 $(CLIENT_DIR)/dist:
 	$(MAKE) -C $(CLIENT_DIR)
 
-test-lib/%: test-lib
-	git clone -b stable https://github.com/nebularis/$*.git test-lib/$*
-	git --git-dir=test-lib/$*/.git \
-		--work-tree=test-lib/$* \
+.PHONY: systest-lib
+systest-lib: $(SYSTEST_GIT)
+	touch $(SYSTEST_GIT)/.done
+
+$(SYSTEST_GIT):
+	mkdir -p test-lib
+	git clone -b stable https://github.com/nebularis/systest.git test-lib/systest
+	git --git-dir=test-lib/systest/.git \
+		--work-tree=test-lib/systest \
 		checkout $(SYSTEST_VERSION)
 
-$(SYSTEST): $(SYSTEST_LIB)
+$(SYSTEST): systest-lib
 	PATH="bin:${PATH}" $(MAKE) -C test-lib/systest
 
-bin/%: bin $(SYSTEST_LIB)
+bin/%: bin systest-lib
 	cp test-lib/systest/bin/$* bin/$*
+
 
