@@ -15,6 +15,7 @@ SYSTEST_DUMP ?= 'false'
 SYSTEST_LOGGING ?= 'false'
 SYSTEST_NO_COVER ?= 'false'
 SYSTEST_PROFILE ?= ''
+SYSTEST_EXTRA ?= ''
 
 ifneq (,$(findstring s,$(MAKEFLAGS)))
 SYSTEST_QUIET=-q
@@ -42,6 +43,12 @@ else
 DUMP=
 endif
 
+ifneq ($(SYSTEST_EXTRA), '')
+EXTRA_FLAGS=$(SYSTEST_EXTRA)
+else
+EXTRA_FLAGS=
+endif
+
 ifneq ($(SYSTEST_NO_COVER), 'false')
 SYSTEST_COVER=-w
 else
@@ -54,7 +61,7 @@ define systest
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
-		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) $(SYSTEST_COVER)
+		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) $(SYSTEST_COVER) $(EXTRA_FLAGS)
 endef
 
 .PHONY: all
