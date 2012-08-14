@@ -20,9 +20,11 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 await_response(ProducerPid) ->
-    await_response(ProducerPid, 60000).
+    await_response(ProducerPid, infinity).
 
 await_response(ProducerPid, Timeout) ->
+    systest:log("waiting for producer pid ~p (timeout = ~p)~n",
+                [ProducerPid, Timeout]),
     case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
         {error, timeout} -> throw(lost_contact_with_producer);
         ok               -> ok
@@ -72,6 +74,7 @@ producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend) ->
 
     ConfirmState1 = maybe_record_confirm(ConfirmState, Channel, MsgsToSend),
 
+    systest:log("publishing msg ~p on ~p~n", [MsgsToSend, Channel]),
     amqp_channel:call(Channel, Method,
                       #amqp_msg{props = #'P_basic'{delivery_mode = 2},
                                 payload = list_to_binary(
@@ -83,6 +86,8 @@ maybe_record_confirm(none, _, _) ->
     none;
 maybe_record_confirm(ConfirmState, Channel, MsgsToSend) ->
     SeqNo = amqp_channel:next_publish_seqno(Channel),
+    systest:log("acquired next seqno ~p from channel ~p~n",
+                [SeqNo, Channel]),
     gb_trees:insert(SeqNo, MsgsToSend, ConfirmState).
 
 drain_confirms(none) ->
@@ -92,6 +97,7 @@ drain_confirms(ConfirmState) ->
         true ->
             ok;
         false ->
+            systest:log("awaiting basic.ack~n", []),
             receive
                 #'basic.ack'{delivery_tag = DeliveryTag,
                              multiple     = IsMulti} ->

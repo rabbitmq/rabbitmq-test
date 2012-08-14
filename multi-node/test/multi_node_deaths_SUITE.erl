@@ -76,7 +76,7 @@ killing_multiple_intermediate_nodes(Config) ->
                                          {Slave3, 300}]],
 
     %% verify that the consumer got all msgs, or die, or time out
-    rabbit_ha_test_consumer:await_response(ConsumerPid),
     rabbit_ha_test_producer:await_response(ProducerPid),
+    rabbit_ha_test_consumer:await_response(ConsumerPid),
     ok.
 

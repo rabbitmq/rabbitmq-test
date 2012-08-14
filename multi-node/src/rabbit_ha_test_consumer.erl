@@ -65,6 +65,8 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                     start(TestPid, Channel, Queue,
                              NoAck, MsgNum, MsgsToConsume - 1);
                 MsgNum >= LowestSeen ->
+                    systest:log("consumer ~p ignoring redelivery of msg ~p~n",
+                                [self(), MsgNum]),
                     true = Redelivered, %% ASSERTION
                     start(TestPid, Channel, Queue,
                              NoAck, LowestSeen, MsgsToConsume);
@@ -76,6 +78,9 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                                    {error, {unexpected_message, MsgNum}})
             end;
         #'basic.cancel'{} ->
+            systest:log("consumer ~p recieved basic.cancel: "
+                        "resubscribing to ~p on ~p~n",
+                        [self(), Queue, Channel]),
             resubscribe(TestPid, Channel, Queue, NoAck,
                         LowestSeen, MsgsToConsume)
     end.
@@ -90,15 +95,17 @@ resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                                             no_local = false,
                                             no_ack   = NoAck},
                            self()),
-
     ok = receive #'basic.consume_ok'{} -> ok
          end,
-
+    systest:log("re-subscripting complete (~p received basic.consume_ok)",
+                [self()]),
     start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume).
 
 maybe_ack(_Delivery, _Channel, true) ->
     ok;
 maybe_ack(#'basic.deliver'{delivery_tag = DeliveryTag}, Channel, false) ->
+    systest:log("consumer ~p sending basic.ack for ~p on ~p~n",
+                [self(), DeliveryTag, Channel]),
     amqp_channel:call(Channel, #'basic.ack'{delivery_tag = DeliveryTag}),
     ok.
 
