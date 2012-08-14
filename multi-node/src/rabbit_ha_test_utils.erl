@@ -44,7 +44,7 @@ disconnect_from_node(Node) ->
 %% @end
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    LogFn = fun systest:log/2,
+    LogFn = fun clean_log/2,
     rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
     ok = rpc:call(NodeId, rabbit, await_startup, []).
 
@@ -54,7 +54,7 @@ start_rabbit(Node) ->
 %% stopped on the node, which prevents the behaviour we saw in bug25070.
 stop_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    LogFn = fun systest:log/2,
+    LogFn = fun clean_log/2,
     rabbit_control_main:action(stop_app, NodeId, [], [], LogFn).
 
 %%
@@ -67,7 +67,7 @@ wait(Node) ->
     %% passing the records around like this really sucks - if only we had
     %% coroutines we could do this far more cleanly... :/
     NodeId  = systest:process_data(id, Node),
-    LogFun  = fun systest:log/2,
+    LogFun  = fun clean_log/2,
     case node_eval("node.user.env", [{node, Node}]) of
         not_found -> throw(no_pidfile);
         Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
@@ -117,6 +117,8 @@ connect_to_node(Node, _ClusterRef, _Siblings) ->
 %%
 %% Test Utility Functions
 %%
+
+clean_log(Fmt, Args) -> systest:log(Fmt ++ "~n", Args).
 
 await_response(Pid, Timeout) ->
     receive
@@ -177,9 +179,7 @@ cluster(Node, Acc) ->
     NodeS = atom_to_list(Node),
     NewAcc = [NodeS|Acc],
     systest:log("clustering ~p with ~p~n", [Node, Acc]),
-    LogFn = fun(Fmt, Args) ->
-                systest:log(Fmt ++ "~n", Args)
-            end,
+    LogFn = fun clean_log/2,
     rabbit_control_main:action(stop_app, Node, [], [], LogFn),
     rabbit_control_main:action(reset, Node, [], [], LogFn),
     rabbit_control_main:action(cluster, Node, NewAcc, [], LogFn),

@@ -42,6 +42,9 @@ create(Channel, Queue, TestPid, NoAck, ExpectingMsgs) ->
 start(TestPid, _Channel, _Queue, _NoAck, _LowestSeen, 0) ->
     consumer_reply(TestPid, ok);
 start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
+    systest:log("consumer awaiting ~p messages "
+                "(lowest seen = ~p, no-ack = ~p)~n",
+                [MsgsToConsume, LowestSeen, NoAck]),
     receive
         #'basic.consume_ok'{} ->
             start(TestPid, Channel, Queue, NoAck,
