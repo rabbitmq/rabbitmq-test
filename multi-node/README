@@ -102,3 +102,21 @@ to fail. For this reason, the Makefile in rabbitmq-test currently
 disables coverage for this profile/suite, and you can do the same if
 required by passing SYSTEST_NO_COVER=1 to make.
 
+A note about rebar
+------------------
+
+We are using rebar to obtain dependencies and compile our test code.
+It should be noted that we're currently using the tip of a remote
+branch (named systest) from https://github.com/hyperthunk/rebar and
+that this is pulled in by systest itself.
+
+We are also using the 'test-compile' command, which was recently
+deprecated from rebar in favour of `eunit compile_only=true` or
+equivalent commands. This will be addressed in a future version of
+systest, at which point we'll need to make the appropriate changes
+to our makefile so that we're using whatever API is supported by
+the version of rebar that systest brings in.
+
+An alternative approach would be to explicitly fork rebar for rabbitmq
+internal use in general.
+
