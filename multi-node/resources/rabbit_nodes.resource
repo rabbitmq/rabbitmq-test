@@ -12,6 +12,8 @@
             {program, "%{RABBITMQ_BROKER_DIR}/scripts/rabbitmq-server"},
             {environment, [
                 {"RABBITMQ_LOG_BASE", "${ct.priv_dir}/${ct.scope}"},
+                {"RABBITMQ_CONFIG_FILE",
+                        "${ct.priv_dir}/${ct.scope}/${proc.name}-conf.config"},
                 {"RABBITMQ_PLUGINS_EXPAND_DIR",
                     "${ct.priv_dir}/${ct.scope}/${proc.name}-plugins-scratch"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
@@ -53,9 +55,9 @@
         {c, [rabbit_node, connected]}
     ]},
     {user_data, [
-        {a, [{amqp_port, 5672}]},
-        {b, [{amqp_port, 5673}]},
-        {c, [{amqp_port, 5674}]}
+        {a, [{amqp_port, 10672}]},
+        {b, [{amqp_port, 10673}]},
+        {c, [{amqp_port, 10674}]}
     ]},
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes

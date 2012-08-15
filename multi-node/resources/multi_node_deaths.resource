@@ -10,12 +10,12 @@
         {n6, [rabbit_node, connected]}
     ]},
     {user_data, [
-        {n1, [{amqp_port, 5672}]},
-        {n2, [{amqp_port, 5673}]},
-        {n3, [{amqp_port, 5674}]},
-        {n4, [{amqp_port, 5675}]},
-        {n5, [{amqp_port, 5676}]},
-        {n6, [{amqp_port, 5677}]}
+        {n1, [{amqp_port, 11672}]},
+        {n2, [{amqp_port, 11673}]},
+        {n3, [{amqp_port, 11674}]},
+        {n4, [{amqp_port, 11675}]},
+        {n5, [{amqp_port, 11676}]},
+        {n6, [{amqp_port, 11677}]}
     ]},
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes

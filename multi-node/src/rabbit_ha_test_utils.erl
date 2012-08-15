@@ -45,8 +45,9 @@ disconnect_from_node(Node) ->
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
     LogFn = fun clean_log/2,
+    systest:log("starting rabbit application on ~p~n", [NodeId]),
     rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
-    ok = rpc:call(NodeId, rabbit, await_startup, []).
+    wait(Node).
 
 %%
 %% @doc A systest 'on_stop' callback that stops the rabbit application
