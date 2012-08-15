@@ -11,6 +11,19 @@ may set one of the following variables when executing make:
 2. SYSTEST_VERBOSE=1 - prints various framework notifications to stdout
 3. SYSTEST_LOGGING=1 - prints additional test code logging to stdout
 
+SysTest version incompatibilities
+---------------------------------
+
+The version of SysTest we install is dictated by the SYSTEST_VERSION
+variable in the Makefile. This version needs to be reflected in the
+rebar configuration file (./systest.config) and will be checked
+during the 'test-compile' make target against the version number we
+find in the ./test-lib/systest/ebin/systest.app file. If you have
+hg pull'ed to a revision wherein the make variable has changed *and*
+you've already got a set of systest artefacts in ./test-lib, then it
+will be necessary to execute `make clean` in order to remove them
+before proceeding.
+
 Adding new test suites
 ----------------------
 
