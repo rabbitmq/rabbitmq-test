@@ -81,7 +81,8 @@ run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
 multi-node-tests:
-	$(MAKE) -C multi-node test-all
+	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=simple-tests
+	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
 
 clean:
 	rm -rf qpid_testsuite

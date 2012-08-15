@@ -7,18 +7,22 @@ either the supplied ./Makefile or the top-level one (../Makefile).
 By default the logging levels are very quiet. To turn these up, you
 may set one of the following variables when executing make:
 
-1. REBAR_LOG - takes a number from 0 (default) to 4
-2. SYSTEST_VERBOSE - active when set to any value apart from 'false'
+1. REBAR_LOG - compile verbosity: takes a number from 0 (default) to 4
+2. SYSTEST_VERBOSE=1 - prints various framework notifications to stdout
+3. SYSTEST_LOGGING=1 - prints additional test code logging to stdout
 
 Adding new test suites
 ----------------------
+
+Reading https://github.com/nebularis/systest/wiki/quickstart is probably
+a good idea before diving in to write new test cases.
 
 Test suites should be added to the ./test directory and must adhere
 to the common_test OTP framework guidelines. In addition to this,
 some configuration is required in order for systest to pick up
 your suite(s):
 
-You must provide a valid systest profile. This consists of a set of
+You may provide a valid systest profile. This consists of a set of
 targets (i.e., the names of the suite modules you wish to run when
 executing this profile) and wildcard(s) used to locate 'resources',
 which are the configuration files systest uses to bootstrap your
@@ -38,19 +42,63 @@ The 'connected' configuration requires that your cluster defines
 broker should listen. See ./resources/simple_ha_cluster.config for
 an example of how to set this up.
 
+If you wish to simply re-use an existing cluster configuration for
+all the tests in your suite, you can do so by setting up a resource
+configuration entry like so:
+
+    {my_test_SUITE, [{all, cluster_config_key}]}.
+
 Running a systest profile via the Makefile
 ------------------------------------------
 
 The systest executable, which is automatically installed if your
 target depends on $(SYSTEST), will run the profile indicated with
-the -P command line argument. See the ha-test target for an 
-example of how this works.
+the -P command line argument if SYSTEST_PROFILE is provided. If you
+wish to run a specific profile, you should invoke make using the
+'test-profile' target, otherwise the 'test-all' target ignores the
+profile and runs all tests in all suite modules using all the
+available configuration files.
 
-Figuring out which profile you want to run
-------------------------------------------
+Customising Test Properties
+---------------------------
 
-A dry-run target exists in the Makefile in this directory, which
-prints out useful information about which test suites will be
-invoked for a specified profile. You need to set the SYSTEST_PROFILE
-variable for the makefile to execute this target successfully.
+Some of the test code uses values which are supplied via configuration
+in the ./resources/default.settings file. If you wish to add new
+common settings, you should put them in here and retrieve them in your
+code using `systest:settings(SettingsKey)` or the systest_config
+API (see https://github.com/nebularis/systest/wiki/configuration for
+more details).
+
+If on the other hand, you wish to override the default settings, then
+doing so in a file named after the current user (i.e., the user who
+is invoking systest) will allow you to override a sub-set of the
+default values, and these changes will only be applied when the
+executable is invoked by that user. So for example, I can override
+the default time trap for the kill-multi test case and increase the
+message throughput at the same time, but overriding these settings
+for my user id:
+
+    %% in file ./resources/tim.settings
+    {message_volumes, [
+        {kill_multi, 10000}
+    ]}.
+
+    {time_traps, [
+        {kill_multi, {minutes, 2}}
+    ]}.
+
+Note that the other configuration elements in default are unaffected
+by this and will continue to work as expected.
+
+A note about code coverage
+--------------------------
+
+When enabled, code coverage will be started and stopped for each remote
+node, dealing with node restarts and shut-down instructions issued via
+the systest API calls transparently. It has been noticed however, that
+in some environments code coverage can cause test cases with large
+numbers of nodes (i.e., the kill_multi tests in multi_node_deaths_SUITE)
+to fail. For this reason, the Makefile in rabbitmq-test currently
+disables coverage for this profile/suite, and you can do the same if
+required by passing SYSTEST_NO_COVER=1 to make.
 
