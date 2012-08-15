@@ -68,8 +68,9 @@ wait(Node) ->
     %% passing the records around like this really sucks - if only we had
     %% coroutines we could do this far more cleanly... :/
     NodeId  = systest:process_data(id, Node),
+    UserData = systest:process_data(user, Node),
     LogFun  = fun clean_log/2,
-    case node_eval("node.user.env", [{node, Node}]) of
+    case proplists:get_value(env, UserData, not_found) of
         not_found -> throw(no_pidfile);
         Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
@@ -104,11 +105,10 @@ make_cluster(SUT) ->
 %%
 connect_to_node(Node, _ClusterRef, _Siblings) ->
     Id = systest:process_data(id, Node),
-    systest:log("connecting to ~p~n", [Id]),
     %% at this point we've already been clustered with all the other nodes,
     %% so we're good to go - now we can open up the connection+channel...
     UserData = systest:process_data(user, Node),
-    systest:log("opening AMQP connection + channel~n", []),
+    systest:log("opening AMQP connection + channel for ~p~n", [Id]),
     {Connection, Channel} = amqp_open(Id, UserData),
     AmqpData = [{amqp_connection, Connection},
                 {amqp_channel,    Channel}],
@@ -118,6 +118,11 @@ connect_to_node(Node, _ClusterRef, _Siblings) ->
 %%
 %% Test Utility Functions
 %%
+
+amqp_port(NodeRef) ->
+    UserData = systest:read_process_user_data(NodeRef),
+    Port = ?REQUIRE(amqp_port, UserData),
+    Port.
 
 clean_log(Fmt, Args) -> systest:log(Fmt ++ "~n", Args).
 

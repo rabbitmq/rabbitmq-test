@@ -131,7 +131,7 @@ restarted_master_honours_declarations(Config) ->
     %% of noisey sasl logs breaking out in the console! :)
     rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
 
-    {ok, {Master, _NewMRef}} = systest:restart_process(Cluster, MRef),
+    {ok, {Master, NewMRef}} = systest:restart_process(Cluster, MRef),
 
     %% NB: when a process restarts, the SUT does *NOT* re-run on_start
     %% hooks for the system as a whole, but it does run on_start, followed
@@ -146,7 +146,8 @@ restarted_master_honours_declarations(Config) ->
     systest:stop_and_wait(PRef),
     systest:stop_and_wait(SRef),
 
-    NewConn = rabbit_ha_test_utils:open_connection(5672),
+    AmqpPort = rabbit_ha_test_utils:amqp_port(NewMRef),
+    NewConn = rabbit_ha_test_utils:open_connection(AmqpPort),
     NewChann = rabbit_ha_test_utils:open_channel(NewConn),
 
     %% the master must refuse redeclaration with different parameters
