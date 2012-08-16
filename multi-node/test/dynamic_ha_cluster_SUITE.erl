@@ -63,7 +63,6 @@ simple_test(Config) ->
 
     %% Give it policy "nodes", it gets specific mirrors
     set_policy(A, Q, <<"nodes">>, [a2b(A), a2b(B)]),
-    timer:sleep(5000), %% TODO oh goody, yet another way to race
     assert_slaves(A, Q, A, [B]),
 
     ok.
@@ -80,30 +79,35 @@ assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes) ->
                     '' -> '';
                     _  -> [node(SPid) || SPid <- SPids]
                 end,
-    assert_equal(ExpMNode, ActMNode),
-    assert_list(ExpSNodes, ActSNodes),
-    ok.
-
-assert_equal(Exp, Act) ->
-    case Exp of
-        Act -> ok;
-        _   -> ct:fail("Expected ~p, got ~p~n", [Exp, Act])
+    case ExpMNode =:= ActMNode andalso equal_list(ExpSNodes, ActSNodes) of
+        false ->
+            %% It's an async change, so if nothing has changed let's
+            %% just wait - of course this means if something does not
+            %% change when expected then we time out the test which is
+            %% a bit tedious
+            case get(previous_exp_m_node) =:= ActMNode andalso
+                equal_list(get(previous_exp_s_nodes), ActSNodes) of
+                true  -> timer:sleep(100),
+                         assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes);
+                false -> ct:fail("Expected ~p / ~p, got ~p / ~p~n",
+                                 [ExpMNode, ExpSNodes, ActMNode, ActSNodes])
+            end;
+        true ->
+            put(previous_exp_m_node, ExpMNode),
+            put(previous_exp_s_nodes, ExpSNodes),
+            ok
     end.
 
-assert_list('', '')   -> ok;
-assert_list('', Act)  -> fail_list(['', Act]);
-assert_list(Exp, '')  -> fail_list([Exp, '']);
-assert_list(Exp, Act) -> assert_l0(Exp, Act, [Exp, Act]).
-
-assert_l0([],    [],   _Args) -> ok;
-assert_l0(_Exp,  [],   Args)  -> fail_list(Args);
-assert_l0([],    _Act, Args)  -> fail_list(Args);
-assert_l0([H|T], Act,  Args)  -> case lists:member(H, Act) of
-                                     true  -> assert_l0(T, Act -- [H], Args);
-                                     false -> fail_list(Args)
-                                 end.
-
-fail_list(Args) -> ct:fail("Expected ~p, got ~p~n", Args).
+equal_list('',    '')   -> true;
+equal_list('',    _Act) -> false;
+equal_list(_Exp,  '')   -> false;
+equal_list([],    [])   -> true;
+equal_list(_Exp,  [])   -> false;
+equal_list([],    _Act) -> false;
+equal_list([H|T], Act)  -> case lists:member(H, Act) of
+                               true  -> equal_list(T, Act -- [H]);
+                               false -> false
+                           end.
 
 find_queue(QName, Qs) ->
     case [Q || Q <- Qs, proplists:get_value(name, Q) =:=
