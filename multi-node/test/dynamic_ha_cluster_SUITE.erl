@@ -37,7 +37,7 @@
 -define(VHOST, <<"/">>).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         %%simple_test/1,
+         simple_test/1,
          change_cluster_test/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
@@ -109,7 +109,8 @@ change_cluster_test(Config) ->
     assert_slaves(A, ?QNAME, A, [B, C, D]),
 
     %% Remove D, E joins in
-    systest:stop_and_wait(DRef),
+    %% Bug 25104 %% systest:stop_and_wait(DRef),
+    systest:kill_and_wait(DRef),
     assert_slaves(A, ?QNAME, A, [B, C, E]),
 
     ok.
