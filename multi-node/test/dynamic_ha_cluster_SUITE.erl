@@ -15,6 +15,19 @@
 %%
 -module(dynamic_ha_cluster_SUITE).
 
+%% rabbit_tests:test_dynamic_mirroring() is a unit test which should
+%% test the logic of what all the policies decide to do, so we don't
+%% need to exhaustively test that here. What we need to test is:
+%%
+%% * Going from non-mirrored to mirrored works and vice versa
+%% * Changing policy can add / remove mirrors and change the master
+%% * Adding a node will create a new mirror when there are not enough nodes
+%%   for the policy
+%% * Removing a node will create a new mirror when there are more than enough
+%%   nodes for the policy
+%%
+%% The first two are simple_test, the last two are change_cluster_test
+
 -include_lib("common_test/include/ct.hrl").
 -include_lib("systest/include/systest.hrl").
 
@@ -24,7 +37,6 @@
 
 -export([suite/0, all/0, init_per_suite/1,
          end_per_suite/1,
-         simple_test/0,
          simple_test/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
@@ -35,16 +47,11 @@ all() ->
     systest_suite:export_all(?MODULE).
 
 init_per_suite(Config) ->
-    timer:start(),
+    timer:start(), %% TODO why is this needed?
     Config.
 
 end_per_suite(_Config) ->
     ok.
-
-simple_test() ->
-    [].
-    %% NB: up to 1.5 mins to fully cluster the nodes
-    %%[{timetrap, systest:settings("time_traps.restarted_master")}].
 
 simple_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
@@ -64,6 +71,14 @@ simple_test(Config) ->
     %% Give it policy "nodes", it gets specific mirrors
     set_policy(A, Q, <<"nodes">>, [a2b(A), a2b(B)]),
     assert_slaves(A, Q, A, [B]),
+
+    %% Now explicitly change the mirrors and the master
+    set_policy(A, Q, <<"nodes">>, [a2b(B), a2b(C)]),
+    assert_slaves(A, Q, B, [C]), %% B becomes master; it's older
+
+    %% Clear the policy, and we go back to non-mirrored
+    clear_policy(A, Q),
+    assert_slaves(A, Q, B, ''),
 
     ok.
 
@@ -128,5 +143,10 @@ set_policy(RPCNode, QName, HAMode, HAParams) ->
                               ]}
               ]
              ]).
+
+clear_policy(RPCNode, QName) ->
+    %% TODO vhost will go here after bug25071 merged
+    rpc:call(RPCNode, rabbit_runtime_parameters, clear,
+             [<<"policy">>, <<"HA">>]).
 
 a2b(A) -> list_to_binary(atom_to_list(A)).
