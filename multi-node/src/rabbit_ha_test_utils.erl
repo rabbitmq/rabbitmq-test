@@ -91,7 +91,8 @@ wait(Node) ->
 %%
 make_cluster(SUT) ->
     Nodes = systest:list_processes(SUT),
-    Members = [Id || {Id, _Ref} <- Nodes],
+    Members = [Id || {Id, Ref} <- Nodes,
+                     systest:process_activity_state(Ref) =/= not_started],
     systest:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members).
 

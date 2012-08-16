@@ -47,6 +47,12 @@
     ]}
 ]}.
 
+{start_cold, [
+    {startup, [
+        {activate_on_start, false}
+    ]}
+]}.
+
 {three_node_cluster, [
     {sut, [{localhost, [a, b, c]}]},
     {processes, [
