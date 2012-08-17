@@ -1,5 +1,6 @@
 .PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app restart-secondary-node cleanup force-snapshot ha-tests
+	prepare restart-app restart-secondary-node cleanup force-snapshot \
+	multi-node-tests
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
