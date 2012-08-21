@@ -24,17 +24,17 @@
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
 
          join_and_part_cluster/1, join_cluster_bad_operations/1,
-         join_to_start_interval/1, remove_cluster_node_test/1,
+         join_to_start_interval/1, forget_cluster_node_test/1,
          change_cluster_node_type_test/1, change_cluster_when_node_offline/1,
-         recluster_test/1
+         update_cluster_nodes_test/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
     [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
-     remove_cluster_node_test, change_cluster_node_type_test,
-     change_cluster_when_node_offline, recluster_test].
+     forget_cluster_node_test, change_cluster_node_type_test,
+     change_cluster_when_node_offline, update_cluster_nodes_test].
 
 init_per_suite(Config) ->
     Config.
@@ -143,11 +143,11 @@ join_to_start_interval(Config) ->
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
                          [Rabbit, Hare]).
 
-remove_cluster_node_test(Config) ->
+forget_cluster_node_test(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Trying to remove a node not in the cluster should fail
-    check_failure(fun () -> remove_cluster_node(Hare, Rabbit) end),
+    check_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
 
     ok = stop_app(Rabbit),
     join_cluster(Rabbit, Hare),
@@ -156,14 +156,14 @@ remove_cluster_node_test(Config) ->
                          [Rabbit, Hare]),
 
     %% Trying to remove an online node should fail
-    check_failure(fun () -> remove_cluster_node(Hare, Rabbit) end),
+    check_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
 
     ok = stop_app(Rabbit),
     %% We're passing the --offline flag, but Hare is online
-    check_failure(fun () -> remove_cluster_node(Hare, Rabbit, true) end),
+    check_failure(fun () -> forget_cluster_node(Hare, Rabbit, true) end),
     %% Removing some non-existant node will fail
-    check_failure(fun () -> remove_cluster_node(Hare, non@existant) end),
-    ok = remove_cluster_node(Hare, Rabbit),
+    check_failure(fun () -> forget_cluster_node(Hare, non@existant) end),
+    ok = forget_cluster_node(Hare, Rabbit),
     check_not_clustered(Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
                          [Rabbit]),
@@ -190,10 +190,10 @@ remove_cluster_node_test(Config) ->
     ok = stop_app(Hare),
     ok = stop_app(Bunny),
     %% Rabbit was not the second-to-last to go down
-    check_failure(fun () -> remove_cluster_node(Rabbit, Bunny, true) end),
+    check_failure(fun () -> forget_cluster_node(Rabbit, Bunny, true) end),
     %% This is fine but we need the flag
-    check_failure(fun () -> remove_cluster_node(Hare, Bunny) end),
-    ok = remove_cluster_node(Hare, Bunny, true),
+    check_failure(fun () -> forget_cluster_node(Hare, Bunny) end),
+    ok = forget_cluster_node(Hare, Bunny, true),
     ok = start_app(Hare),
     ok = start_app(Rabbit),
     %% Bunny still thinks its clustered with Rabbit and Hare
@@ -293,11 +293,11 @@ change_cluster_when_node_offline(Config) ->
                          [Rabbit, Hare]),
     check_not_clustered(Bunny).
 
-recluster_test(Config) ->
+update_cluster_nodes_test(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Mnesia is running...
-    check_failure(fun () -> recluster(Rabbit, Hare) end),
+    check_failure(fun () -> update_cluster_nodes(Rabbit, Hare) end),
 
     ok = stop_app(Rabbit),
     ok = join_cluster(Rabbit, Hare),
@@ -309,10 +309,10 @@ recluster_test(Config) ->
     ok = start_app(Hare),
     check_failure(fun () -> start_app(Rabbit) end),
     %% Bogus node
-    check_failure(fun () -> recluster(Rabbit, non@existant) end),
+    check_failure(fun () -> update_cluster_nodes(Rabbit, non@existant) end),
     %% Inconsisent node
-    check_failure(fun () -> recluster(Rabbit, Hare) end),
-    ok = recluster(Rabbit, Bunny),
+    check_failure(fun () -> update_cluster_nodes(Rabbit, Hare) end),
+    ok = update_cluster_nodes(Rabbit, Bunny),
     ok = start_app(Rabbit),
     check_not_clustered(Hare),
     check_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
@@ -364,18 +364,18 @@ join_cluster(Node, To, Ram) ->
 reset(Node) ->
     rabbit_ha_test_utils:control_action(reset, Node).
 
-remove_cluster_node(Node, Removee, RemoveWhenOffline) ->
+forget_cluster_node(Node, Removee, RemoveWhenOffline) ->
     rabbit_ha_test_utils:control_action(
-      remove_cluster_node, Node, [atom_to_list(Removee)],
+      forget_cluster_node, Node, [atom_to_list(Removee)],
       [{"--offline", RemoveWhenOffline}]).
 
-remove_cluster_node(Node, Removee) ->
-    remove_cluster_node(Node, Removee, false).
+forget_cluster_node(Node, Removee) ->
+    forget_cluster_node(Node, Removee, false).
 
 change_cluster_node_type(Node, Type) ->
     rabbit_ha_test_utils:control_action(change_cluster_node_type, Node,
                                         [atom_to_list(Type)]).
 
-recluster(Node, DiscoveryNode) ->
-    rabbit_ha_test_utils:control_action(recluster, Node,
+update_cluster_nodes(Node, DiscoveryNode) ->
+    rabbit_ha_test_utils:control_action(update_cluster_nodes, Node,
                                         [atom_to_list(DiscoveryNode)]).
