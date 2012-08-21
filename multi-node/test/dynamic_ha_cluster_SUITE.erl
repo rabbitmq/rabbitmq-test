@@ -40,6 +40,8 @@
          simple_test/1,
          change_cluster_test/1]).
 
+-import(rabbit_ha_test_utils, [set_policy/4, clear_policy/2]).
+
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
@@ -54,10 +56,14 @@ end_per_suite(_Config) ->
     ok.
 
 simple_test(Config) ->
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_CConn, _CCh}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+    %% TODO this test only needs three nodes
+    SUT = systest:active_sut(Config),
+    [{A, ARef},
+     {B, _BRef},
+     {C, _CRef},
+     {_D, _DRef},
+     {_E, _ERef}] = systest:list_processes(SUT),
+    ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
 
     %% When we first declare a queue with no policy, it's not HA.
     #'queue.declare_ok'{} = amqp_channel:call(
@@ -165,21 +171,5 @@ find_queue(QName, Qs) ->
     end.
 
 %%----------------------------------------------------------------------------
-
-set_policy(RPCNode, QName, HAMode, HAParams) ->
-    %% TODO vhost will go here after bug25071 merged
-    rpc:call(RPCNode, rabbit_runtime_parameters, set,
-             [<<"policy">>, <<"HA">>,
-              [{<<"prefix">>, QName},
-               {<<"policy">>, [{<<"ha-mode">>,   HAMode},
-                               {<<"ha-params">>, HAParams}
-                              ]}
-              ]
-             ]).
-
-clear_policy(RPCNode, QName) ->
-    %% TODO vhost will go here after bug25071 merged
-    rpc:call(RPCNode, rabbit_runtime_parameters, clear,
-             [<<"policy">>, <<"HA">>]).
 
 a2b(A) -> list_to_binary(atom_to_list(A)).

@@ -90,11 +90,19 @@ wait(Node) ->
 %% callback is ignored.
 %%
 make_cluster(SUT) ->
-    Nodes = systest:list_processes(SUT),
-    Members = [Id || {Id, Ref} <- Nodes,
-                     systest:process_activity_state(Ref) =/= not_started],
+    Members = live_members(SUT),
     systest:log("clustering ~p~n", [Members]),
     lists:foldl(fun cluster/2, [], Members).
+
+live_members(SUT) ->
+    [Id || {Id, Ref} <- systest:list_processes(SUT),
+           systest:process_activity_state(Ref) =/= not_started].
+
+declare_ha_policies(SUT) ->
+    Members = [Node | _] = live_members(SUT),
+    set_policy(Node, <<"ha.all.">>, <<"all">>, <<"">>),
+    set_policy(Node, <<"ha.nodes.">>, <<"nodes">>,
+               [list_to_binary(atom_to_list(M)) || M <- Members]).
 
 %%
 %% @doc This systest_sut on_join callback sets up a single connection and
@@ -142,12 +150,20 @@ read_timeout(SettingsKey) ->
         Other        -> throw({illegal_timetrap, Other})
     end.
 
-mirror_args([]) ->
-    [{<<"x-ha-policy">>, longstr, <<"all">>}];
-mirror_args(Nodes) ->
-    [{<<"x-ha-policy">>, longstr, <<"nodes">>},
-     {<<"x-ha-policy-params">>, array,
-      [{longstr, list_to_binary(atom_to_list(N))} || N <- Nodes]}].
+set_policy(Node, Prefix, HAMode, HAParams) ->
+    %% TODO vhost will go here after bug25071 merged
+    rpc:call(Node, rabbit_runtime_parameters, set,
+             [<<"policy">>, Prefix,
+              [{<<"prefix">>, Prefix},
+               {<<"policy">>, [{<<"ha-mode">>,   HAMode},
+                               {<<"ha-params">>, HAParams}
+                              ]}
+              ]
+             ]).
+
+clear_policy(Node, Prefix) ->
+    %% TODO vhost will go here after bug25071 merged
+    rpc:call(Node, rabbit_runtime_parameters, clear, [<<"policy">>, Prefix]).
 
 cluster_members(Config) ->
     Cluster = systest:active_sut(Config),

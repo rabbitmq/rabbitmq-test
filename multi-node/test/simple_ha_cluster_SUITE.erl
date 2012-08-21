@@ -55,13 +55,10 @@ send_consume_survives_node_deaths(Config) ->
                                                    rpc:call(N, rabbit_mnesia,
                                                             status, [])}
                                               end || N <- Nodes]],
-    MirrorArgs = rabbit_ha_test_utils:mirror_args(Nodes),
-
     %% declare the queue on the master, mirrored to the two slaves
-    #'queue.declare_ok'{queue=Queue} =
-        amqp_channel:call(Channel1,
-                          #'queue.declare'{auto_delete = false,
-                                           arguments   = MirrorArgs}),
+    Queue = <<"ha.nodes.test">>,
+    amqp_channel:call(Channel1, #'queue.declare'{queue       = Queue,
+                                                 auto_delete = false}),
 
     Msgs = systest:settings("message_volumes.send_consume"),
 
@@ -90,13 +87,10 @@ producer_confirms_survive_death_of_master(Config) ->
             } = rabbit_ha_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
-    #'queue.declare_ok'{queue = Queue} =
-        amqp_channel:call(MasterChannel,
-                          #'queue.declare'{
-                              auto_delete = false,
-                              durable     = true,
-                              arguments   = [{<<"x-ha-policy">>,
-                                                longstr, <<"all">>}]}),
+    Queue = <<"ha.all.test">>,
+    amqp_channel:call(MasterChannel,#'queue.declare'{queue       = Queue,
+                                                     auto_delete = false,
+                                                     durable     = true}),
 
     Msgs = systest:settings("message_volumes.producer_confirms"),
 
@@ -120,12 +114,10 @@ restarted_master_honours_declarations(Config) ->
          {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]
         } = rabbit_ha_test_utils:cluster_members(Config),
 
-    Queue = <<"ha-test-restarting-master">>,
-    MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Producer, Slave]),
+    Queue = <<"ha.nodes.test-restarting-master">>,
     #'queue.declare_ok'{} = amqp_channel:call(MasterChannel,
                         #'queue.declare'{queue       = Queue,
-                                         auto_delete = false,
-                                         arguments   = MirrorArgs}),
+                                         auto_delete = false}),
 
     %% restart master - we close the connections only to avoid a lot
     %% of noisey sasl logs breaking out in the console! :)

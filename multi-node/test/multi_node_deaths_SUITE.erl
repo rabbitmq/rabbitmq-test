@@ -48,11 +48,9 @@ killing_multiple_intermediate_nodes(Config) ->
           {_Producer, {_ProducerConnection, ProducerChannel}}]} =
                     rabbit_ha_test_utils:cluster_members(Config),
 
-    #'queue.declare_ok'{queue = Queue} =
-        amqp_channel:call(MasterChannel,
-                #'queue.declare'{
-                    auto_delete = false,
-                    arguments   = [{<<"x-ha-policy">>, longstr, <<"all">>}]}),
+    Queue = <<"ha.all.test">>,
+    amqp_channel:call(MasterChannel, #'queue.declare'{queue       = Queue,
+                                                      auto_delete = false}),
 
     %% TODO: this seems *highly* timing dependant - the assumption being
     %% that the kill will work quickly enough that there will still be

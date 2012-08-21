@@ -68,7 +68,8 @@
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes
         %% are up and running, so at this point we can cluster them...
-        {local, rabbit_ha_test_utils, make_cluster, []}
+        {local, rabbit_ha_test_utils, make_cluster, []},
+        {local, rabbit_ha_test_utils, declare_ha_policies, []}
     ]}
 ]}.
 
