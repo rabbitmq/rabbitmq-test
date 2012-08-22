@@ -102,8 +102,8 @@ change_cluster_test(Config) ->
                               ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, A, ''),
 
-    %% Give it policy at-least 4, it should mirror to all 3 nodes
-    set_policy(A, ?QNAME, <<"at-least">>, 4),
+    %% Give it policy exactly 4, it should mirror to all 3 nodes
+    set_policy(A, ?QNAME, <<"exactly">>, 4),
     assert_slaves(A, ?QNAME, A, [B, C]),
 
     %% Add D and E, D joins in
