@@ -66,8 +66,7 @@ simple_test(Config) ->
     ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
 
     %% When we first declare a queue with no policy, it's not HA.
-    #'queue.declare_ok'{} = amqp_channel:call(
-                              ACh, #'queue.declare'{queue = ?QNAME}),
+    amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, A, ''),
 
     %% Give it policy "all", it becomes HA and gets all mirrors
@@ -98,8 +97,7 @@ change_cluster_test(Config) ->
      {E, ERef}] = systest:list_processes(SUT),
     ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
 
-    #'queue.declare_ok'{} = amqp_channel:call(
-                              ACh, #'queue.declare'{queue = ?QNAME}),
+    amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, A, ''),
 
     %% Give it policy exactly 4, it should mirror to all 3 nodes
