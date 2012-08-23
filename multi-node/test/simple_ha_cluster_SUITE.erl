@@ -23,7 +23,8 @@
 -export([suite/0, all/0, init_per_suite/1,
          end_per_suite/1,
          send_consume_survives_node_deaths/1,
-         producer_confirms_survive_death_of_master/1]).
+         producer_confirms_survive_death_of_master/1,
+         rapid_redeclare/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -99,4 +100,14 @@ producer_confirms_survive_death_of_master(Config) ->
     systest:kill_after(50, Master),
 
     rabbit_ha_test_producer:await_response(ProducerPid),
+    ok.
+
+rapid_redeclare(Config) ->
+    {_, [{_, {_, Ch}}|_]} = rabbit_ha_test_utils:cluster_members(Config),
+    Queue = <<"ha.all.test">>,
+    [begin
+         amqp_channel:call(Ch, #'queue.declare'{queue  = Queue,
+                                                durable = true}),
+         amqp_channel:call(Ch, #'queue.delete'{queue  = Queue})
+     end || I <- lists:seq(1, 20)],
     ok.
