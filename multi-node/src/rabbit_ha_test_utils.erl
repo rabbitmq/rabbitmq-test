@@ -151,9 +151,8 @@ read_timeout(SettingsKey) ->
     end.
 
 set_policy(Node, Prefix, HAMode, HAParams) ->
-    %% TODO vhost will go here after bug25071 merged
     rpc:call(Node, rabbit_runtime_parameters, set,
-             [<<"policy">>, Prefix,
+             [<<"/">>, <<"policy">>, Prefix,
               [{<<"prefix">>, Prefix},
                {<<"policy">>, [{<<"ha-mode">>,   HAMode},
                                {<<"ha-params">>, HAParams}
@@ -162,8 +161,8 @@ set_policy(Node, Prefix, HAMode, HAParams) ->
              ]).
 
 clear_policy(Node, Prefix) ->
-    %% TODO vhost will go here after bug25071 merged
-    rpc:call(Node, rabbit_runtime_parameters, clear, [<<"policy">>, Prefix]).
+    rpc:call(Node, rabbit_runtime_parameters, clear,
+             [<<"/">>, <<"policy">>, Prefix]).
 
 cluster_members(Config) ->
     Cluster = systest:active_sut(Config),
