@@ -23,9 +23,7 @@
 -export([suite/0, all/0, init_per_suite/1,
          end_per_suite/1,
          send_consume_survives_node_deaths/1,
-         producer_confirms_survive_death_of_master/1,
-         restarted_master_honours_declarations/0,
-         restarted_master_honours_declarations/1]).
+         producer_confirms_survive_death_of_master/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -102,55 +100,3 @@ producer_confirms_survive_death_of_master(Config) ->
 
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
-
-restarted_master_honours_declarations() ->
-    %% NB: up to 1.5 mins to fully cluster the nodes
-    [{timetrap, systest:settings("time_traps.restarted_master")}].
-
-restarted_master_honours_declarations(Config) ->
-    {Cluster,
-        [{{Master,   MRef}, {MasterConnection,    MasterChannel}},
-         {{Producer, PRef}, {_ProducerConnection, _ProducerChannel}},
-         {{Slave,    SRef}, {_SlaveConnection,    _SlaveChannel}}]
-        } = rabbit_ha_test_utils:cluster_members(Config),
-
-    Queue = <<"ha.nodes.test-restarting-master">>,
-    #'queue.declare_ok'{} = amqp_channel:call(MasterChannel,
-                        #'queue.declare'{queue       = Queue,
-                                         auto_delete = false}),
-
-    %% restart master - we close the connections only to avoid a lot
-    %% of noisey sasl logs breaking out in the console! :)
-    rabbit_ha_test_utils:amqp_close(MasterChannel, MasterConnection),
-
-    {ok, {Master, NewMRef}} = systest:restart_process(Cluster, MRef),
-
-    %% NB: when a process restarts, the SUT does *NOT* re-run on_start
-    %% hooks for the system as a whole, but it does run on_start, followed
-    %% by on_join hooks for the individual process being restarted.
-    %% As such, we need to 're-cluster' here, as the clustering operation
-    %% run by the framework is attached to the SUT as a whole, so as to ensure
-    %% that the cluster is not set up until *after* all the processes
-    %% (i.e., nodes) have come online
-    rabbit_ha_test_utils:cluster_with(Producer, [Master]),
-
-    %% retire other members of the cluster
-    systest:stop_and_wait(PRef),
-    systest:stop_and_wait(SRef),
-
-    AmqpPort = rabbit_ha_test_utils:amqp_port(NewMRef),
-    NewConn = rabbit_ha_test_utils:open_connection(AmqpPort),
-    NewChann = rabbit_ha_test_utils:open_channel(NewConn),
-
-    %% the master must refuse redeclaration with different parameters
-    try amqp_channel:call(NewChann, #'queue.declare'{queue = Queue}) of
-        #'queue.declare_ok'{} ->
-            ct:fail("Expected exception ~p wasn't thrown~n",
-                    [?PRECONDITION_FAILED])
-    catch
-        exit:{{shutdown, {server_initiated_close,
-                ?PRECONDITION_FAILED, _Bin}}, _Rest} -> ok
-    after
-        rabbit_ha_test_utils:amqp_close(NewChann, NewConn)
-    end.
-
