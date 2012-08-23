@@ -58,6 +58,9 @@ killing_multiple_intermediate_nodes(Config) ->
     %% node deaths. It would be nice if we could find a means to do this
     %% in a way that is not actually timing dependent.
 
+    %% Worse still, it assumes that killing the master will cause a
+    %% failover to Slave1, and so on. Nope.
+
     Msgs = systest:settings("message_volumes.kill_multi"),
 
     ConsumerPid = rabbit_ha_test_consumer:create(Slave4Channel,
