@@ -113,8 +113,7 @@ change_cluster_test(Config) ->
     assert_slaves(A, ?QNAME, A, [B, C, D]),
 
     %% Remove D, E joins in
-    %% Bug 25104 %% systest:stop_and_wait(DRef),
-    systest:kill_and_wait(DRef),
+    systest:stop_and_wait(DRef),
     assert_slaves(A, ?QNAME, A, [B, C, E]),
 
     ok.
