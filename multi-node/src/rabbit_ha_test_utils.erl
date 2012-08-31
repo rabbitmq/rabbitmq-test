@@ -141,6 +141,18 @@ read_timeout(SettingsKey) ->
         Other        -> throw({illegal_timetrap, Other})
     end.
 
+control_action(Command, Node) ->
+    control_action(Command, Node, [], []).
+
+control_action(Command, Node, Args) ->
+    control_action(Command, Node, Args, []).
+
+control_action(Command, Node, Args, Opts) ->
+    rabbit_control_main:action(Command, Node, Args, Opts,
+                               fun (Format, Args1) ->
+                                       io:format(Format ++ " ...~n", Args1)
+                               end).
+
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
 mirror_args(Nodes) ->
@@ -170,6 +182,12 @@ open_connection(NodePort) ->
     {ok, Connection} =
         amqp_connection:start(#amqp_params_network{port=NodePort}),
     Connection.
+
+stop_app(Node) ->
+    rabbit_ha_test_utils:control_action(stop_app, Node).
+
+start_app(Node) ->
+    rabbit_ha_test_utils:control_action(start_app, Node).
 
 %%
 %% Private API
