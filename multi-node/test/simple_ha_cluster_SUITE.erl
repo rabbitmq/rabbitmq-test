@@ -133,15 +133,6 @@ restarted_master_honours_declarations(Config) ->
 
     {ok, {Master, NewMRef}} = systest:restart_process(Cluster, MRef),
 
-    %% NB: when a process restarts, the SUT does *NOT* re-run on_start
-    %% hooks for the system as a whole, but it does run on_start, followed
-    %% by on_join hooks for the individual process being restarted.
-    %% As such, we need to 're-cluster' here, as the clustering operation
-    %% run by the framework is attached to the SUT as a whole, so as to ensure
-    %% that the cluster is not set up until *after* all the processes
-    %% (i.e., nodes) have come online
-    rabbit_ha_test_utils:cluster_with(Producer, [Master]),
-
     %% retire other members of the cluster
     systest:stop_and_wait(PRef),
     systest:stop_and_wait(SRef),
