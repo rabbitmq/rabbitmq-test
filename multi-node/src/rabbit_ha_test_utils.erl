@@ -44,9 +44,8 @@ disconnect_from_node(Node) ->
 %% @end
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    LogFn = fun clean_log/2,
     systest:log("starting rabbit application on ~p~n", [NodeId]),
-    rabbit_control_main:action(start_app, NodeId, [], [], LogFn),
+    control_action(start_app, NodeId),
     wait(Node).
 
 %%
@@ -55,8 +54,7 @@ start_rabbit(Node) ->
 %% stopped on the node, which prevents the behaviour we saw in bug25070.
 stop_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    LogFn = fun clean_log/2,
-    rabbit_control_main:action(stop_app, NodeId, [], [], LogFn).
+    control_action(stop_app, NodeId).
 
 %%
 %% @doc runs <pre>rabbitmqctl wait</pre> against the supplied Node.
@@ -69,14 +67,12 @@ wait(Node) ->
     %% coroutines we could do this far more cleanly... :/
     NodeId  = systest:process_data(id, Node),
     UserData = systest:process_data(user, Node),
-    LogFun  = fun clean_log/2,
     case proplists:get_value(env, UserData, not_found) of
         not_found -> throw(no_pidfile);
         Env -> case lists:keyfind("RABBITMQ_PID_FILE", 1, Env) of
                    false   -> throw(no_pidfile);
                    {_, PF} -> systest:log("reading pid from ~s~n", [PF]),
-                              rabbit_control_main:action(wait, NodeId,
-                                                         [PF], [], LogFun)
+                              control_action(wait, NodeId, [PF])
                end
     end.
 
@@ -127,8 +123,6 @@ amqp_port(NodeRef) ->
     Port = ?REQUIRE(amqp_port, UserData),
     Port.
 
-clean_log(Fmt, Args) -> systest:log(Fmt ++ "~n", Args).
-
 await_response(Pid, Timeout) ->
     receive
         {Pid, Response} -> Response
@@ -152,8 +146,8 @@ control_action(Command, Node, Args) ->
 
 control_action(Command, Node, Args, Opts) ->
     rabbit_control_main:action(Command, Node, Args, Opts,
-                               fun (Format, Args1) ->
-                                       io:format(Format ++ " ...~n", Args1)
+                               fun (Fmt, Args) ->
+                                       systest:log(Fmt ++ "~n", Args)
                                end).
 
 cluster_status(Node) ->
@@ -179,11 +173,9 @@ amqp_config(NodeRef) ->
 
 cluster(Node, ClusterTo) ->
     systest:log("clustering ~p with ~p~n", [Node, ClusterTo]),
-    LogFn = fun clean_log/2,
-    rabbit_control_main:action(stop_app, Node, [], [], LogFn),
-    rabbit_control_main:action(join_cluster, Node,
-                               [atom_to_list(ClusterTo)], [], LogFn),
-    rabbit_control_main:action(start_app, Node, [], [], LogFn),
+    control_action(stop_app, Node),
+    control_action(join_cluster, Node, [atom_to_list(ClusterTo)]),
+    control_action(start_app, Node),
     ok = rpc:call(Node, rabbit, await_startup, []).
 
 amqp_open(_Id, UserData) ->
