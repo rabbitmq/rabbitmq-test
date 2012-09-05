@@ -114,6 +114,9 @@ change_cluster_test(Config) ->
 
     %% Remove D, E joins in
     systest:stop_and_wait(DRef),
+    %% This is a bit unfortunate, but after killing D we can detect A,
+    %% [B, C] before E fires up. Then we fail.
+    timer:sleep(1000),
     assert_slaves(A, ?QNAME, A, [B, C, E]),
 
     ok.
