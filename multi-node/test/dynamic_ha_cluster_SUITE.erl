@@ -121,8 +121,7 @@ change_cluster_test(Config) ->
 %%----------------------------------------------------------------------------
 
 assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes) ->
-    Qs = rpc:call(RPCNode, rabbit_amqqueue, info_all, [?VHOST], infinity),
-    Q = find_queue(QName, Qs),
+    Q = find_queue(QName, RPCNode),
     Pid = proplists:get_value(pid, Q),
     SPids = proplists:get_value(slave_pids, Q),
     ActMNode = node(Pid),
@@ -160,11 +159,19 @@ equal_list([H|T], Act)  -> case lists:member(H, Act) of
                                false -> false
                            end.
 
-find_queue(QName, Qs) ->
+find_queue(QName, RPCNode) ->
+    Qs = rpc:call(RPCNode, rabbit_amqqueue, info_all, [?VHOST], infinity),
+    case find_queue0(QName, Qs) of
+        did_not_find_queue -> timer:sleep(100),
+                              find_queue(QName, RPCNode);
+        Q -> Q
+    end.
+
+find_queue0(QName, Qs) ->
     case [Q || Q <- Qs, proplists:get_value(name, Q) =:=
                    rabbit_misc:r(?VHOST, queue, QName)] of
         [R] -> R;
-        []  -> exit({did_not_find_queue, QName})
+        []  -> did_not_find_queue
     end.
 
 %%----------------------------------------------------------------------------
