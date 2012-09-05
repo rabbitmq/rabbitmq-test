@@ -47,33 +47,25 @@ join_and_part_cluster(Config) ->
     check_not_clustered(Hare),
     check_not_clustered(Bunny),
 
-    ok = stop_app(Rabbit),
-    ok = join_cluster(Rabbit, Bunny),
-    ok = start_app(Rabbit),
+    stop_join_start(Rabbit, Bunny),
 
     check_cluster_status(
       {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
       [Rabbit, Bunny]),
 
-    ok = stop_app(Hare),
-    ok = join_cluster(Hare, Bunny, true),
-    ok = start_app(Hare),
+    stop_join_start(Hare, Bunny, true),
 
     check_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
-    ok = stop_app(Rabbit),
-    ok = reset(Rabbit),
-    ok = start_app(Rabbit),
+    stop_reset_start(Rabbit),
 
     check_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
     check_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
                          [Hare, Bunny]),
 
-    ok = stop_app(Hare),
-    ok = reset(Hare),
-    ok = start_app(Hare),
+    stop_reset_start(Hare),
 
     check_not_clustered(Hare),
     check_not_clustered(Bunny).
@@ -98,9 +90,7 @@ join_cluster_bad_operations(Config) ->
     check_not_clustered(Rabbit),
 
     %% Fail if trying to cluster with already clustered node
-    ok = stop_app(Rabbit),
-    join_cluster(Rabbit, Hare),
-    ok = start_app(Rabbit),
+    stop_join_start(Rabbit, Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
                          [Rabbit, Hare]),
     ok = stop_app(Rabbit),
@@ -110,17 +100,13 @@ join_cluster_bad_operations(Config) ->
                          [Rabbit, Hare]),
 
     %% Cleanup
-    ok = stop_app(Rabbit),
-    reset(Rabbit),
-    ok = start_app(Rabbit),
+    stop_reset_start(Rabbit),
     check_not_clustered(Rabbit),
     check_not_clustered(Hare),
 
     %% Do not let the node leave the cluster or reset if it's the only
     %% ram node
-    ok = stop_app(Hare),
-    ok = join_cluster(Hare, Rabbit, true),
-    ok = start_app(Hare),
+    stop_join_start(Hare, Rabbit, true),
     check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                          [Rabbit, Hare]),
     ok = stop_app(Hare),
@@ -149,9 +135,7 @@ forget_cluster_node_test(Config) ->
     %% Trying to remove a node not in the cluster should fail
     check_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
 
-    ok = stop_app(Rabbit),
-    join_cluster(Rabbit, Hare),
-    ok = start_app(Rabbit),
+    stop_join_start(Rabbit, Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
                          [Rabbit, Hare]),
 
@@ -177,12 +161,8 @@ forget_cluster_node_test(Config) ->
     check_not_clustered(Rabbit),
 
     %% Now we remove Rabbit from an offline node.
-    ok = stop_app(Bunny),
-    ok = join_cluster(Bunny, Hare),
-    ok = start_app(Bunny),
-    ok = stop_app(Rabbit),
-    ok = join_cluster(Rabbit, Hare),
-    ok = start_app(Rabbit),
+    stop_join_start(Bunny, Hare),
+    stop_join_start(Rabbit, Hare),
     check_cluster_status(
       {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
       [Rabbit, Hare, Bunny]),
@@ -237,15 +217,11 @@ change_cluster_when_node_offline(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Cluster the three notes
-    ok = stop_app(Rabbit),
-    join_cluster(Rabbit, Hare),
-    ok = start_app(Rabbit),
+    stop_join_start(Rabbit, Hare),
     check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
                          [Rabbit, Hare]),
 
-    ok = stop_app(Bunny),
-    join_cluster(Bunny, Hare),
-    ok = start_app(Bunny),
+    stop_join_start(Bunny, Hare),
     check_cluster_status(
       {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
       [Rabbit, Hare, Bunny]),
@@ -273,9 +249,7 @@ change_cluster_when_node_offline(Config) ->
     ok = stop_app(Rabbit),
     ok = change_cluster_node_type(Rabbit, ram),
     ok = start_app(Rabbit),
-    ok = stop_app(Bunny),
-    ok = join_cluster(Bunny, Hare),
-    ok = start_app(Bunny),
+    stop_join_start(Bunny, Hare),
     check_cluster_status(
       {[Rabbit, Hare, Bunny], [Hare, Bunny], [Rabbit, Hare, Bunny]},
       [Rabbit, Hare, Bunny]),
@@ -304,9 +278,7 @@ update_cluster_nodes_test(Config) ->
     ok = stop_app(Bunny),
     ok = join_cluster(Bunny, Hare),
     ok = start_app(Bunny),
-    ok = stop_app(Hare),
-    ok = reset(Hare),
-    ok = start_app(Hare),
+    stop_reset_start(Hare),
     check_failure(fun () -> start_app(Rabbit) end),
     %% Bogus node
     check_failure(fun () -> update_cluster_nodes(Rabbit, non@existant) end),
@@ -379,3 +351,16 @@ change_cluster_node_type(Node, Type) ->
 update_cluster_nodes(Node, DiscoveryNode) ->
     rabbit_ha_test_utils:control_action(update_cluster_nodes, Node,
                                         [atom_to_list(DiscoveryNode)]).
+
+stop_join_start(Node, ClusterTo, Ram) ->
+    ok = stop_app(Node),
+    ok = join_cluster(Node, ClusterTo, Ram),
+    ok = start_app(Node).
+
+stop_join_start(Node, ClusterTo) ->
+    stop_join_start(Node, ClusterTo, false).
+
+stop_reset_start(Node) ->
+    ok = stop_app(Node),
+    ok = reset(Node),
+    ok = start_app(Node).
