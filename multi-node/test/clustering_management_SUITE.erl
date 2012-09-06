@@ -317,7 +317,8 @@ assert_not_clustered(Node) ->
 assert_failure(Fun) ->
     case catch Fun() of
         {error, Reason}            -> Reason;
-        {badrpc, {'EXIT', Reason}} -> Reason
+        {badrpc, {'EXIT', Reason}} -> Reason;
+        Other                      -> exit({expected_failure, Other})
     end.
 
 stop_app(Node) ->
