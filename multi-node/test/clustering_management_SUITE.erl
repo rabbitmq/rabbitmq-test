@@ -43,78 +43,78 @@ end_per_suite(_Config) ->
 
 join_and_part_cluster(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
-    check_not_clustered(Rabbit),
-    check_not_clustered(Hare),
-    check_not_clustered(Bunny),
+    assert_not_clustered(Rabbit),
+    assert_not_clustered(Hare),
+    assert_not_clustered(Bunny),
 
     stop_join_start(Rabbit, Bunny),
 
-    check_cluster_status(
+    assert_cluster_status(
       {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
       [Rabbit, Bunny]),
 
     stop_join_start(Hare, Bunny, true),
 
-    check_cluster_status(
+    assert_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
     stop_reset_start(Rabbit),
 
-    check_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
-    check_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
-                         [Hare, Bunny]),
+    assert_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
+    assert_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
+                          [Hare, Bunny]),
 
     stop_reset_start(Hare),
 
-    check_not_clustered(Hare),
-    check_not_clustered(Bunny).
+    assert_not_clustered(Hare),
+    assert_not_clustered(Bunny).
 
 join_cluster_bad_operations(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Non-existant node
     ok = stop_app(Rabbit),
-    check_failure(fun () -> join_cluster(Rabbit, non@existant) end),
+    assert_failure(fun () -> join_cluster(Rabbit, non@existant) end),
     ok = start_app(Rabbit),
-    check_not_clustered(Rabbit),
+    assert_not_clustered(Rabbit),
 
     %% Trying to cluster with mnesia running
-    check_failure(fun () -> join_cluster(Rabbit, Bunny) end),
-    check_not_clustered(Rabbit),
+    assert_failure(fun () -> join_cluster(Rabbit, Bunny) end),
+    assert_not_clustered(Rabbit),
 
     %% Trying to cluster the node with itself
     ok = stop_app(Rabbit),
-    check_failure(fun () -> join_cluster(Rabbit, Rabbit) end),
+    assert_failure(fun () -> join_cluster(Rabbit, Rabbit) end),
     ok = start_app(Rabbit),
-    check_not_clustered(Rabbit),
+    assert_not_clustered(Rabbit),
 
     %% Fail if trying to cluster with already clustered node
     stop_join_start(Rabbit, Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
     ok = stop_app(Rabbit),
-    check_failure(fun () -> join_cluster(Rabbit, Hare) end),
+    assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
     ok = start_app(Rabbit),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
 
     %% Cleanup
     stop_reset_start(Rabbit),
-    check_not_clustered(Rabbit),
-    check_not_clustered(Hare),
+    assert_not_clustered(Rabbit),
+    assert_not_clustered(Hare),
 
     %% Do not let the node leave the cluster or reset if it's the only
     %% ram node
     stop_join_start(Hare, Rabbit, true),
-    check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
     ok = stop_app(Hare),
-    check_failure(fun () -> join_cluster(Rabbit, Bunny) end),
-    check_failure(fun () -> reset(Rabbit) end),
+    assert_failure(fun () -> join_cluster(Rabbit, Bunny) end),
+    assert_failure(fun () -> reset(Rabbit) end),
     ok = start_app(Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                         [Rabbit, Hare]).
+    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                          [Rabbit, Hare]).
 
 %% This tests that the nodes in the cluster are notified immediately of a node
 %% join, and not just after the app is started.
@@ -123,94 +123,94 @@ join_to_start_interval(Config) ->
 
     ok = stop_app(Rabbit),
     ok = join_cluster(Rabbit, Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                          [Rabbit, Hare]),
     ok = start_app(Rabbit),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]).
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]).
 
 forget_cluster_node_test(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Trying to remove a node not in the cluster should fail
-    check_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
+    assert_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
 
     stop_join_start(Rabbit, Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
+                          [Rabbit, Hare]),
 
     %% Trying to remove an online node should fail
-    check_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
+    assert_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
 
     ok = stop_app(Rabbit),
     %% We're passing the --offline flag, but Hare is online
-    check_failure(fun () -> forget_cluster_node(Hare, Rabbit, true) end),
+    assert_failure(fun () -> forget_cluster_node(Hare, Rabbit, true) end),
     %% Removing some non-existant node will fail
-    check_failure(fun () -> forget_cluster_node(Hare, non@existant) end),
+    assert_failure(fun () -> forget_cluster_node(Hare, non@existant) end),
     ok = forget_cluster_node(Hare, Rabbit),
-    check_not_clustered(Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
-                         [Rabbit]),
+    assert_not_clustered(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                          [Rabbit]),
 
     %% Now we can't start Rabbit since it thinks that it's still in the cluster
     %% with Hare, while Hare disagrees.
-    check_failure(fun () -> start_app(Rabbit) end),
+    assert_failure(fun () -> start_app(Rabbit) end),
 
     ok = reset(Rabbit),
     ok = start_app(Rabbit),
-    check_not_clustered(Rabbit),
+    assert_not_clustered(Rabbit),
 
     %% Now we remove Rabbit from an offline node.
     stop_join_start(Bunny, Hare),
     stop_join_start(Rabbit, Hare),
-    check_cluster_status(
+    assert_cluster_status(
       {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
       [Rabbit, Hare, Bunny]),
     ok = stop_app(Rabbit),
     ok = stop_app(Hare),
     ok = stop_app(Bunny),
     %% Rabbit was not the second-to-last to go down
-    check_failure(fun () -> forget_cluster_node(Rabbit, Bunny, true) end),
+    assert_failure(fun () -> forget_cluster_node(Rabbit, Bunny, true) end),
     %% This is fine but we need the flag
-    check_failure(fun () -> forget_cluster_node(Hare, Bunny) end),
+    assert_failure(fun () -> forget_cluster_node(Hare, Bunny) end),
     ok = forget_cluster_node(Hare, Bunny, true),
     ok = start_app(Hare),
     ok = start_app(Rabbit),
     %% Bunny still thinks its clustered with Rabbit and Hare
-    check_failure(fun () -> start_app(Bunny) end),
+    assert_failure(fun () -> start_app(Bunny) end),
     ok = reset(Bunny),
     ok = start_app(Bunny),
-    check_not_clustered(Bunny),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]).
+    assert_not_clustered(Bunny),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]).
 
 change_cluster_node_type_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
     %% Trying to change the ram node when not clustered should always fail
     ok = stop_app(Rabbit),
-    check_failure(fun () -> change_cluster_node_type(Rabbit, ram) end),
-    check_failure(fun () -> change_cluster_node_type(Rabbit, disc) end),
+    assert_failure(fun () -> change_cluster_node_type(Rabbit, ram) end),
+    assert_failure(fun () -> change_cluster_node_type(Rabbit, disc) end),
     ok = start_app(Rabbit),
 
     ok = stop_app(Rabbit),
     join_cluster(Rabbit, Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                          [Rabbit, Hare]),
     change_cluster_node_type(Rabbit, ram),
-    check_cluster_status({[Rabbit, Hare], [Hare], [Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Hare], [Hare]},
+                          [Rabbit, Hare]),
     change_cluster_node_type(Rabbit, disc),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                          [Rabbit, Hare]),
     change_cluster_node_type(Rabbit, ram),
     ok = start_app(Rabbit),
-    check_cluster_status({[Rabbit, Hare], [Hare], [Hare, Rabbit]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Hare], [Hare, Rabbit]},
+                          [Rabbit, Hare]),
 
     %% Changing to ram when you're the only ram node should fail
     ok = stop_app(Hare),
-    check_failure(fun () -> change_cluster_node_type(Hare, ram) end),
+    assert_failure(fun () -> change_cluster_node_type(Hare, ram) end),
     ok = start_app(Hare).
 
 change_cluster_when_node_offline(Config) ->
@@ -218,11 +218,11 @@ change_cluster_when_node_offline(Config) ->
 
     %% Cluster the three notes
     stop_join_start(Rabbit, Hare),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
+                          [Rabbit, Hare]),
 
     stop_join_start(Bunny, Hare),
-    check_cluster_status(
+    assert_cluster_status(
       {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
       [Rabbit, Hare, Bunny]),
 
@@ -231,18 +231,18 @@ change_cluster_when_node_offline(Config) ->
     ok = stop_app(Rabbit),
     ok = stop_app(Bunny),
     ok = reset(Bunny),
-    check_cluster_status({[Bunny], [Bunny], []}, [Bunny]),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]}, [Hare]),
-    check_cluster_status(
+    assert_cluster_status({[Bunny], [Bunny], []}, [Bunny]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]}, [Hare]),
+    assert_cluster_status(
       {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Hare, Bunny]},
       [Rabbit]),
 
     %% Bring Rabbit back up
     ok = start_app(Rabbit),
-    check_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
     ok = start_app(Bunny),
-    check_not_clustered(Bunny),
+    assert_not_clustered(Bunny),
 
     %% Now the same, but Rabbit is a RAM node, and we bring up Bunny
     %% before
@@ -250,28 +250,28 @@ change_cluster_when_node_offline(Config) ->
     ok = change_cluster_node_type(Rabbit, ram),
     ok = start_app(Rabbit),
     stop_join_start(Bunny, Hare),
-    check_cluster_status(
+    assert_cluster_status(
       {[Rabbit, Hare, Bunny], [Hare, Bunny], [Rabbit, Hare, Bunny]},
       [Rabbit, Hare, Bunny]),
     ok = stop_app(Rabbit),
     ok = stop_app(Bunny),
     ok = reset(Bunny),
     ok = start_app(Bunny),
-    check_not_clustered(Bunny),
-    check_cluster_status({[Rabbit, Hare], [Hare], [Hare]}, [Hare]),
-    check_cluster_status(
+    assert_not_clustered(Bunny),
+    assert_cluster_status({[Rabbit, Hare], [Hare], [Hare]}, [Hare]),
+    assert_cluster_status(
       {[Rabbit, Hare, Bunny], [Hare, Bunny], [Hare, Bunny]},
       [Rabbit]),
     ok = start_app(Rabbit),
-    check_cluster_status({[Rabbit, Hare], [Hare], [Rabbit, Hare]},
-                         [Rabbit, Hare]),
-    check_not_clustered(Bunny).
+    assert_cluster_status({[Rabbit, Hare], [Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
+    assert_not_clustered(Bunny).
 
 update_cluster_nodes_test(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Mnesia is running...
-    check_failure(fun () -> update_cluster_nodes(Rabbit, Hare) end),
+    assert_failure(fun () -> update_cluster_nodes(Rabbit, Hare) end),
 
     ok = stop_app(Rabbit),
     ok = join_cluster(Rabbit, Hare),
@@ -279,16 +279,16 @@ update_cluster_nodes_test(Config) ->
     ok = join_cluster(Bunny, Hare),
     ok = start_app(Bunny),
     stop_reset_start(Hare),
-    check_failure(fun () -> start_app(Rabbit) end),
+    assert_failure(fun () -> start_app(Rabbit) end),
     %% Bogus node
-    check_failure(fun () -> update_cluster_nodes(Rabbit, non@existant) end),
+    assert_failure(fun () -> update_cluster_nodes(Rabbit, non@existant) end),
     %% Inconsisent node
-    check_failure(fun () -> update_cluster_nodes(Rabbit, Hare) end),
+    assert_failure(fun () -> update_cluster_nodes(Rabbit, Hare) end),
     ok = update_cluster_nodes(Rabbit, Bunny),
     ok = start_app(Rabbit),
-    check_not_clustered(Hare),
-    check_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
-                         [Rabbit, Bunny]).
+    assert_not_clustered(Hare),
+    assert_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
+                          [Rabbit, Bunny]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
@@ -297,7 +297,7 @@ cluster_members(Config) ->
     Cluster = systest:active_sut(Config),
     [Id || {Id, _Ref} <- systest:list_processes(Cluster)].
 
-check_cluster_status(Status0, Nodes) ->
+assert_cluster_status(Status0, Nodes) ->
     SortStatus =
         fun ({All, Disc, Running}) ->
                 {lists:sort(All), lists:sort(Disc), lists:sort(Running)}
@@ -311,10 +311,10 @@ check_cluster_status(Status0, Nodes) ->
                  Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
       end, Nodes).
 
-check_not_clustered(Node) ->
-    check_cluster_status({[Node], [Node], [Node]}, [Node]).
+assert_not_clustered(Node) ->
+    assert_cluster_status({[Node], [Node], [Node]}, [Node]).
 
-check_failure(Fun) ->
+assert_failure(Fun) ->
     case catch Fun() of
         {error, Reason}            -> Reason;
         {badrpc, {'EXIT', Reason}} -> Reason
