@@ -18,12 +18,12 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         slave_synchronization/1]).
+         slave_synchronization/1, slave_synchronization_ttl/1]).
 
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
 all() ->
-    [slave_synchronization].
+    [slave_synchronization, slave_synchronization_ttl].
 
 init_per_suite(Config) ->
     timer:start(),
@@ -49,6 +49,9 @@ slave_synchronization(Config) ->
     %% the master.
     rabbit_ha_test_utils:stop_app(Slave),
 
+    %% We get and ack one message when the slave is down, and check that when we
+    %% start the slave it's not marked as synced until ack the message.  We also
+    %% publish another message when the slave is up.
     send_dummy_message(Channel, Queue),                                 % 1 - 0
     {#'basic.get_ok'{delivery_tag = Tag1}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 0 - 1
@@ -64,12 +67,17 @@ slave_synchronization(Config) ->
     timer:sleep(1000),
     slave_synced(Master),
 
-    send_dummy_message(Channel, Queue),                                 % 2 - 0
-
+    %% We restart the slave and we send a message, so that the slave will only
+    %% have one of the messages.
     rabbit_ha_test_utils:stop_app(Slave),
     rabbit_ha_test_utils:start_app(Slave),
 
+    send_dummy_message(Channel, Queue),                                 % 2 - 0
+
     slave_unsynced(Master),
+
+    %% We reject the message that the slave doesn't have, and verify that it's
+    %% still unsynced
     {#'basic.get_ok'{delivery_tag = Tag2}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 1 - 1
     slave_unsynced(Master),
@@ -79,13 +87,59 @@ slave_synchronization(Config) ->
     {#'basic.get_ok'{delivery_tag = Tag3}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 1 - 1
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag3}),      % 1 - 0
-    slave_unsynced(Master),
+    timer:sleep(1000),
+    slave_synced(Master),
     {#'basic.get_ok'{delivery_tag = Tag4}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 0 - 1
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag4}),      % 0 - 0
+    slave_synced(Master).
+
+slave_synchronization_ttl(Config) ->
+    {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
+                {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
+                _Unused]} =
+        rabbit_ha_test_utils:cluster_members(Config),
+
+    Queue = <<"test">>,
+    %% Sadly we need fairly high numbers for the TTL because starting/stopping
+    %% nodes takes a fair amount of time.
+    Args = rabbit_ha_test_utils:mirror_args([Master, Slave]) ++
+        [{<<"x-message-ttl">>, long, 1000}],
+    #'queue.declare_ok'{} =
+        amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
+                                                    auto_delete = false,
+                                                    arguments   = Args}),
 
     timer:sleep(1000),
-    slave_synced(Master).
+    slave_synced(Master),
+
+    %% All unknown
+    rabbit_ha_test_utils:stop_app(Slave),
+    send_dummy_message(Channel, Queue),
+    send_dummy_message(Channel, Queue),
+    rabbit_ha_test_utils:start_app(Slave),
+    slave_unsynced(Master),
+    timer:sleep(2000),
+    slave_synced(Master),
+
+    %% 1 unknown, 1 known
+    rabbit_ha_test_utils:stop_app(Slave),
+    send_dummy_message(Channel, Queue),
+    rabbit_ha_test_utils:start_app(Slave),
+    slave_unsynced(Master),
+    send_dummy_message(Channel, Queue),
+    slave_unsynced(Master),
+    timer:sleep(2000),
+    slave_synced(Master),
+
+    %% both known
+    send_dummy_message(Channel, Queue),
+    send_dummy_message(Channel, Queue),
+    slave_synced(Master),
+    timer:sleep(2000),
+    slave_synced(Master),
+
+    ok.
 
 send_dummy_message(Channel, Queue) ->
     Payload = <<"foo">>,
