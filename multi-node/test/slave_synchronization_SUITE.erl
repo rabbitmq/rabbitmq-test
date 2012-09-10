@@ -58,14 +58,14 @@ slave_synchronization(Config) ->
 
     rabbit_ha_test_utils:start_app(Slave),
 
-    slave_unsynced(Master),
+    slave_unsynced(Master, Queue),
     send_dummy_message(Channel, Queue),                                 % 1 - 1
-    slave_unsynced(Master),
+    slave_unsynced(Master, Queue),
 
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag1}),      % 1 - 0
 
     timer:sleep(1000),
-    slave_synced(Master),
+    slave_synced(Master, Queue),
 
     %% We restart the slave and we send a message, so that the slave will only
     %% have one of the messages.
@@ -74,70 +74,81 @@ slave_synchronization(Config) ->
 
     send_dummy_message(Channel, Queue),                                 % 2 - 0
 
-    slave_unsynced(Master),
+    slave_unsynced(Master, Queue),
 
     %% We reject the message that the slave doesn't have, and verify that it's
     %% still unsynced
     {#'basic.get_ok'{delivery_tag = Tag2}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 1 - 1
-    slave_unsynced(Master),
+    slave_unsynced(Master, Queue),
     amqp_channel:cast(Channel, #'basic.reject'{ delivery_tag = Tag2,
                                                 requeue      = true }), % 2 - 0
-    slave_unsynced(Master),
+    slave_unsynced(Master, Queue),
     {#'basic.get_ok'{delivery_tag = Tag3}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 1 - 1
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag3}),      % 1 - 0
     timer:sleep(1000),
-    slave_synced(Master),
+    slave_synced(Master, Queue),
     {#'basic.get_ok'{delivery_tag = Tag4}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 0 - 1
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag4}),      % 0 - 0
-    slave_synced(Master).
+    slave_synced(Master, Queue).
 
 slave_synchronization_ttl(Config) ->
     {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
                 {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
-                _Unused]} =
+                {{DLX,    _DRef}, {_DLXConnection,   DLXChannel}}]} =
         rabbit_ha_test_utils:cluster_members(Config),
+
+    %% We declare a DLX queue to wait for messages to be TTL'ed
+    DLXQueue = <<"dlx-queue">>,
+    #'queue.declare_ok'{} =
+        amqp_channel:call(Channel, #'queue.declare'{queue       = DLXQueue,
+                                                    auto_delete = false}),
 
     Queue = <<"test">>,
     %% Sadly we need fairly high numbers for the TTL because starting/stopping
     %% nodes takes a fair amount of time.
     Args = rabbit_ha_test_utils:mirror_args([Master, Slave]) ++
-        [{<<"x-message-ttl">>, long, 1000}],
+        [{<<"x-message-ttl">>, long, 1000},
+         {<<"x-dead-letter-exchange">>, longstr, <<>>},
+         {<<"x-dead-letter-routing-key">>, longstr, DLXQueue}],
     #'queue.declare_ok'{} =
         amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
                                                     auto_delete = false,
                                                     arguments   = Args}),
 
     timer:sleep(1000),
-    slave_synced(Master),
+    slave_synced(Master, Queue),
 
     %% All unknown
     rabbit_ha_test_utils:stop_app(Slave),
     send_dummy_message(Channel, Queue),
     send_dummy_message(Channel, Queue),
     rabbit_ha_test_utils:start_app(Slave),
-    slave_unsynced(Master),
-    timer:sleep(2000),
-    slave_synced(Master),
+    slave_unsynced(Master, Queue),
+    wait_for_messages(DLXQueue, DLXChannel, 2),
+    timer:sleep(1000),
+    slave_synced(Master, Queue),
 
     %% 1 unknown, 1 known
     rabbit_ha_test_utils:stop_app(Slave),
     send_dummy_message(Channel, Queue),
     rabbit_ha_test_utils:start_app(Slave),
-    slave_unsynced(Master),
+    slave_unsynced(Master, Queue),
     send_dummy_message(Channel, Queue),
-    slave_unsynced(Master),
-    timer:sleep(2000),
-    slave_synced(Master),
+    slave_unsynced(Master, Queue),
+    wait_for_messages(DLXQueue, DLXChannel, 2),
+    timer:sleep(1000),
+    slave_synced(Master, Queue),
 
-    %% both known
+    %% %% both known
     send_dummy_message(Channel, Queue),
     send_dummy_message(Channel, Queue),
-    slave_synced(Master),
-    timer:sleep(2000),
-    slave_synced(Master),
+    slave_synced(Master, Queue),
+    wait_for_messages(DLXQueue, DLXChannel, 2),
+    timer:sleep(1000),
+    slave_synced(Master, Queue),
 
     ok.
 
@@ -146,14 +157,31 @@ send_dummy_message(Channel, Queue) ->
     Publish = #'basic.publish'{exchange = <<>>, routing_key = Queue},
     amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Payload}).
 
-slave_pids(Node) ->
-    [[{synchronised_slave_pids, Pids}]] =
-        rpc:call(Node, rabbit_amqqueue, info_all,
-                 [<<"/">>, [synchronised_slave_pids]]),
+slave_pids(Node, Queue) ->
+    [[_Name, {synchronised_slave_pids, Pids}]] =
+        lists:filter(
+          fun ([{name, {resource, <<"/">>, queue, Queue1}}, _SyncPids]) ->
+                  Queue1 =:= Queue
+          end, rpc:call(Node, rabbit_amqqueue, info_all,
+                        [<<"/">>, [name, synchronised_slave_pids]])),
     Pids.
 
-slave_synced(Node) ->
-    1 = length(slave_pids(Node)).
+slave_synced(Node, Queue) ->
+    1 = length(slave_pids(Node, Queue)).
 
-slave_unsynced(Node) ->
-    0 = length(slave_pids(Node)).
+slave_unsynced(Node, Queue) ->
+    0 = length(slave_pids(Node, Queue)).
+
+wait_for_messages(Queue, Channel, N) ->
+    Sub = #'basic.consume'{queue = Queue},
+    #'basic.consume_ok'{consumer_tag = CTag} = amqp_channel:call(Channel, Sub),
+    receive
+        #'basic.consume_ok'{} -> ok
+    end,
+    lists:foreach(
+      fun (_) -> receive
+                     {#'basic.deliver'{delivery_tag = Tag}, Content} ->
+                         amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag})
+                 end
+      end, lists:seq(1, N)),
+    amqp_channel:call(Channel, #'basic.cancel'{consumer_tag = CTag}).

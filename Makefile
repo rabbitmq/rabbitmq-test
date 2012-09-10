@@ -70,8 +70,8 @@ qpid_testsuite:
 	$(MAKE) update-qpid-testsuite
 
 update-qpid-testsuite:
-	#svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
-	hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
+	svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
+	# hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
 	- patch -N -r - -p0 -d qpid_testsuite/ < qpid_patch
 
 prepare-qpid-patch:
