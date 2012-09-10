@@ -67,23 +67,23 @@ simple_test(Config) ->
 
     %% When we first declare a queue with no policy, it's not HA.
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
-    assert_slaves(A, ?QNAME, A, ''),
+    assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy "all", it becomes HA and gets all mirrors
     set_policy(A, ?QNAME, <<"all">>, []),
-    assert_slaves(A, ?QNAME, A, [B, C]),
+    assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Give it policy "nodes", it gets specific mirrors
     set_policy(A, ?QNAME, <<"nodes">>, [a2b(A), a2b(B)]),
-    assert_slaves(A, ?QNAME, A, [B]),
+    assert_slaves(A, ?QNAME, {A, [B]}),
 
     %% Now explicitly change the mirrors and the master
     set_policy(A, ?QNAME, <<"nodes">>, [a2b(B), a2b(C)]),
-    assert_slaves(A, ?QNAME, B, [C]), %% B becomes master; it's older
+    assert_slaves(A, ?QNAME, {B, [C]}), %% B becomes master; it's older
 
     %% Clear the policy, and we go back to non-mirrored
     clear_policy(A, ?QNAME),
-    assert_slaves(A, ?QNAME, B, ''),
+    assert_slaves(A, ?QNAME, {B, ''}),
 
     ok.
 
@@ -98,11 +98,11 @@ change_cluster_test(Config) ->
     ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
 
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
-    assert_slaves(A, ?QNAME, A, ''),
+    assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy exactly 4, it should mirror to all 3 nodes
     set_policy(A, ?QNAME, <<"exactly">>, 4),
-    assert_slaves(A, ?QNAME, A, [B, C]),
+    assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
     ok = systest:activate_process(DRef),
@@ -110,20 +110,25 @@ change_cluster_test(Config) ->
     Cluster = [atom_to_list(A)],
     rabbit_ha_test_utils:cluster(D, Cluster),
     rabbit_ha_test_utils:cluster(E, Cluster),
-    assert_slaves(A, ?QNAME, A, [B, C, D]),
+    assert_slaves(A, ?QNAME, {A, [B, C, D]}),
 
     %% Remove D, E joins in
     systest:stop_and_wait(DRef),
-    %% This is a bit unfortunate, but after killing D we can detect A,
-    %% [B, C] before E fires up. Then we fail.
-    timer:sleep(1000),
-    assert_slaves(A, ?QNAME, A, [B, C, E]),
+    assert_slaves(A, ?QNAME, {A, [B, C, E]}, [{A, [B, C]}]),
 
     ok.
 
 %%----------------------------------------------------------------------------
 
-assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes) ->
+assert_slaves(RPCNode, QName, Exp) ->
+    assert_slaves(RPCNode, QName, Exp, []).
+
+assert_slaves(RPCNode, QName, Exp, PermittedIntermediate) ->
+    assert_slaves0(RPCNode, QName, Exp,
+                  [{get(previous_exp_m_node), get(previous_exp_s_nodes)} |
+                   PermittedIntermediate]).
+
+assert_slaves0(RPCNode, QName, {ExpMNode, ExpSNodes}, PermittedIntermediate) ->
     Q = find_queue(QName, RPCNode),
     Pid = proplists:get_value(pid, Q),
     SPids = proplists:get_value(slave_pids, Q),
@@ -138,12 +143,13 @@ assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes) ->
             %% just wait - of course this means if something does not
             %% change when expected then we time out the test which is
             %% a bit tedious
-            case get(previous_exp_m_node) =:= ActMNode andalso
-                equal_list(get(previous_exp_s_nodes), ActSNodes) of
-                true  -> timer:sleep(100),
-                         assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes);
-                false -> ct:fail("Expected ~p / ~p, got ~p / ~p~n",
-                                 [ExpMNode, ExpSNodes, ActMNode, ActSNodes])
+            case [found || {PermMNode, PermSNodes} <- PermittedIntermediate,
+                           PermMNode =:= ActMNode,
+                           equal_list(PermSNodes, ActSNodes)] of
+                [] -> ct:fail("Expected ~p / ~p, got ~p / ~p~n",
+                              [ExpMNode, ExpSNodes, ActMNode, ActSNodes]);
+                _  -> timer:sleep(100),
+                      assert_slaves(RPCNode, QName, ExpMNode, ExpSNodes)
             end;
         true ->
             put(previous_exp_m_node, ExpMNode),
