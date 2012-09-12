@@ -165,7 +165,7 @@ slave_pids(Node, Queue) ->
 %% The mnesia syncronization takes a while, but we don't want to wait for the
 %% test to fail, since the timetrap is quite high.
 wait_for_sync_status(Status, Node, Queue) ->
-    Max = rabbit_ha_test_utils:read_timeout("time_traps.slave_sync_delay")
+    Max = systest:settings("limits.slave_sync_recursion_depth")
         / ?LOOP_RECURSION_DELAY,
     wait_for_sync_status(0, Max, Status, Node, Queue).
 

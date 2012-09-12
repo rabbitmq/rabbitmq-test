@@ -8,7 +8,10 @@
 {time_traps, [
     {kill_multi, {minutes, 10}},
     {restarted_master, {minutes, 4}},
-    {ha_cluster_SUITE, {seconds, 100}},
-    {slave_sync_delay, {seconds, 10}}
+    {ha_cluster_SUITE, {seconds, 100}}
+]}.
+
+{limits, [
+    {slave_sync_recursion_depth, 10000}
 ]}.
 
