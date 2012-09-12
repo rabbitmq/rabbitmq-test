@@ -170,7 +170,8 @@ wait_for_sync_status(Status, Node, Queue) ->
     wait_for_sync_status(0, Max, Status, Node, Queue).
 
 wait_for_sync_status(N, Max, Status, _Node, _Queue) when N >= Max ->
-    exit({wrong_sync_status, not Status});
+    ct:fail("wrong sync status: expected ~p but was ~p",
+            [Status, not Status]);
 wait_for_sync_status(N, Max, Status, Node, Queue) ->
     Synced = length(slave_pids(Node, Queue)) =:= 1,
     case Synced =:= Status of
