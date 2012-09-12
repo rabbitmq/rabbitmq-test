@@ -20,6 +20,8 @@
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          slave_synchronization/1, slave_synchronization_ttl/1]).
 
+-define(LOOP_RECURSION_DELAY, 100).
+
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
 all() ->
@@ -64,7 +66,6 @@ slave_synchronization(Config) ->
 
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag1}),      % 1 - 0
 
-    timer:sleep(1000),
     slave_synced(Master, Queue),
 
     %% We restart the slave and we send a message, so that the slave will only
@@ -87,7 +88,6 @@ slave_synchronization(Config) ->
     {#'basic.get_ok'{delivery_tag = Tag3}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 1 - 1
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag3}),      % 1 - 0
-    timer:sleep(1000),
     slave_synced(Master, Queue),
     {#'basic.get_ok'{delivery_tag = Tag4}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 0 - 1
@@ -118,7 +118,6 @@ slave_synchronization_ttl(Config) ->
                                                     auto_delete = false,
                                                     arguments   = Args}),
 
-    timer:sleep(1000),
     slave_synced(Master, Queue),
 
     %% All unknown
@@ -128,7 +127,6 @@ slave_synchronization_ttl(Config) ->
     rabbit_ha_test_utils:start_app(Slave),
     slave_unsynced(Master, Queue),
     wait_for_messages(DLXQueue, DLXChannel, 2),
-    timer:sleep(1000),
     slave_synced(Master, Queue),
 
     %% 1 unknown, 1 known
@@ -139,7 +137,6 @@ slave_synchronization_ttl(Config) ->
     send_dummy_message(Channel, Queue),
     slave_unsynced(Master, Queue),
     wait_for_messages(DLXQueue, DLXChannel, 2),
-    timer:sleep(1000),
     slave_synced(Master, Queue),
 
     %% %% both known
@@ -147,7 +144,6 @@ slave_synchronization_ttl(Config) ->
     send_dummy_message(Channel, Queue),
     slave_synced(Master, Queue),
     wait_for_messages(DLXQueue, DLXChannel, 2),
-    timer:sleep(1000),
     slave_synced(Master, Queue),
 
     ok.
@@ -166,11 +162,28 @@ slave_pids(Node, Queue) ->
                         [<<"/">>, [name, synchronised_slave_pids]])),
     Pids.
 
+%% The mnesia syncronization takes a while, but we don't want to wait for the
+%% test to fail, since the timetrap is quite high.
+wait_for_sync_status(Status, Node, Queue) ->
+    Max = rabbit_ha_test_utils:read_timeout("time_traps.slave_sync_delay")
+        / ?LOOP_RECURSION_DELAY,
+    wait_for_sync_status(0, Max, Status, Node, Queue).
+
+wait_for_sync_status(N, Max, Status, _Node, _Queue) when N >= Max ->
+    exit({wrong_sync_status, not Status});
+wait_for_sync_status(N, Max, Status, Node, Queue) ->
+    Synced = length(slave_pids(Node, Queue)) =:= 1,
+    case Synced =:= Status of
+        true  -> ok;
+        false -> timer:sleep(?LOOP_RECURSION_DELAY),
+                 wait_for_sync_status(N + 1, Max, Status, Node, Queue)
+    end.
+
 slave_synced(Node, Queue) ->
-    1 = length(slave_pids(Node, Queue)).
+    wait_for_sync_status(true, Node, Queue).
 
 slave_unsynced(Node, Queue) ->
-    0 = length(slave_pids(Node, Queue)).
+    wait_for_sync_status(false, Node, Queue).
 
 wait_for_messages(Queue, Channel, N) ->
     Sub = #'basic.consume'{queue = Queue},
