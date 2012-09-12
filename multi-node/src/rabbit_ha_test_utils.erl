@@ -101,8 +101,7 @@ live_members(SUT) ->
 declare_ha_policies(SUT) ->
     Members = [Node | _] = live_members(SUT),
     set_policy(Node, <<"ha.all.">>, <<"all">>, <<"">>),
-    set_policy(Node, <<"ha.nodes.">>, <<"nodes">>,
-               [list_to_binary(atom_to_list(M)) || M <- Members]).
+    set_policy(Node, <<"ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]).
 
 %%
 %% @doc This systest_sut on_join callback sets up a single connection and
@@ -227,3 +226,5 @@ close_channel(Channel) ->
     systest:log("closing channel ~p~n", [Channel]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
+
+a2b(A) -> list_to_binary(atom_to_list(A)).

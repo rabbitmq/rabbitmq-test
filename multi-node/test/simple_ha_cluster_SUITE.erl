@@ -20,11 +20,14 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([suite/0, all/0, init_per_suite/1,
-         end_per_suite/1,
-         send_consume_survives_node_deaths/1,
-         producer_confirms_survive_death_of_master/1,
+-export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
+         consume_survives_stop/1, consume_survives_sigkill/1,
+         consume_survives_policy/1,
+         confirms_survive_stop/1, confirms_survive_sigkill/1,
+         confirms_survive_policy/1,
          rapid_redeclare/1]).
+
+-import(rabbit_ha_test_utils, [set_policy/4, clear_policy/2, a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -37,25 +40,41 @@ init_per_suite(Config) ->
     timer:start(),
     Config.
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    %% Since the tests for policy mess with this
+    %% {_, [{{Node,_}, _} | _]} = rabbit_ha_test_utils:cluster_members(Config),
+    %% set_policy(Node, <<"ha.all.">>, <<"all">>, <<"">>),
     ok.
 
-send_consume_survives_node_deaths(Config) ->
+rapid_redeclare(Config) ->
+    {_, [{_, {_, Ch}}|_]} = rabbit_ha_test_utils:cluster_members(Config),
+    Queue = <<"ha.all.test">>,
+    [begin
+         amqp_channel:call(Ch, #'queue.declare'{queue  = Queue,
+                                                durable = true}),
+         amqp_channel:call(Ch, #'queue.delete'{queue  = Queue})
+     end || _I <- lists:seq(1, 20)],
+    ok.
+
+consume_survives_stop(Config)    -> consume_survives(Config, fun stop/2).
+consume_survives_sigkill(Config) -> consume_survives(Config, fun sigkill/2).
+consume_survives_policy(Config)  -> consume_survives(Config, fun policy/2).
+
+confirms_survive_stop(Config)    -> confirms_survive(Config, fun stop/2).
+confirms_survive_sigkill(Config) -> confirms_survive(Config, fun sigkill/2).
+confirms_survive_policy(Config)  -> confirms_survive(Config, fun policy/2).
+
+%%----------------------------------------------------------------------------
+
+consume_survives(Config, DeathFun) ->
     {_Cluster,
       [{{Node1,_}, {_Conn1, Channel1}},
        {{Node2,_}, {_Conn2, Channel2}},
        {{Node3,_}, {_Conn3, Channel3}}
             ]} = rabbit_ha_test_utils:cluster_members(Config),
 
-    %% Test the nodes policy this time.
-    Nodes = [Node1, Node2, Node3],
-    [ct:log("~p: ~p~n", [P, R]) || {P, R} <- [begin
-                                                  {N,
-                                                   rpc:call(N, rabbit_mnesia,
-                                                            status, [])}
-                                              end || N <- Nodes]],
     %% declare the queue on the master, mirrored to the two slaves
-    Queue = <<"ha.nodes.test">>,
+    Queue = <<"ha.all.test">>,
     amqp_channel:call(Channel1, #'queue.declare'{queue       = Queue,
                                                  auto_delete = false}),
 
@@ -68,21 +87,17 @@ send_consume_survives_node_deaths(Config) ->
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
                                                  self(), false, Msgs),
-
-    %% create a killer for the master - we send a brutal -9 (SIGKILL)
-    %% instruction, as that is how the previous implementation worked
-    systest:kill_after(50, Node1, sigkill),
-
+    DeathFun(Node1, [Node2, Node3]),
     %% verify that the consumer got all msgs, or die - the await_response
     %% calls throw an exception if anything goes wrong....
     rabbit_ha_test_consumer:await_response(ConsumerPid),
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
-producer_confirms_survive_death_of_master(Config) ->
+confirms_survive(Config, DeathFun) ->
     {_Cluster,
         [{{Master, _}, {_MasterConnection, MasterChannel}},
-        {{_Producer,_},{_ProducerConnection, ProducerChannel}}|_]
+         {{Producer,_},{_ProducerConnection, ProducerChannel}}|_]
             } = rabbit_ha_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
@@ -96,18 +111,12 @@ producer_confirms_survive_death_of_master(Config) ->
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(ProducerChannel, Queue,
                                                  self(), true, Msgs),
-
-    systest:kill_after(50, Master),
-
+    DeathFun(Master, [Producer]),
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
-rapid_redeclare(Config) ->
-    {_, [{_, {_, Ch}}|_]} = rabbit_ha_test_utils:cluster_members(Config),
-    Queue = <<"ha.all.test">>,
-    [begin
-         amqp_channel:call(Ch, #'queue.declare'{queue  = Queue,
-                                                durable = true}),
-         amqp_channel:call(Ch, #'queue.delete'{queue  = Queue})
-     end || I <- lists:seq(1, 20)],
-    ok.
+
+stop(Node, _Rest)    -> systest:kill_after(50, Node, stop).
+sigkill(Node, _Rest) -> systest:kill_after(50, Node, sigkill).
+policy(Node, Rest)   -> Nodes = [a2b(N) || N <- Rest],
+                        set_policy(Node, <<"ha.all.">>, <<"nodes">>, Nodes).

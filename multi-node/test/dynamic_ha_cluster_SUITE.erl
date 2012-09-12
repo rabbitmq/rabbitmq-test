@@ -40,7 +40,7 @@
          change_policy_test/1,
          change_cluster_test/1]).
 
--import(rabbit_ha_test_utils, [set_policy/4, clear_policy/2]).
+-import(rabbit_ha_test_utils, [set_policy/4, clear_policy/2, a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -182,7 +182,3 @@ find_queue0(QName, Qs) ->
         [R] -> R;
         []  -> did_not_find_queue
     end.
-
-%%----------------------------------------------------------------------------
-
-a2b(A) -> list_to_binary(atom_to_list(A)).
