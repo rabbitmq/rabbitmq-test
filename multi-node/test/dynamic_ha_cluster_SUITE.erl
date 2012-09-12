@@ -37,7 +37,7 @@
 -define(VHOST, <<"/">>).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         simple_test/1,
+         change_policy_test/1,
          change_cluster_test/1]).
 
 -import(rabbit_ha_test_utils, [set_policy/4, clear_policy/2]).
@@ -55,7 +55,7 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-simple_test(Config) ->
+change_policy_test(Config) ->
     %% TODO this test only needs three nodes
     SUT = systest:active_sut(Config),
     [{A, ARef},
