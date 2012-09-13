@@ -106,11 +106,12 @@ slave_synchronization_ttl(Config) ->
         amqp_channel:call(Channel, #'queue.declare'{queue       = DLXQueue,
                                                     auto_delete = false}),
 
+    TestMsgTTL = systest:settings("limits.slave_sync.test_msg_ttl"),
     Queue = <<"test">>,
     %% Sadly we need fairly high numbers for the TTL because starting/stopping
     %% nodes takes a fair amount of time.
     Args = rabbit_ha_test_utils:mirror_args([Master, Slave]) ++
-        [{<<"x-message-ttl">>, long, 1000},
+        [{<<"x-message-ttl">>, long, TestMsgTTL},
          {<<"x-dead-letter-exchange">>, longstr, <<>>},
          {<<"x-dead-letter-routing-key">>, longstr, DLXQueue}],
     #'queue.declare_ok'{} =
@@ -165,7 +166,7 @@ slave_pids(Node, Queue) ->
 %% The mnesia syncronization takes a while, but we don't want to wait for the
 %% test to fail, since the timetrap is quite high.
 wait_for_sync_status(Status, Node, Queue) ->
-    Max = systest:settings("limits.slave_sync_recursion_depth")
+    Max = systest:settings("limits.slave_sync.sync_check_max_recursion_depth")
         / ?LOOP_RECURSION_DELAY,
     wait_for_sync_status(0, Max, Status, Node, Queue).
 

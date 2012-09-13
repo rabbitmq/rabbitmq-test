@@ -12,6 +12,8 @@
 ]}.
 
 {limits, [
-    {slave_sync_recursion_depth, 10000}
+    {slave_sync, [
+        {test_msg_ttl, 5000},
+        {sync_check_max_recursion_depth, 10000}
+    ]}
 ]}.
-
