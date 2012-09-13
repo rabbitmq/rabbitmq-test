@@ -170,9 +170,11 @@ wait_for_sync_status(Status, Node, Queue) ->
     wait_for_sync_status(0, Max, Status, Node, Queue).
 
 wait_for_sync_status(N, Max, Status, Node, Queue) when N >= Max ->
-    ct:fail("queue '~s' on ~p failed to reach sync status ~p "
-            "within allowed limits (~p tries)",
-            [Queue, Node, Status, Max]);
+    error({sync_status_max_tries_failed,
+          [{queue, Queue},
+           {node, Node},
+           {expected_status, Status},
+           {max_tried, Max}]});
 wait_for_sync_status(N, Max, Status, Node, Queue) ->
     Synced = length(slave_pids(Node, Queue)) =:= 1,
     case Synced =:= Status of
