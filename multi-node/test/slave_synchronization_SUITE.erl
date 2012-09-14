@@ -20,7 +20,7 @@
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          slave_synchronization/1, slave_synchronization_ttl/1]).
 
--define(LOOP_RECURSION_DELAY, 1000).
+-define(LOOP_RECURSION_DELAY, 100).
 
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
@@ -177,11 +177,11 @@ wait_for_sync_status(N, Max, Status, Node, Queue) when N >= Max ->
            {expected_status, Status},
            {max_tried, Max}]});
 wait_for_sync_status(N, Max, Status, Node, Queue) ->
-    timer:sleep(?LOOP_RECURSION_DELAY),
     Synced = length(slave_pids(Node, Queue)) =:= 1,
     case Synced =:= Status of
         true  -> ok;
-        false -> wait_for_sync_status(N + 1, Max, Status, Node, Queue)
+        false -> timer:sleep(?LOOP_RECURSION_DELAY),
+                 wait_for_sync_status(N + 1, Max, Status, Node, Queue)
     end.
 
 slave_synced(Node, Queue) ->
