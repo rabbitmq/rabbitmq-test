@@ -78,7 +78,7 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                                    {error, {unexpected_message, MsgNum}})
             end;
         #'basic.cancel'{} ->
-            systest:log("consumer ~p recieved basic.cancel: "
+            systest:log("consumer ~p received basic.cancel: "
                         "resubscribing to ~p on ~p~n",
                         [self(), Queue, Channel]),
             resubscribe(TestPid, Channel, Queue, NoAck,

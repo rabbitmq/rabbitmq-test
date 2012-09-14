@@ -189,6 +189,12 @@ open_connection(NodePort) ->
         amqp_connection:start(#amqp_params_network{port=NodePort}),
     Connection.
 
+stop_app(Node) ->
+    rabbit_ha_test_utils:control_action(stop_app, Node).
+
+start_app(Node) ->
+    rabbit_ha_test_utils:control_action(start_app, Node).
+
 %%
 %% Private API
 %%
