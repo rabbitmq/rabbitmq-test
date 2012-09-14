@@ -70,8 +70,8 @@ qpid_testsuite:
 	$(MAKE) update-qpid-testsuite
 
 update-qpid-testsuite:
-	#svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
-	hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
+	svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
+	# hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
 	- patch -N -r - -p0 -d qpid_testsuite/ < qpid_patch
 
 prepare-qpid-patch:
@@ -82,7 +82,7 @@ run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
 multi-node-tests:
-	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=simple-tests
+	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=ha-test
 	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
 
 clean:
