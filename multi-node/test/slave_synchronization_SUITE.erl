@@ -40,12 +40,10 @@ slave_synchronization(Config) ->
                 _Unused]} =
         rabbit_ha_test_utils:cluster_members(Config),
 
-    Queue = <<"test">>,
-    MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Slave]),
+    Queue = <<"ha.two.test">>,
     #'queue.declare_ok'{} =
         amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
-                                                    auto_delete = false,
-                                                    arguments   = MirrorArgs}),
+                                                    auto_delete = false}),
 
     %% The comments on the right are the queue length and the pending acks on
     %% the master.
@@ -107,13 +105,12 @@ slave_synchronization_ttl(Config) ->
                                                     auto_delete = false}),
 
     TestMsgTTL = systest:settings("limits.slave_sync.test_msg_ttl"),
-    Queue = <<"test">>,
+    Queue = <<"ha.two.test">>,
     %% Sadly we need fairly high numbers for the TTL because starting/stopping
     %% nodes takes a fair amount of time.
-    Args = rabbit_ha_test_utils:mirror_args([Master, Slave]) ++
-        [{<<"x-message-ttl">>, long, TestMsgTTL},
-         {<<"x-dead-letter-exchange">>, longstr, <<>>},
-         {<<"x-dead-letter-routing-key">>, longstr, DLXQueue}],
+    Args = [{<<"x-message-ttl">>, long, TestMsgTTL},
+            {<<"x-dead-letter-exchange">>, longstr, <<>>},
+            {<<"x-dead-letter-routing-key">>, longstr, DLXQueue}],
     #'queue.declare_ok'{} =
         amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
                                                     auto_delete = false,

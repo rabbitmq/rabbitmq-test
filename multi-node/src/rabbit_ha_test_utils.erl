@@ -100,7 +100,9 @@ live_members(SUT) ->
 declare_ha_policies(SUT) ->
     Members = [Node | _] = live_members(SUT),
     set_policy(Node, <<"^ha.all.">>, <<"all">>, <<"">>),
-    set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]).
+    set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
+    set_policy(Node, <<"^ha.two.">>, <<"nodes">>,
+               [a2b(M) || M <- lists:sublist(Members, 2)]).
 
 %%
 %% @doc This systest_sut on_join callback sets up a single connection and
