@@ -149,7 +149,8 @@ assert_slaves0(RPCNode, QName, {ExpMNode, ExpSNodes}, PermittedIntermediate) ->
                 [] -> ct:fail("Expected ~p / ~p, got ~p / ~p~n",
                               [ExpMNode, ExpSNodes, ActMNode, ActSNodes]);
                 _  -> timer:sleep(100),
-                      assert_slaves(RPCNode, QName, {ExpMNode, ExpSNodes})
+                      assert_slaves0(RPCNode, QName, {ExpMNode, ExpSNodes},
+                                     PermittedIntermediate)
             end;
         true ->
             put(previous_exp_m_node, ExpMNode),
