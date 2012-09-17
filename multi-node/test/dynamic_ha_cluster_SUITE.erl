@@ -108,7 +108,7 @@ change_cluster_test(Config) ->
     %% Add D and E, D joins in
     ok = systest:activate_process(DRef),
     ok = systest:activate_process(ERef),
-    Cluster = [atom_to_list(A)],
+    Cluster = [A],
     rabbit_ha_test_utils:cluster(D, Cluster),
     rabbit_ha_test_utils:cluster(E, Cluster),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
