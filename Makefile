@@ -1,6 +1,6 @@
 .PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
 	prepare restart-app restart-secondary-node cleanup force-snapshot \
-	multi-node-tests
+	multi-node-tests enable-ha disable-ha
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
@@ -128,6 +128,13 @@ set-resource-alarm:
 
 clear-resource-alarm:
 	$(MAKE) -C $(BROKER_DIR) clear-resource-alarm SOURCE=$(SOURCE)
+
+enable-ha:
+	$(BROKER_DIR)/scripts/rabbitmqctl set_parameter policy HA \
+		'{"pattern": ".*", "policy": {"ha-mode": "all"}}'
+
+disable-ha:
+	$(BROKER_DIR)/scripts/rabbitmqctl clear_parameter policy HA
 
 cleanup:
 	-$(MAKE) -C $(BROKER_DIR) \
