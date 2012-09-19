@@ -45,8 +45,16 @@ disconnect_from_node(Node) ->
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
     systest:log("starting rabbit application on ~p~n", [NodeId]),
-    control_action(start_app, NodeId),
-    wait(Node).
+    case control_action(start_app, NodeId) of
+        ok    -> wait(Node);
+        Other -> systest_log:log(system,
+                                 "ERROR: unable to start rabbit on ~p - please "
+                                 "check the node's logs for more information~n",
+                                 [NodeId]),
+                %% throwing rather than using ct:fail/2 is better, as it
+                %% preseves the stack trace in the common_test error report
+                throw({start_rabbit_failed, Other})
+    end.
 
 %%
 %% @doc A systest 'on_stop' callback that stops the rabbit application
