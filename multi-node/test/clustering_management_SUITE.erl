@@ -21,7 +21,7 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
+-export([suite/0, all/0, init_per_suite/1, end_per_suite/1, end_per_testcase/2,
 
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, forget_cluster_node_test/1,
@@ -39,6 +39,9 @@ all() ->
 init_per_suite(Config) ->
     Config.
 end_per_suite(_Config) ->
+    ok.
+
+end_per_testcase(_, _) ->
     ok.
 
 join_and_part_cluster(Config) ->
