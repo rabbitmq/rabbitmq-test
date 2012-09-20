@@ -86,6 +86,10 @@ change_policy_test(Config) ->
     clear_policy(A, ?POLICY),
     assert_slaves(A, ?QNAME, {B, ''}),
 
+    %% Test switching away from an unmirrored node
+    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
+    assert_slaves(A, ?QNAME, {C, [A]}),
+
     ok.
 
 change_cluster_test(Config) ->
