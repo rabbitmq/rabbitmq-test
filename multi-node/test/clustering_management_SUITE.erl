@@ -29,6 +29,8 @@
          update_cluster_nodes_test/1
         ]).
 
+-define(LOOP_RECURSION_DELAY, 100).
+
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
@@ -298,18 +300,35 @@ cluster_members(Config) ->
     [Id || {Id, _Ref} <- systest:list_processes(Cluster)].
 
 assert_cluster_status(Status0, Nodes) ->
-    SortStatus =
-        fun ({All, Disc, Running}) ->
-                {lists:sort(All), lists:sort(Disc), lists:sort(Running)}
-        end,
-    Status = {AllNodes, _, _} = SortStatus(Status0),
-    lists:foreach(
-      fun (Node) ->
-              ?assertEqual(AllNodes =/= [Node],
-                           rpc:call(Node, rabbit_mnesia, is_clustered, [])),
-              ?assertEqual(
-                 Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
-      end, Nodes).
+    Status = {AllNodes, _, _} = sort_cluster_status(Status0),
+    wait_for_cluster_status(Status, AllNodes, Nodes).
+
+wait_for_cluster_status(Status, AllNodes, Nodes) ->
+    Max = systest:settings("limits.clustering_mgmt.status_check_max_wait")
+        / ?LOOP_RECURSION_DELAY,
+    wait_for_cluster_status(0, Max, Status, AllNodes, Nodes).
+
+wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) when N >= Max ->
+    error({cluster_status_max_tries_failed,
+           [{nodes, Nodes},
+            {expected_status, Status},
+            {max_tried, Max}]});
+wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) ->
+    case lists:all(fun (Node) ->
+                            verify_status_equal(Node, Status, AllNodes)
+                   end, Nodes) of
+        true  -> ok;
+        false -> timer:sleep(?LOOP_RECURSION_DELAY),
+                 wait_for_cluster_status(N + 1, Max, Status, AllNodes, Nodes)
+    end.
+
+verify_status_equal(Node, Status, AllNodes) ->
+    NodeStatus = sort_cluster_status(rabbit_ha_test_utils:cluster_status(Node)),
+    (AllNodes =/= [Node]) =:= rpc:call(Node, rabbit_mnesia, is_clustered, [])
+        andalso NodeStatus =:= Status.
+
+sort_cluster_status({All, Disc, Running}) ->
+    {lists:sort(All), lists:sort(Disc), lists:sort(Running)}.
 
 assert_not_clustered(Node) ->
     assert_cluster_status({[Node], [Node], [Node]}, [Node]).
