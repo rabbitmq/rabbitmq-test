@@ -151,9 +151,9 @@ control_action(Command, Node, Args, Opts) ->
                                end).
 
 cluster_status(Node) ->
-    {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
-     rpc:call(Node, rabbit_mnesia, clustered_disc_nodes, []),
-     rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
+    {rpc:call(Node, rabbit_mnesia, cluster_nodes, [all]),
+     rpc:call(Node, rabbit_mnesia, cluster_nodes, [disc]),
+     rpc:call(Node, rabbit_mnesia, cluster_nodes, [running])}.
 
 mirror_args([]) ->
     [{<<"x-ha-policy">>, longstr, <<"all">>}];
