@@ -18,7 +18,6 @@
                     "${ct.priv_dir}/${ct.scope}/${proc.name}-plugins-scratch"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
                     "${ct.priv_dir}/${ct.scope}/${proc.name}-enabled-plugins"},
-                {"RABBITMQ_NODE_IP_ADDRESS", "0.0.0.0"},
                 {"RABBITMQ_ALLOW_INPUT", "1"},
                 {"RABBITMQ_NODENAME", "${proc.name}"},
                 {"RABBITMQ_MNESIA_DIR",
