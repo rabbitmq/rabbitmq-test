@@ -150,8 +150,9 @@ assert_slaves0(RPCNode, QName, {ExpMNode, ExpSNodes}, PermittedIntermediate) ->
             case [found || {PermMNode, PermSNodes} <- PermittedIntermediate,
                            PermMNode =:= ActMNode,
                            equal_list(PermSNodes, ActSNodes)] of
-                [] -> ct:fail("Expected ~p / ~p, got ~p / ~p~n",
-                              [ExpMNode, ExpSNodes, ActMNode, ActSNodes]);
+                [] -> ct:fail("Expected ~p / ~p, got ~p / ~p~nat ~p~n",
+                              [ExpMNode, ExpSNodes, ActMNode, ActSNodes,
+                               get_stacktrace()]);
                 _  -> timer:sleep(100),
                       assert_slaves0(RPCNode, QName, {ExpMNode, ExpSNodes},
                                      PermittedIntermediate)
@@ -186,4 +187,12 @@ find_queue0(QName, Qs) ->
                    rabbit_misc:r(?VHOST, queue, QName)] of
         [R] -> R;
         []  -> did_not_find_queue
+    end.
+
+get_stacktrace() ->
+    try
+        throw(e)
+    catch
+        _:e ->
+            erlang:get_stacktrace()
     end.
