@@ -89,6 +89,15 @@ test-profile:
 	$(error you need to specify a SYSTEST_PROFILE to run this target)
 endif
 
+.PHONY: test-individual
+ifneq ($(SYSTEST_INDIVIDUAL), '')
+test-individual: $(SYSTEST) test-compile
+	$(call systest,-Z $(SYSTEST_INDIVIDUAL))
+else
+test-individual:
+	$(error you need to specify SYSTEST_INDIVIDUAL to run this target)
+endif
+
 .PHONY: test-compile
 test-compile: $(REBAR) $(RABBIT_SERVER) test-ebin
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
