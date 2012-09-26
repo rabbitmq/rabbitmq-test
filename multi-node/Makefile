@@ -75,8 +75,10 @@ $(TEMP_DIRS):
 	mkdir -p $@
 
 .PHONY: test-all
+# Cover seems to reliably hang multi_node_deaths_SUITE
 test-all: $(SYSTEST) test-compile
-	$(call systest,'')
+	$(MAKE) -C . test-profile SYSTEST_PROFILE=ha-test
+	$(MAKE) -C . test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
 
 .PHONY: test-profile
 ifneq ($(SYSTEST_PROFILE), '')
@@ -85,6 +87,15 @@ test-profile: $(SYSTEST) test-compile
 else
 test-profile:
 	$(error you need to specify a SYSTEST_PROFILE to run this target)
+endif
+
+.PHONY: test-individual
+ifneq ($(SYSTEST_INDIVIDUAL), '')
+test-individual: $(SYSTEST) test-compile
+	$(call systest,-Z $(SYSTEST_INDIVIDUAL))
+else
+test-individual:
+	$(error you need to specify SYSTEST_INDIVIDUAL to run this target)
 endif
 
 .PHONY: test-compile
