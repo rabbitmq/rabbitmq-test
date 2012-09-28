@@ -158,7 +158,10 @@ slave_pids(Node, Queue) ->
                   Queue1 =:= Queue
           end, rpc:call(Node, rabbit_amqqueue, info_all,
                         [<<"/">>, [name, synchronised_slave_pids]])),
-    Pids.
+    case Pids of
+        '' -> [];
+        _  -> Pids
+    end.
 
 %% The mnesia syncronization takes a while, but we don't want to wait for the
 %% test to fail, since the timetrap is quite high.
