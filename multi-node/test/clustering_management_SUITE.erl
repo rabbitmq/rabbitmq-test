@@ -316,7 +316,13 @@ erlang_config_test(Config) ->
     ok = rpc:call(Hare, application, set_env,
                   [rabbit, cluster_nodes, {[non@existent], disc}]),
     ok = start_app(Hare),
-    assert_cluster_status({[Hare], [Hare], [Hare]}, [Hare]).
+    assert_cluster_status({[Hare], [Hare], [Hare]}, [Hare]),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[non@existent], bogus}]),
+    assert_failure(fun () -> start_app(Hare) end).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
