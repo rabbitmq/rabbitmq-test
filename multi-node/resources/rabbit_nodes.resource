@@ -26,8 +26,7 @@
                 {"RABBITMQ_PID_FILE",
                 "${ct.priv_dir}/${ct.scope}/rabbitmq-${proc.name}-mnesia.pid"},
                 {"RABBITMQ_NODE_PORT", "${proc.user.amqp_port}"},
-                {"RABBITMQ_NODE_ONLY", "true"}%% ,
-                %% {"RABBITMQ_SERVER_START_ARGS", "+S 1:1"}
+                {"RABBITMQ_NODE_ONLY", "true"}
             ]}
         ]},
         {stop,  [
