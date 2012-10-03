@@ -170,8 +170,8 @@ control_action(Command, Node, Args) ->
 
 control_action(Command, Node, Args, Opts) ->
     rabbit_control_main:action(Command, Node, Args, Opts,
-                               fun (Fmt, Args) ->
-                                       systest:log(Fmt ++ "~n", Args)
+                               fun (Fmt, FmtArgs) ->
+                                       systest:log(Fmt ++ "~n", FmtArgs)
                                end).
 
 cluster_status(Node) ->

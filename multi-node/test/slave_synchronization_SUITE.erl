@@ -95,7 +95,7 @@ slave_synchronization(Config) ->
 slave_synchronization_ttl(Config) ->
     {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
                 {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
-                {{DLX,    _DRef}, {_DLXConnection,   DLXChannel}}]} =
+                {{_DLX,   _DRef}, {_DLXConnection,   DLXChannel}}]} =
         rabbit_ha_test_utils:cluster_members(Config),
 
     %% We declare a DLX queue to wait for messages to be TTL'ed
@@ -198,8 +198,9 @@ wait_for_messages(Queue, Channel, N) ->
     end,
     lists:foreach(
       fun (_) -> receive
-                     {#'basic.deliver'{delivery_tag = Tag}, Content} ->
-                         amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag})
+                     {#'basic.deliver'{delivery_tag = Tag}, _Content} ->
+                         amqp_channel:cast(Channel,
+                                           #'basic.ack'{delivery_tag = Tag})
                  end
       end, lists:seq(1, N)),
     amqp_channel:call(Channel, #'basic.cancel'{consumer_tag = CTag}).
