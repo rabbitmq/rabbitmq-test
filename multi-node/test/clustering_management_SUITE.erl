@@ -26,7 +26,7 @@
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, forget_cluster_node_test/1,
          change_cluster_node_type_test/1, change_cluster_when_node_offline/1,
-         update_cluster_nodes_test/1
+         update_cluster_nodes_test/1, erlang_config_test/1
         ]).
 
 suite() -> [{timetrap, {seconds, 60}}].
@@ -34,7 +34,8 @@ suite() -> [{timetrap, {seconds, 60}}].
 all() ->
     [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
      forget_cluster_node_test, change_cluster_node_type_test,
-     change_cluster_when_node_offline, update_cluster_nodes_test].
+     change_cluster_when_node_offline, update_cluster_nodes_test,
+     erlang_config_test].
 
 init_per_suite(Config) ->
     Config.
@@ -289,6 +290,33 @@ update_cluster_nodes_test(Config) ->
     assert_not_clustered(Hare),
     assert_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
                           [Rabbit, Bunny]).
+
+erlang_config_test(Config) ->
+    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], disc}]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], ram}]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
+
+    %% We get a warning but we start anyway
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[non@existent], disc}]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Hare], [Hare], [Hare]}, [Hare]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
