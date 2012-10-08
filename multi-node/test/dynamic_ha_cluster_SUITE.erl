@@ -23,8 +23,9 @@
 %% * Changing policy can add / remove mirrors and change the master
 %% * Adding a node will create a new mirror when there are not enough nodes
 %%   for the policy
-%% * Removing a node will create a new mirror when there are more than enough
-%%   nodes for the policy
+%% * Removing a node will not create a new mirror even if the policy
+%%   logic wants it (since this gives us a good way to lose messages
+%%   on cluster shutdown, by repeated failover to new nodes)
 %%
 %% The first two are change_policy_test, the last two are change_cluster_test
 
@@ -116,9 +117,9 @@ change_cluster_test(Config) ->
     rabbit_ha_test_utils:cluster(E, A),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
 
-    %% Remove D, E joins in
+    %% Remove D, E does not join in
     systest:stop_and_wait(DRef),
-    assert_slaves(A, ?QNAME, {A, [B, C, E]}, [{A, [B, C]}]),
+    assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     ok.
 
