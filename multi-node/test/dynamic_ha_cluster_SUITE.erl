@@ -26,7 +26,7 @@
 %% * Removing a node will create a new mirror when there are more than enough
 %%   nodes for the policy
 %%
-%% The first two are simple_test, the last two are change_cluster_test
+%% The first two are change_policy_test, the last two are change_cluster_test
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("systest/include/systest.hrl").
