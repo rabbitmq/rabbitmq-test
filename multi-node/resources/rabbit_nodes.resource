@@ -18,7 +18,6 @@
                     "${ct.priv_dir}/${ct.scope}/${proc.name}-plugins-scratch"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
                     "${ct.priv_dir}/${ct.scope}/${proc.name}-enabled-plugins"},
-                {"RABBITMQ_NODE_IP_ADDRESS", "0.0.0.0"},
                 {"RABBITMQ_ALLOW_INPUT", "1"},
                 {"RABBITMQ_NODENAME", "${proc.name}"},
                 {"RABBITMQ_MNESIA_DIR",
@@ -47,6 +46,12 @@
     ]}
 ]}.
 
+{start_cold, [
+    {startup, [
+        {activate_on_start, false}
+    ]}
+]}.
+
 {three_node_cluster, [
     {sut, [{localhost, [a, b, c]}]},
     {processes, [
@@ -62,7 +67,8 @@
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes
         %% are up and running, so at this point we can cluster them...
-        {local, rabbit_ha_test_utils, make_cluster, []}
+        {local, rabbit_ha_test_utils, make_cluster, []},
+        {local, rabbit_ha_test_utils, declare_ha_policies, []}
     ]}
 ]}.
 

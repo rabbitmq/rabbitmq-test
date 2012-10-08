@@ -86,13 +86,23 @@ wait(Node) ->
 %% callback is ignored.
 %%
 make_cluster(SUT) ->
-    Nodes = systest:list_processes(SUT),
-    Members = [Id || {Id, _Ref} <- Nodes],
+    Members = live_members(SUT),
     systest:log("clustering ~p~n", [Members]),
     case Members of
         [To | Rest] -> lists:foreach(fun (Node) -> cluster(Node, To) end, Rest);
         _           -> ok
     end.
+
+live_members(SUT) ->
+    [Id || {Id, Ref} <- systest:list_processes(SUT),
+           systest:process_activity_state(Ref) =/= not_started].
+
+declare_ha_policies(SUT) ->
+    Members = [Node | _] = live_members(SUT),
+    set_policy(Node, <<"^ha.all.">>, <<"all">>, <<"">>),
+    set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
+    set_policy(Node, <<"^ha.two.">>, <<"nodes">>,
+               [a2b(M) || M <- lists:sublist(Members, 2)]).
 
 %%
 %% @doc This systest_sut on_join callback sets up a single connection and
@@ -138,6 +148,20 @@ read_timeout(SettingsKey) ->
         Other        -> throw({illegal_timetrap, Other})
     end.
 
+set_policy(Node, Pattern, HAMode, HAParams) ->
+    rpc:call(Node, rabbit_runtime_parameters, set,
+             [<<"/">>, <<"policy">>, Pattern,
+              [{<<"pattern">>, Pattern},
+               {<<"policy">>, [{<<"ha-mode">>,   HAMode},
+                               {<<"ha-params">>, HAParams}
+                              ]}
+              ]
+             ]).
+
+clear_policy(Node, Pattern) ->
+    rpc:call(Node, rabbit_runtime_parameters, clear,
+             [<<"/">>, <<"policy">>, Pattern]).
+
 control_action(Command, Node) ->
     control_action(Command, Node, [], []).
 
@@ -146,21 +170,15 @@ control_action(Command, Node, Args) ->
 
 control_action(Command, Node, Args, Opts) ->
     rabbit_control_main:action(Command, Node, Args, Opts,
-                               fun (Fmt, Args) ->
-                                       systest:log(Fmt ++ "~n", Args)
+                               fun (Fmt, FmtArgs) ->
+                                       systest:log(Fmt ++ "~n", FmtArgs)
                                end).
 
 cluster_status(Node) ->
-    {rpc:call(Node, rabbit_mnesia, all_clustered_nodes, []),
-     rpc:call(Node, rabbit_mnesia, clustered_disc_nodes, []),
-     rpc:call(Node, rabbit_mnesia, running_clustered_nodes, [])}.
+    {rpc:call(Node, rabbit_mnesia, cluster_nodes, [all]),
+     rpc:call(Node, rabbit_mnesia, cluster_nodes, [disc]),
+     rpc:call(Node, rabbit_mnesia, cluster_nodes, [running])}.
 
-mirror_args([]) ->
-    [{<<"x-ha-policy">>, longstr, <<"all">>}];
-mirror_args(Nodes) ->
-    [{<<"x-ha-policy">>, longstr, <<"nodes">>},
-     {<<"x-ha-policy-params">>, array,
-      [{longstr, list_to_binary(atom_to_list(N))} || N <- Nodes]}].
 
 cluster_members(Config) ->
     Cluster = systest:active_sut(Config),
@@ -222,3 +240,5 @@ close_channel(Channel) ->
     systest:log("closing channel ~p~n", [Channel]),
     rabbit_misc:with_exit_handler(
       rabbit_misc:const(ok), fun () -> amqp_channel:close(Channel) end).
+
+a2b(A) -> list_to_binary(atom_to_list(A)).
