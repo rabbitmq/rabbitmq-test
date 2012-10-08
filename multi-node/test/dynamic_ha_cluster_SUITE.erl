@@ -89,7 +89,7 @@ change_policy_test(Config) ->
 
     %% Test switching away from an unmirrored node
     set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
-    assert_slaves(A, ?QNAME, {C, [A]}),
+    assert_slaves(A, ?QNAME, {A, [C]}),
 
     ok.
 
