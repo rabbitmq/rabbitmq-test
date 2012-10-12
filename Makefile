@@ -129,11 +129,11 @@ clear-resource-alarm:
 	$(MAKE) -C $(BROKER_DIR) clear-resource-alarm SOURCE=$(SOURCE)
 
 enable-ha:
-	$(BROKER_DIR)/scripts/rabbitmqctl set_parameter policy HA \
-		'{"pattern": ".*", "policy": {"ha-mode": "all"}}'
+	$(BROKER_DIR)/scripts/rabbitmqctl set_policy HA \
+		".*" '{"ha-mode": "all"}'
 
 disable-ha:
-	$(BROKER_DIR)/scripts/rabbitmqctl clear_parameter policy HA
+	$(BROKER_DIR)/scripts/rabbitmqctl clear_policy HA
 
 cleanup:
 	-$(MAKE) -C $(BROKER_DIR) \

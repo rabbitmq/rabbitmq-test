@@ -149,18 +149,12 @@ read_timeout(SettingsKey) ->
     end.
 
 set_policy(Node, Pattern, HAMode, HAParams) ->
-    rpc:call(Node, rabbit_runtime_parameters, set,
-             [<<"/">>, <<"policy">>, Pattern,
-              [{<<"pattern">>, Pattern},
-               {<<"policy">>, [{<<"ha-mode">>,   HAMode},
-                               {<<"ha-params">>, HAParams}
-                              ]}
-              ]
-             ]).
+    rpc:call(Node, rabbit_runtime_parameters, set_policy,
+             [<<"/">>, Pattern, Pattern, [{<<"ha-mode">>,   HAMode},
+                                          {<<"ha-params">>, HAParams}]]).
 
 clear_policy(Node, Pattern) ->
-    rpc:call(Node, rabbit_runtime_parameters, clear,
-             [<<"/">>, <<"policy">>, Pattern]).
+    rpc:call(Node, rabbit_runtime_parameters, clear_policy, [<<"/">>, Pattern]).
 
 control_action(Command, Node) ->
     control_action(Command, Node, [], []).
