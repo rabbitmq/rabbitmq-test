@@ -99,7 +99,7 @@ live_members(SUT) ->
 
 declare_ha_policies(SUT) ->
     Members = [Node | _] = live_members(SUT),
-    set_policy(Node, <<"^ha.all.">>, <<"all">>, <<"">>),
+    set_policy(Node, <<"^ha.all.">>, <<"all">>),
     set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
     set_policy(Node, <<"^ha.two.">>, <<"nodes">>,
                [a2b(M) || M <- lists:sublist(Members, 2)]).
@@ -148,14 +148,19 @@ read_timeout(SettingsKey) ->
         Other        -> throw({illegal_timetrap, Other})
     end.
 
+set_policy(Node, Pattern, HAMode) ->
+    set_policy0(Node, Pattern, [{<<"ha-mode">>,   HAMode}]).
+
 set_policy(Node, Pattern, HAMode, HAParams) ->
-    rpc:call(Node, rabbit_policy, add,
-             [<<"/">>, Pattern, Pattern,
-              [{<<"ha-mode">>, HAMode}, {<<"ha-params">>, HAParams}],
-              undefined]).
+    set_policy0(Node, Pattern, [{<<"ha-mode">>,   HAMode},
+                                {<<"ha-params">>, HAParams}]).
+
+set_policy0(Node, Pattern, Definition) ->
+    ok = rpc:call(Node, rabbit_policy, set,
+                  [<<"/">>, Pattern, Pattern, Definition, undefined]).
 
 clear_policy(Node, Pattern) ->
-    rpc:call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
+    ok = rpc:call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
 
 control_action(Command, Node) ->
     control_action(Command, Node, [], []).

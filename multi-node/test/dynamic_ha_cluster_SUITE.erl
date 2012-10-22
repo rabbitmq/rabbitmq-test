@@ -42,7 +42,8 @@
          change_policy_test/1,
          change_cluster_test/1]).
 
--import(rabbit_ha_test_utils, [set_policy/4, clear_policy/2, a2b/1]).
+-import(rabbit_ha_test_utils, [set_policy/3, set_policy/4, clear_policy/2,
+                               a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -72,7 +73,7 @@ change_policy_test(Config) ->
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy "all", it becomes HA and gets all mirrors
-    set_policy(A, ?POLICY, <<"all">>, []),
+    set_policy(A, ?POLICY, <<"all">>),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Give it policy "nodes", it gets specific mirrors
