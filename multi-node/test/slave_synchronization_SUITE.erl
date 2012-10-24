@@ -40,12 +40,10 @@ slave_synchronization(Config) ->
                 _Unused]} =
         rabbit_ha_test_utils:cluster_members(Config),
 
-    Queue = <<"test">>,
-    MirrorArgs = rabbit_ha_test_utils:mirror_args([Master, Slave]),
+    Queue = <<"ha.two.test">>,
     #'queue.declare_ok'{} =
         amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
-                                                    auto_delete = false,
-                                                    arguments   = MirrorArgs}),
+                                                    auto_delete = false}),
 
     %% The comments on the right are the queue length and the pending acks on
     %% the master.
@@ -97,7 +95,7 @@ slave_synchronization(Config) ->
 slave_synchronization_ttl(Config) ->
     {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
                 {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
-                {{DLX,    _DRef}, {_DLXConnection,   DLXChannel}}]} =
+                {{_DLX,   _DRef}, {_DLXConnection,   DLXChannel}}]} =
         rabbit_ha_test_utils:cluster_members(Config),
 
     %% We declare a DLX queue to wait for messages to be TTL'ed
@@ -107,13 +105,12 @@ slave_synchronization_ttl(Config) ->
                                                     auto_delete = false}),
 
     TestMsgTTL = systest:settings("limits.slave_sync.test_msg_ttl"),
-    Queue = <<"test">>,
+    Queue = <<"ha.two.test">>,
     %% Sadly we need fairly high numbers for the TTL because starting/stopping
     %% nodes takes a fair amount of time.
-    Args = rabbit_ha_test_utils:mirror_args([Master, Slave]) ++
-        [{<<"x-message-ttl">>, long, TestMsgTTL},
-         {<<"x-dead-letter-exchange">>, longstr, <<>>},
-         {<<"x-dead-letter-routing-key">>, longstr, DLXQueue}],
+    Args = [{<<"x-message-ttl">>, long, TestMsgTTL},
+            {<<"x-dead-letter-exchange">>, longstr, <<>>},
+            {<<"x-dead-letter-routing-key">>, longstr, DLXQueue}],
     #'queue.declare_ok'{} =
         amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
                                                     auto_delete = false,
@@ -161,7 +158,10 @@ slave_pids(Node, Queue) ->
                   Queue1 =:= Queue
           end, rpc:call(Node, rabbit_amqqueue, info_all,
                         [<<"/">>, [name, synchronised_slave_pids]])),
-    Pids.
+    case Pids of
+        '' -> [];
+        _  -> Pids
+    end.
 
 %% The mnesia syncronization takes a while, but we don't want to wait for the
 %% test to fail, since the timetrap is quite high.
@@ -198,8 +198,9 @@ wait_for_messages(Queue, Channel, N) ->
     end,
     lists:foreach(
       fun (_) -> receive
-                     {#'basic.deliver'{delivery_tag = Tag}, Content} ->
-                         amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag})
+                     {#'basic.deliver'{delivery_tag = Tag}, _Content} ->
+                         amqp_channel:cast(Channel,
+                                           #'basic.ack'{delivery_tag = Tag})
                  end
       end, lists:seq(1, N)),
     amqp_channel:call(Channel, #'basic.cancel'{consumer_tag = CTag}).

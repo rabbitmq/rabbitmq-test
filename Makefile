@@ -1,6 +1,6 @@
 .PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
 	prepare restart-app restart-secondary-node cleanup force-snapshot \
-	multi-node-tests
+	multi-node-tests enable-ha disable-ha
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
@@ -82,8 +82,7 @@ run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
 multi-node-tests:
-	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=ha-test
-	$(MAKE) -C multi-node test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
+	$(MAKE) -C multi-node all
 
 clean:
 	rm -rf qpid_testsuite
@@ -128,6 +127,13 @@ set-resource-alarm:
 
 clear-resource-alarm:
 	$(MAKE) -C $(BROKER_DIR) clear-resource-alarm SOURCE=$(SOURCE)
+
+enable-ha:
+	$(BROKER_DIR)/scripts/rabbitmqctl set_policy HA \
+		".*" '{"ha-mode": "all"}'
+
+disable-ha:
+	$(BROKER_DIR)/scripts/rabbitmqctl clear_policy HA
 
 cleanup:
 	-$(MAKE) -C $(BROKER_DIR) \
