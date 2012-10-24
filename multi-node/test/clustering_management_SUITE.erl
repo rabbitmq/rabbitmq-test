@@ -308,7 +308,7 @@ wait_for_cluster_status(Status, AllNodes, Nodes) ->
         / ?LOOP_RECURSION_DELAY,
     wait_for_cluster_status(0, Max, Status, AllNodes, Nodes).
 
-wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) when N >= Max ->
+wait_for_cluster_status(N, Max, Status, _AllNodes, Nodes) when N >= Max ->
     error({cluster_status_max_tries_failed,
            [{nodes, Nodes},
             {expected_status, Status},
