@@ -80,17 +80,17 @@ change_policy_test(Config) ->
     set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(B)]),
     assert_slaves(A, ?QNAME, {A, [B]}),
 
-    %% Now explicitly change the mirrors and the master
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
-    assert_slaves(A, ?QNAME, {B, [C]}), %% B becomes master; it's older
+    %% Now explicitly change the mirrors
+    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
+    assert_slaves(A, ?QNAME, {A, [C]}, [{A, [B, C]}]),
 
     %% Clear the policy, and we go back to non-mirrored
     clear_policy(A, ?POLICY),
-    assert_slaves(A, ?QNAME, {B, ''}),
+    assert_slaves(A, ?QNAME, {A, ''}),
 
-    %% Test switching away from an unmirrored node
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
-    assert_slaves(A, ?QNAME, {A, [C]}),
+    %% Test switching "away" from an unmirrored node
+    set_policy(A, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
+    assert_slaves(A, ?QNAME, {A, [B, C]}, [{A, [B]}, {A, [C]}]),
 
     ok.
 
