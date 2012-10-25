@@ -51,25 +51,19 @@ join_and_part_cluster(Config) ->
     assert_not_clustered(Bunny),
 
     stop_join_start(Rabbit, Bunny),
-
-    assert_cluster_status(
-      {[Bunny, Rabbit], [Bunny, Rabbit], [Bunny, Rabbit]},
-      [Rabbit, Bunny]),
+    assert_clustered([Rabbit, Bunny]),
 
     stop_join_start(Hare, Bunny, true),
-
     assert_cluster_status(
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
     stop_reset_start(Rabbit),
-
-    assert_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
+    assert_not_clustered(Rabbit),
     assert_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
                           [Hare, Bunny]),
 
     stop_reset_start(Hare),
-
     assert_not_clustered(Hare),
     assert_not_clustered(Bunny).
 
@@ -94,13 +88,11 @@ join_cluster_bad_operations(Config) ->
 
     %% Fail if trying to cluster with already clustered node
     stop_join_start(Rabbit, Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]),
+    assert_clustered([Rabbit, Hare]),
     ok = stop_app(Rabbit),
     assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
     ok = start_app(Rabbit),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]),
+    assert_clustered([Rabbit, Hare]),
 
     %% Cleanup
     stop_reset_start(Rabbit),
@@ -129,8 +121,7 @@ join_to_start_interval(Config) ->
     assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
                           [Rabbit, Hare]),
     ok = start_app(Rabbit),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+    assert_clustered([Rabbit, Hare]).
 
 forget_cluster_node_test(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
@@ -139,8 +130,7 @@ forget_cluster_node_test(Config) ->
     assert_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
 
     stop_join_start(Rabbit, Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
-                          [Rabbit, Hare]),
+    assert_clustered([Rabbit, Hare]),
 
     %% Trying to remove an online node should fail
     assert_failure(fun () -> forget_cluster_node(Hare, Rabbit) end),
@@ -166,9 +156,7 @@ forget_cluster_node_test(Config) ->
     %% Now we remove Rabbit from an offline node.
     stop_join_start(Bunny, Hare),
     stop_join_start(Rabbit, Hare),
-    assert_cluster_status(
-      {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
-      [Rabbit, Hare, Bunny]),
+    assert_clustered([Rabbit, Hare, Bunny]),
     ok = stop_app(Rabbit),
     ok = stop_app(Hare),
     ok = stop_app(Bunny),
@@ -184,8 +172,7 @@ forget_cluster_node_test(Config) ->
     ok = reset(Bunny),
     ok = start_app(Bunny),
     assert_not_clustered(Bunny),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+    assert_clustered([Rabbit, Hare]).
 
 change_cluster_node_type_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
@@ -221,13 +208,10 @@ change_cluster_when_node_offline(Config) ->
 
     %% Cluster the three notes
     stop_join_start(Rabbit, Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare, Rabbit]},
-                          [Rabbit, Hare]),
+    assert_clustered([Rabbit, Hare]),
 
     stop_join_start(Bunny, Hare),
-    assert_cluster_status(
-      {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny]},
-      [Rabbit, Hare, Bunny]),
+    assert_clustered([Rabbit, Hare, Bunny]),
 
     %% Bring down Rabbit, and remove Bunny from the cluster while
     %% Rabbit is offline
@@ -237,13 +221,11 @@ change_cluster_when_node_offline(Config) ->
     assert_cluster_status({[Bunny], [Bunny], []}, [Bunny]),
     assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]}, [Hare]),
     assert_cluster_status(
-      {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Hare, Bunny]},
-      [Rabbit]),
+      {[Rabbit, Hare, Bunny], [Rabbit, Hare, Bunny], [Hare, Bunny]}, [Rabbit]),
 
     %% Bring Rabbit back up
     ok = start_app(Rabbit),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]),
+    assert_clustered([Rabbit, Hare]),
     ok = start_app(Bunny),
     assert_not_clustered(Bunny),
 
@@ -290,8 +272,7 @@ update_cluster_nodes_test(Config) ->
     ok = update_cluster_nodes(Rabbit, Bunny),
     ok = start_app(Rabbit),
     assert_not_clustered(Hare),
-    assert_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
-                          [Rabbit, Bunny]).
+    assert_clustered([Rabbit, Bunny]).
 
 erlang_config_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
@@ -301,8 +282,7 @@ erlang_config_test(Config) ->
     ok = rpc:call(Hare, application, set_env,
                   [rabbit, cluster_nodes, {[Rabbit], disc}]),
     ok = start_app(Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]),
+    assert_clustered([Rabbit, Hare]),
 
     ok = stop_app(Hare),
     ok = reset(Hare),
@@ -318,8 +298,8 @@ erlang_config_test(Config) ->
     ok = rpc:call(Hare, application, set_env,
                   [rabbit, cluster_nodes, {[non@existent], disc}]),
     ok = start_app(Hare),
-    assert_cluster_status({[Hare], [Hare], [Hare]}, [Hare]),
-    assert_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
+    assert_not_clustered(Hare),
+    assert_not_clustered(Rabbit),
 
     %% If we use a legacy config file, it still works (and a warning is emitted)
     ok = stop_app(Hare),
@@ -346,8 +326,7 @@ force_reset_test(Config) ->
     %% We can rejoin Rabbit and Hare
     update_cluster_nodes(Rabbit, Hare),
     start_app(Rabbit),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+    assert_clustered([Rabbit, Hare]).
 
 %% ----------------------------------------------------------------------------
 %% Internal utils
@@ -386,6 +365,9 @@ verify_status_equal(Node, Status, AllNodes) ->
 
 sort_cluster_status({All, Disc, Running}) ->
     {lists:sort(All), lists:sort(Disc), lists:sort(Running)}.
+
+assert_clustered(Nodes) ->
+    assert_cluster_status({Nodes, Nodes, Nodes}, Nodes).
 
 assert_not_clustered(Node) ->
     assert_cluster_status({[Node], [Node], [Node]}, [Node]).
