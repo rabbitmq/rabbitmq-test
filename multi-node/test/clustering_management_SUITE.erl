@@ -26,7 +26,7 @@
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, forget_cluster_node_test/1,
          change_cluster_node_type_test/1, change_cluster_when_node_offline/1,
-         update_cluster_nodes_test/1, erlang_config_test/1
+         update_cluster_nodes_test/1, erlang_config_test/1, force_reset_test/1
         ]).
 
 -define(LOOP_RECURSION_DELAY, 100).
@@ -37,7 +37,7 @@ all() ->
     [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
      forget_cluster_node_test, change_cluster_node_type_test,
      change_cluster_when_node_offline, update_cluster_nodes_test,
-     erlang_config_test].
+     erlang_config_test, force_reset_test].
 
 init_per_suite(Config) ->
     Config.
@@ -337,6 +337,25 @@ erlang_config_test(Config) ->
                   [rabbit, cluster_nodes, {[non@existent], bogus}]),
     assert_failure(fun () -> start_app(Hare) end).
 
+force_reset_test(Config) ->
+    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+
+    stop_join_start(Rabbit, Hare),
+    stop_app(Rabbit),
+    force_reset(Rabbit),
+    %% Hare things that Rabbit is still clustered
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                          [Hare]),
+    %% %% ...but it isn't
+    assert_cluster_status({[Rabbit], [Rabbit], []}, [Rabbit]),
+    %% Hare still thinks rabbit is in the cluster
+    assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
+    %% We can rejoin Rabbit and Hare
+    update_cluster_nodes(Rabbit, Hare),
+    start_app(Rabbit),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]).
+
 %% ----------------------------------------------------------------------------
 %% Internal utils
 
@@ -400,6 +419,9 @@ join_cluster(Node, To, Ram) ->
 
 reset(Node) ->
     rabbit_ha_test_utils:control_action(reset, Node).
+
+force_reset(Node) ->
+    rabbit_ha_test_utils:control_action(force_reset, Node).
 
 forget_cluster_node(Node, Removee, RemoveWhenOffline) ->
     rabbit_ha_test_utils:control_action(
