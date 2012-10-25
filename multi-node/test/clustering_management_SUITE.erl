@@ -328,14 +328,7 @@ erlang_config_test(Config) ->
                   [rabbit, cluster_nodes, [Rabbit]]),
     ok = start_app(Hare),
     assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                          [Rabbit, Hare]),
-
-    %% If we pass an invalid config it fails
-    ok = stop_app(Hare),
-    ok = reset(Hare),
-    ok = rpc:call(Hare, application, set_env,
-                  [rabbit, cluster_nodes, {[non@existent], bogus}]),
-    assert_failure(fun () -> start_app(Hare) end).
+                          [Rabbit, Hare]).
 
 force_reset_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
