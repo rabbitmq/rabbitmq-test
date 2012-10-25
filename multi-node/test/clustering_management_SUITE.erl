@@ -319,7 +319,18 @@ erlang_config_test(Config) ->
                   [rabbit, cluster_nodes, {[non@existent], disc}]),
     ok = start_app(Hare),
     assert_cluster_status({[Hare], [Hare], [Hare]}, [Hare]),
+    assert_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
 
+    %% If we use a legacy config file, it still works (and a warning is emitted)
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, [Rabbit]]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
+
+    %% If we pass an invalid config it fails
     ok = stop_app(Hare),
     ok = reset(Hare),
     ok = rpc:call(Hare, application, set_env,
