@@ -343,12 +343,12 @@ force_reset_test(Config) ->
     stop_join_start(Rabbit, Hare),
     stop_app(Rabbit),
     force_reset(Rabbit),
-    %% Hare things that Rabbit is still clustered
+    %% Hare thinks that Rabbit is still clustered
     assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
                           [Hare]),
     %% %% ...but it isn't
     assert_cluster_status({[Rabbit], [Rabbit], []}, [Rabbit]),
-    %% Hare still thinks rabbit is in the cluster
+    %% Hare still thinks Rabbit is in the cluster
     assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
     %% We can rejoin Rabbit and Hare
     update_cluster_nodes(Rabbit, Hare),
