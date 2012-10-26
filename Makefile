@@ -1,5 +1,6 @@
 .PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app restart-secondary-node cleanup force-snapshot \
+	prepare restart-app start-secondary-app stop-secondary-app \
+	restart-secondary-node cleanup force-snapshot \
 	multi-node-tests enable-ha disable-ha
 
 BROKER_DIR=../rabbitmq-server
@@ -108,6 +109,12 @@ restart-app:
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		stop-rabbit-on-node start-rabbit-on-node
+
+start-secondary-app:
+	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
+
+stop-secondary-app:
+	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare stop-rabbit-on-node
 
 restart-secondary-node:
 	$(MAKE) -C $(BROKER_DIR) \

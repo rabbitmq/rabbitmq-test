@@ -26,15 +26,18 @@
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, forget_cluster_node_test/1,
          change_cluster_node_type_test/1, change_cluster_when_node_offline/1,
-         update_cluster_nodes_test/1
+         update_cluster_nodes_test/1, erlang_config_test/1, force_reset_test/1
         ]).
+
+-define(LOOP_RECURSION_DELAY, 100).
 
 suite() -> [{timetrap, {seconds, 60}}].
 
 all() ->
     [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
      forget_cluster_node_test, change_cluster_node_type_test,
-     change_cluster_when_node_offline, update_cluster_nodes_test].
+     change_cluster_when_node_offline, update_cluster_nodes_test,
+     erlang_config_test, force_reset_test].
 
 init_per_suite(Config) ->
     Config.
@@ -290,6 +293,62 @@ update_cluster_nodes_test(Config) ->
     assert_cluster_status({[Rabbit, Bunny], [Rabbit, Bunny], [Rabbit, Bunny]},
                           [Rabbit, Bunny]).
 
+erlang_config_test(Config) ->
+    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], disc}]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], ram}]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                          [Rabbit, Hare]),
+
+    %% We get a warning but we start anyway
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[non@existent], disc}]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Hare], [Hare], [Hare]}, [Hare]),
+    assert_cluster_status({[Rabbit], [Rabbit], [Rabbit]}, [Rabbit]),
+
+    %% If we use a legacy config file, it still works (and a warning is emitted)
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, [Rabbit]]),
+    ok = start_app(Hare),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
+                          [Rabbit, Hare]).
+
+force_reset_test(Config) ->
+    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+
+    stop_join_start(Rabbit, Hare),
+    stop_app(Rabbit),
+    force_reset(Rabbit),
+    %% Hare thinks that Rabbit is still clustered
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Hare]},
+                          [Hare]),
+    %% %% ...but it isn't
+    assert_cluster_status({[Rabbit], [Rabbit], []}, [Rabbit]),
+    %% Hare still thinks Rabbit is in the cluster
+    assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
+    %% We can rejoin Rabbit and Hare
+    update_cluster_nodes(Rabbit, Hare),
+    start_app(Rabbit),
+    assert_cluster_status({[Rabbit, Hare], [Rabbit, Hare], [Rabbit, Hare]},
+                          [Rabbit, Hare]).
+
 %% ----------------------------------------------------------------------------
 %% Internal utils
 
@@ -298,18 +357,35 @@ cluster_members(Config) ->
     [Id || {Id, _Ref} <- systest:list_processes(Cluster)].
 
 assert_cluster_status(Status0, Nodes) ->
-    SortStatus =
-        fun ({All, Disc, Running}) ->
-                {lists:sort(All), lists:sort(Disc), lists:sort(Running)}
-        end,
-    Status = {AllNodes, _, _} = SortStatus(Status0),
-    lists:foreach(
-      fun (Node) ->
-              ?assertEqual(AllNodes =/= [Node],
-                           rpc:call(Node, rabbit_mnesia, is_clustered, [])),
-              ?assertEqual(
-                 Status, SortStatus(rabbit_ha_test_utils:cluster_status(Node)))
-      end, Nodes).
+    Status = {AllNodes, _, _} = sort_cluster_status(Status0),
+    wait_for_cluster_status(Status, AllNodes, Nodes).
+
+wait_for_cluster_status(Status, AllNodes, Nodes) ->
+    Max = systest:settings("limits.clustering_mgmt.status_check_max_wait")
+        / ?LOOP_RECURSION_DELAY,
+    wait_for_cluster_status(0, Max, Status, AllNodes, Nodes).
+
+wait_for_cluster_status(N, Max, Status, _AllNodes, Nodes) when N >= Max ->
+    error({cluster_status_max_tries_failed,
+           [{nodes, Nodes},
+            {expected_status, Status},
+            {max_tried, Max}]});
+wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) ->
+    case lists:all(fun (Node) ->
+                            verify_status_equal(Node, Status, AllNodes)
+                   end, Nodes) of
+        true  -> ok;
+        false -> timer:sleep(?LOOP_RECURSION_DELAY),
+                 wait_for_cluster_status(N + 1, Max, Status, AllNodes, Nodes)
+    end.
+
+verify_status_equal(Node, Status, AllNodes) ->
+    NodeStatus = sort_cluster_status(rabbit_ha_test_utils:cluster_status(Node)),
+    (AllNodes =/= [Node]) =:= rpc:call(Node, rabbit_mnesia, is_clustered, [])
+        andalso NodeStatus =:= Status.
+
+sort_cluster_status({All, Disc, Running}) ->
+    {lists:sort(All), lists:sort(Disc), lists:sort(Running)}.
 
 assert_not_clustered(Node) ->
     assert_cluster_status({[Node], [Node], [Node]}, [Node]).
@@ -336,6 +412,9 @@ join_cluster(Node, To, Ram) ->
 
 reset(Node) ->
     rabbit_ha_test_utils:control_action(reset, Node).
+
+force_reset(Node) ->
+    rabbit_ha_test_utils:control_action(force_reset, Node).
 
 forget_cluster_node(Node, Removee, RemoveWhenOffline) ->
     rabbit_ha_test_utils:control_action(
