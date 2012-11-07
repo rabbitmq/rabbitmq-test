@@ -1,5 +1,6 @@
 .PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app start-secondary-app stop-secondary-app \
+	prepare restart-app stop-app start-app \
+	start-secondary-app stop-secondary-app \
 	restart-secondary-node cleanup force-snapshot \
 	multi-node-tests enable-ha disable-ha
 
@@ -103,12 +104,17 @@ prepare: create_ssl_certs
 		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
-restart-app:
+start-app:
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
-		stop-rabbit-on-node start-rabbit-on-node
+		start-rabbit-on-node
+
+stop-app:
+	$(MAKE) -C $(BROKER_DIR) stop-rabbit-on-node
+
+restart-app: stop-app start-app
 
 start-secondary-app:
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
