@@ -39,8 +39,7 @@
 -define(VHOST, <<"/">>).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         change_policy_test/1,
-         change_cluster_test/1]).
+         change_policy_test/1, change_cluster_test/1, rapid_change_test/1]).
 
 -import(rabbit_ha_test_utils, [set_policy/3, set_policy/4, clear_policy/2,
                                a2b/1]).
@@ -123,6 +122,48 @@ change_cluster_test(Config) ->
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     ok.
+
+rapid_change_test(Config) ->
+    %% TODO this test does not need five nodes
+    SUT = systest:active_sut(Config),
+    [{A, ARef},
+     {_B, _BRef},
+     {_C, _CRef},
+     {_D, _DRef},
+     {_E, _ERef}] = systest:list_processes(SUT),
+    ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
+    Self = self(),
+    spawn_link(
+      fun() ->
+              [rct_amqp_ops(ACh, I) || I <- lists:seq(1, 100)],
+              Self ! done
+      end),
+    rct_loop(A),
+    ok.
+
+rct_amqp_ops(Ch, I) ->
+    Payload = list_to_binary(integer_to_list(I)),
+    amqp_channel:call(Ch, #'queue.declare'{queue = ?QNAME}),
+    amqp_channel:cast(Ch, #'basic.publish'{exchange = <<"">>,
+                                           routing_key = ?QNAME},
+                      #amqp_msg{payload = Payload}),
+    amqp_channel:subscribe(Ch, #'basic.consume'{queue    = ?QNAME,
+                                                no_ack   = true}, self()),
+    receive #'basic.consume_ok'{} -> ok
+    end,
+    receive {#'basic.deliver'{}, #amqp_msg{payload = Payload}} ->
+            ok
+    end,
+    amqp_channel:call(Ch, #'queue.delete'{queue = ?QNAME}).
+
+rct_loop(Node) ->
+    receive done ->
+            ok
+    after 0 ->
+            set_policy(Node, ?POLICY, <<"all">>),
+            clear_policy(Node, ?POLICY),
+            rct_loop(Node)
+    end.
 
 %%----------------------------------------------------------------------------
 
