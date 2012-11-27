@@ -1,4 +1,6 @@
-{dynamic_ha_cluster_SUITE, [{all, three_node_cluster_plus_two}]}.
+{dynamic_ha_cluster_SUITE,
+ [{all,                 three_node_cluster},
+  {change_cluster_test, three_node_cluster_plus_two}]}.
 
 %% TODO How can we factor out the commonality?
 {three_node_cluster_plus_two, [

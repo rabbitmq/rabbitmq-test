@@ -58,13 +58,10 @@ end_per_suite(_Config) ->
     ok.
 
 change_policy_test(Config) ->
-    %% TODO this test only needs three nodes
     SUT = systest:active_sut(Config),
     [{A, ARef},
      {B, _BRef},
-     {C, _CRef},
-     {_D, _DRef},
-     {_E, _ERef}] = systest:list_processes(SUT),
+     {C, _CRef}] = systest:list_processes(SUT),
     ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
 
     %% When we first declare a queue with no policy, it's not HA.
@@ -124,13 +121,10 @@ change_cluster_test(Config) ->
     ok.
 
 rapid_change_test(Config) ->
-    %% TODO this test does not need five nodes
     SUT = systest:active_sut(Config),
     [{A, ARef},
      {_B, _BRef},
-     {_C, _CRef},
-     {_D, _DRef},
-     {_E, _ERef}] = systest:list_processes(SUT),
+     {_C, _CRef}] = systest:list_processes(SUT),
     ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
     Self = self(),
     spawn_link(
