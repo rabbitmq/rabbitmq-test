@@ -65,7 +65,7 @@ eager_sync_test(Config) ->
     publish(Ch, 10),
     lose(A),
     amqp_channel:call(Ch2, #'basic.get'{queue = ?QNAME, no_ack = false}),
-    {error,queue_has_pending_acks} = sync(C),
+    {error, pending_acks} = sync(C),
     amqp_channel:close(Ch2),
     consume(Ch, 10),
 
