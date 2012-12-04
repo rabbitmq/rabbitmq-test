@@ -1,8 +1,8 @@
 # NB: VERSION *might* be passed down from another makefile, otherwise we
 # will take it from the user - in CI in seems this will always be 0.0.0 
 VERSION ?= 0.0.0
-BROKER_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-server)
-CLIENT_DIR=$(abspath ../../rabbitmq-public-umbrella/rabbitmq-erlang-client)
+BROKER_DIR=$(abspath ../../rabbitmq-server)
+CLIENT_DIR=$(abspath ../../rabbitmq-erlang-client)
 TEMP_DIRS=lib test-lib bin ebin test-ebin
 RABBIT_SERVER=$(abspath lib/rabbit)
 REBAR=bin/rebar
