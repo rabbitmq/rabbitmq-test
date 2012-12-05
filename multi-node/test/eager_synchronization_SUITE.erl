@@ -21,6 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
+-define(MESSAGE_COUNT, 10000).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          eager_sync_test/1]).
@@ -45,37 +46,46 @@ eager_sync_test(Config) ->
                 {{C, _CRef}, {Conn, Ch}}]} =
         rabbit_ha_test_utils:cluster_members(Config),
 
-    amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
+    amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
+                                            durable = true}),
+    amqp_channel:call(Ch, #'tx.select'{}),
 
     %% Don't sync, lose messages
-    publish(Ch, 10),
+    publish(Ch, ?MESSAGE_COUNT),
     lose(A),
     lose(B),
     consume(Ch, 0),
 
     %% Sync, keep messages
-    publish(Ch, 10),
+    publish(Ch, ?MESSAGE_COUNT),
     lose(A),
     ok = sync(C),
     lose(B),
-    consume(Ch, 10),
+    consume(Ch, ?MESSAGE_COUNT),
+
+    %% Check the no-need-to-sync path
+    publish(Ch, ?MESSAGE_COUNT),
+    ok = sync(C),
+    consume(Ch, ?MESSAGE_COUNT),
 
     %% messages_unacknowledged > 0, fail to sync
     {ok, Ch2} = amqp_connection:open_channel(Conn),
-    publish(Ch, 10),
+    publish(Ch, ?MESSAGE_COUNT),
     lose(A),
     amqp_channel:call(Ch2, #'basic.get'{queue = ?QNAME, no_ack = false}),
     {error, pending_acks} = sync(C),
     amqp_channel:close(Ch2),
-    consume(Ch, 10),
+    consume(Ch, ?MESSAGE_COUNT),
 
     ok.
 
 publish(Ch, Count) ->
     [amqp_channel:call(Ch,
                        #'basic.publish'{routing_key = ?QNAME},
-                       #amqp_msg{payload = list_to_binary(integer_to_list(I))})
-     || I <- lists:seq(1, Count)].
+                       #amqp_msg{props   = #'P_basic'{delivery_mode = 2},
+                                 payload = list_to_binary(integer_to_list(I))})
+     || I <- lists:seq(1, Count)],
+    amqp_channel:call(Ch, #'tx.commit'{}).
 
 consume(Ch, Count) ->
     amqp_channel:subscribe(Ch, #'basic.consume'{queue = ?QNAME, no_ack = true},
@@ -91,7 +101,8 @@ consume(Ch, Count) ->
          end
      end|| I <- lists:seq(1, Count)],
     #'queue.declare_ok'{message_count = 0}
-        = amqp_channel:call(Ch, #'queue.declare'{queue = ?QNAME}),
+        = amqp_channel:call(Ch, #'queue.declare'{queue   = ?QNAME,
+                                                 durable = true}),
     amqp_channel:call(Ch, #'basic.cancel'{consumer_tag = CTag}),
     ok.
 
