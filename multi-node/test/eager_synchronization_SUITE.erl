@@ -48,7 +48,7 @@ eager_sync_test(Config) ->
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
-    amqp_channel:call(Ch, #'tx.select'{}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
 
     %% Don't sync, lose messages
     publish(Ch, ?MESSAGE_COUNT),
@@ -85,7 +85,7 @@ publish(Ch, Count) ->
                        #amqp_msg{props   = #'P_basic'{delivery_mode = 2},
                                  payload = list_to_binary(integer_to_list(I))})
      || I <- lists:seq(1, Count)],
-    amqp_channel:call(Ch, #'tx.commit'{}).
+    amqp_channel:wait_for_confirms(Ch).
 
 consume(Ch, Count) ->
     amqp_channel:subscribe(Ch, #'basic.consume'{queue = ?QNAME, no_ack = true},
@@ -111,9 +111,10 @@ lose(Node) ->
     rabbit_ha_test_utils:start_app(Node).
 
 sync(Node) ->
-    {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup,
-                       [rabbit_misc:r(<<"/">>, queue, ?QNAME)]),
-    case rpc:call(Node, rabbit_amqqueue, sync_mirrors, [Q]) of
+    QName = rabbit_misc:r(<<"/">>, queue, ?QNAME),
+    {ok, #amqqueue{pid = QPid}} =
+        rpc:call(Node, rabbit_amqqueue, lookup, [QName]),
+    case rpc:call(Node, rabbit_amqqueue, sync_mirrors, [QPid]) of
         ok -> slave_synchronization_SUITE:wait_for_sync_status(
                 true, Node, ?QNAME),
               ok;
