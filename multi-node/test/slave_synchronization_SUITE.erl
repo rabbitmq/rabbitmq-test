@@ -18,7 +18,8 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         slave_synchronization/1, slave_synchronization_ttl/1]).
+         slave_synchronization/1, slave_synchronization_ttl/1,
+         wait_for_sync_status/3]).
 
 -define(LOOP_RECURSION_DELAY, 100).
 
