@@ -69,10 +69,11 @@ eager_sync_test(Config) ->
     consume(Ch, ?MESSAGE_COUNT),
 
     %% messages_unacknowledged > 0, fail to sync
-    {ok, Ch2} = amqp_connection:open_channel(Conn),
     publish(Ch, ?MESSAGE_COUNT),
     lose(A),
-    amqp_channel:call(Ch2, #'basic.get'{queue = ?QNAME, no_ack = false}),
+    {ok, Ch2} = amqp_connection:open_channel(Conn),
+    {#'basic.get_ok'{}, _} = amqp_channel:call(
+                               Ch2, #'basic.get'{queue = ?QNAME}),
     {error, pending_acks} = sync(C),
     amqp_channel:close(Ch2),
     consume(Ch, ?MESSAGE_COUNT),
