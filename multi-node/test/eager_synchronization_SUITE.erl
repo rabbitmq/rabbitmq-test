@@ -24,7 +24,7 @@
 -define(MESSAGE_COUNT, 10000).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         eager_sync_test/1]).
+         eager_sync_test/1, eager_sync_cancel_test/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -79,6 +79,29 @@ eager_sync_test(Config) ->
 
     ok.
 
+eager_sync_cancel_test(Config) ->
+    %% Queue is on AB but not C.
+    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
+                {{B, _BRef}, {_BConn, _BCh}},
+                {{C, _CRef}, {_Conn, Ch}}]} =
+        rabbit_ha_test_utils:cluster_members(Config),
+
+    amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
+                                            durable = true}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
+
+    %% Sync then cancel
+    publish(Ch, ?MESSAGE_COUNT),
+    lose(A),
+    spawn_link(fun() -> sync_nowait(C) end),
+    wait_for_syncing(C),
+    sync_cancel(C),
+    wait_for_running(C),
+    lose(B),
+    consume(Ch, 0),
+    ok.
+
+
 publish(Ch, Count) ->
     [amqp_channel:call(Ch,
                        #'basic.publish'{routing_key = ?QNAME},
@@ -111,12 +134,40 @@ lose(Node) ->
     rabbit_ha_test_utils:start_app(Node).
 
 sync(Node) ->
-    QName = rabbit_misc:r(<<"/">>, queue, ?QNAME),
-    {ok, #amqqueue{pid = QPid}} =
-        rpc:call(Node, rabbit_amqqueue, lookup, [QName]),
-    case rpc:call(Node, rabbit_amqqueue, sync_mirrors, [QPid]) of
+    case sync_nowait(Node) of
         ok -> slave_synchronization_SUITE:wait_for_sync_status(
                 true, Node, ?QNAME),
               ok;
         R  -> R
     end.
+
+sync_nowait(Node) -> action(Node, sync_mirrors).
+sync_cancel(Node) -> action(Node, cancel_sync_mirrors).
+
+action(Node, Action) ->
+    #amqqueue{pid = QPid} = queue(Node),
+    rpc:call(Node, rabbit_amqqueue, Action, [QPid]).
+
+queue(Node) ->
+    QName = rabbit_misc:r(<<"/">>, queue, ?QNAME),
+    {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup, [QName]),
+    Q.
+
+wait_for_syncing(Node) ->
+    case status(Node) of
+        {syncing, _} -> ok;
+        _            -> timer:sleep(100),
+                        wait_for_syncing(Node)
+    end.
+
+wait_for_running(Node) ->
+    case status(Node) of
+        running -> ok;
+        _       -> timer:sleep(100),
+                   wait_for_running(Node)
+    end.
+
+status(Node) ->
+    [{status, Status}] =
+        rpc:call(Node, rabbit_amqqueue, info, [queue(Node), [status]]),
+    Status.
