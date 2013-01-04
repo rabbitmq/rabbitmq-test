@@ -152,12 +152,10 @@ send_dummy_message(Channel, Queue) ->
     amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Payload}).
 
 slave_pids(Node, Queue) ->
-    [[_Name, {synchronised_slave_pids, Pids}]] =
-        lists:filter(
-          fun ([{name, {resource, <<"/">>, queue, Queue1}}, _SyncPids]) ->
-                  Queue1 =:= Queue
-          end, rpc:call(Node, rabbit_amqqueue, info_all,
-                        [<<"/">>, [name, synchronised_slave_pids]])),
+    {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup,
+                       [rabbit_misc:r(<<"/">>, queue, Queue)]),
+    SSP = synchronised_slave_pids,
+    [{SSP, Pids}] = rpc:call(Node, rabbit_amqqueue, info, [Q, [SSP]]),
     case Pids of
         '' -> [];
         _  -> Pids
