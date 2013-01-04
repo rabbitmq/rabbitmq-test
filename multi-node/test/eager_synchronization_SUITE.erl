@@ -112,10 +112,8 @@ lose(Node) ->
     rabbit_ha_test_utils:start_app(Node).
 
 sync(Node) ->
-    QName = rabbit_misc:r(<<"/">>, queue, ?QNAME),
-    {ok, #amqqueue{pid = QPid}} =
-        rpc:call(Node, rabbit_amqqueue, lookup, [QName]),
-    case rpc:call(Node, rabbit_amqqueue, sync_mirrors, [QPid]) of
+    case rabbit_ha_test_utils:control_action(
+           sync_queue, Node, [binary_to_list(?QNAME)], [{"-p", "/"}]) of
         ok -> slave_synchronization_SUITE:wait_for_sync_status(
                 true, Node, ?QNAME),
               ok;
