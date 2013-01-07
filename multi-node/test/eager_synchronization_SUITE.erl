@@ -21,7 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
--define(MESSAGE_COUNT, 10000).
+-define(MESSAGE_COUNT, 500).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          eager_sync_test/1, eager_sync_cancel_test/1]).
@@ -69,10 +69,11 @@ eager_sync_test(Config) ->
     consume(Ch, ?MESSAGE_COUNT),
 
     %% messages_unacknowledged > 0, fail to sync
-    {ok, Ch2} = amqp_connection:open_channel(Conn),
     publish(Ch, ?MESSAGE_COUNT),
     lose(A),
-    amqp_channel:call(Ch2, #'basic.get'{queue = ?QNAME, no_ack = false}),
+    {ok, Ch2} = amqp_connection:open_channel(Conn),
+    {#'basic.get_ok'{}, _} = amqp_channel:call(
+                               Ch2, #'basic.get'{queue = ?QNAME}),
     {error, pending_acks} = sync(C),
     amqp_channel:close(Ch2),
     consume(Ch, ?MESSAGE_COUNT),
@@ -141,12 +142,12 @@ sync(Node) ->
         R  -> R
     end.
 
-sync_nowait(Node) -> action(Node, sync_mirrors).
-sync_cancel(Node) -> action(Node, cancel_sync_mirrors).
+sync_nowait(Node) -> action(Node, sync_queue).
+sync_cancel(Node) -> action(Node, cancel_sync_queue).
 
 action(Node, Action) ->
-    #amqqueue{pid = QPid} = queue(Node),
-    rpc:call(Node, rabbit_amqqueue, Action, [QPid]).
+    rabbit_ha_test_utils:control_action(
+      Action, Node, [binary_to_list(?QNAME)], [{"-p", "/"}]).
 
 queue(Node) ->
     QName = rabbit_misc:r(<<"/">>, queue, ?QNAME),
