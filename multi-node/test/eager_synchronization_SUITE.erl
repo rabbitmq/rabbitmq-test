@@ -90,16 +90,19 @@ eager_sync_cancel_test(Config) ->
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
+    {ok, not_syncing} = sync_cancel(C), %% Idempotence
 
     %% Sync then cancel
     publish(Ch, ?MESSAGE_COUNT),
     lose(A),
-    spawn_link(fun() -> sync_nowait(C) end),
+    spawn_link(fun() -> ok = sync_nowait(C) end),
     wait_for_syncing(C),
-    sync_cancel(C),
+    ok = sync_cancel(C),
     wait_for_running(C),
     lose(B),
     consume(Ch, 0),
+
+    {ok, not_syncing} = sync_cancel(C), %% Idempotence
     ok.
 
 
