@@ -52,15 +52,15 @@ eager_sync_test(Config) ->
 
     %% Don't sync, lose messages
     publish(Ch, ?MESSAGE_COUNT),
-    lose(A),
-    lose(B),
+    restart(A),
+    restart(B),
     consume(Ch, 0),
 
     %% Sync, keep messages
     publish(Ch, ?MESSAGE_COUNT),
-    lose(A),
+    restart(A),
     ok = sync(C),
-    lose(B),
+    restart(B),
     consume(Ch, ?MESSAGE_COUNT),
 
     %% Check the no-need-to-sync path
@@ -70,7 +70,7 @@ eager_sync_test(Config) ->
 
     %% messages_unacknowledged > 0, fail to sync
     publish(Ch, ?MESSAGE_COUNT),
-    lose(A),
+    restart(A),
     {ok, Ch2} = amqp_connection:open_channel(Conn),
     {#'basic.get_ok'{}, _} = amqp_channel:call(
                                Ch2, #'basic.get'{queue = ?QNAME}),
@@ -94,12 +94,12 @@ eager_sync_cancel_test(Config) ->
 
     %% Sync then cancel
     publish(Ch, ?MESSAGE_COUNT),
-    lose(A),
+    restart(A),
     spawn_link(fun() -> ok = sync_nowait(C) end),
     wait_for_syncing(C),
     ok = sync_cancel(C),
     wait_for_running(C),
-    lose(B),
+    restart(B),
     consume(Ch, 0),
 
     {ok, not_syncing} = sync_cancel(C), %% Idempotence
@@ -133,7 +133,7 @@ consume(Ch, Count) ->
     amqp_channel:call(Ch, #'basic.cancel'{consumer_tag = CTag}),
     ok.
 
-lose(Node) ->
+restart(Node) ->
     rabbit_ha_test_utils:stop_app(Node),
     rabbit_ha_test_utils:start_app(Node).
 
