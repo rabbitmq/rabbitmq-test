@@ -43,7 +43,7 @@ eager_sync_test(Config) ->
     %% Queue is on AB but not C.
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {Conn, Ch}}]} =
+                {{C, _CRef}, {_CConn, Ch}}]} =
         rabbit_ha_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
@@ -68,14 +68,13 @@ eager_sync_test(Config) ->
     ok = sync(C),
     consume(Ch, ?MESSAGE_COUNT),
 
-    %% messages_unacknowledged > 0, fail to sync
+    %% keep unacknowledged messages
     publish(Ch, ?MESSAGE_COUNT),
+    fetch(Ch, 2),
     restart(A),
-    {ok, Ch2} = amqp_connection:open_channel(Conn),
-    {#'basic.get_ok'{}, _} = amqp_channel:call(
-                               Ch2, #'basic.get'{queue = ?QNAME}),
-    {error, pending_acks} = sync(C),
-    amqp_channel:close(Ch2),
+    fetch(Ch, 3),
+    sync(C),
+    restart(B),
     consume(Ch, ?MESSAGE_COUNT),
 
     ok.
@@ -131,6 +130,12 @@ consume(Ch, Count) ->
         = amqp_channel:call(Ch, #'queue.declare'{queue   = ?QNAME,
                                                  durable = true}),
     amqp_channel:call(Ch, #'basic.cancel'{consumer_tag = CTag}),
+    ok.
+
+fetch(Ch, Count) ->
+    [{#'basic.get_ok'{}, _} =
+         amqp_channel:call(Ch, #'basic.get'{queue = ?QNAME}) ||
+        _ <- lists:seq(1, Count)],
     ok.
 
 restart(Node) ->
