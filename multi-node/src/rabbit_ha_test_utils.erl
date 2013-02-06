@@ -124,6 +124,13 @@ connect_to_node(Node, _ClusterRef, _Siblings) ->
     %% we store these pids for later use....
     {store, AmqpData}.
 
+connect(NodeRef) ->
+    UserData = systest:read_process_user_data(NodeRef),
+    NodePort = ?REQUIRE(amqp_port, UserData),
+    {ok, Conn} = amqp_connection:start(#amqp_params_network{port = NodePort}),
+    {ok, Ch} = amqp_connection:open_channel(Conn),
+    {Conn, Ch}.
+
 %%
 %% Test Utility Functions
 %%

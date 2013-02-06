@@ -25,6 +25,7 @@
 
          join_and_part_cluster/1, join_cluster_bad_operations/1,
          join_to_start_interval/1, forget_cluster_node_test/1,
+         forget_cluster_node_removes_things_test/1,
          change_cluster_node_type_test/1, change_cluster_when_node_offline/1,
          update_cluster_nodes_test/1, erlang_config_test/1, force_reset_test/1
         ]).
@@ -173,6 +174,33 @@ forget_cluster_node_test(Config) ->
     ok = start_app(Bunny),
     assert_not_clustered(Bunny),
     assert_clustered([Rabbit, Hare]).
+
+forget_cluster_node_removes_things_test(Config) ->
+    {_Cluster, [{{Rabbit, RabbitRef}, _},
+                {{Hare,   HareRef},   _},
+                {{_Bunny, _BunnyRef}, _}
+               ]} = rabbit_ha_test_utils:cluster_members(Config),
+
+    stop_join_start(Rabbit, Hare),
+    {_RConn, RCh} = rabbit_ha_test_utils:connect(RabbitRef),
+    #'queue.declare_ok'{} =
+        amqp_channel:call(RCh, #'queue.declare'{queue   = <<"test">>,
+                                                durable = true}),
+
+    ok = stop_app(Rabbit),
+
+    {_HConn, HCh} = rabbit_ha_test_utils:connect(HareRef),
+    {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
+        (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
+                                                       durable = true})),
+
+    ok = forget_cluster_node(Hare, Rabbit),
+
+    {_HConn2, HCh2} = rabbit_ha_test_utils:connect(HareRef),
+    #'queue.declare_ok'{} =
+        amqp_channel:call(HCh2, #'queue.declare'{queue   = <<"test">>,
+                                                 durable = true}),
+    ok.
 
 change_cluster_node_type_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
