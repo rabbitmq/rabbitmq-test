@@ -101,8 +101,9 @@ declare_ha_policies(SUT) ->
     Members = [Node | _] = live_members(SUT),
     set_policy(Node, <<"^ha.all.">>, <<"all">>),
     set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
-    set_policy(Node, <<"^ha.two.">>, <<"nodes">>,
-               [a2b(M) || M <- lists:sublist(Members, 2)]).
+    TwoNodes = [a2b(M) || M <- lists:sublist(Members, 2)],
+    set_policy(Node, <<"^ha.two.">>, <<"nodes">>, TwoNodes),
+    set_policy(Node, <<"^ha.auto.">>, <<"nodes">>, TwoNodes, <<"automatic">>).
 
 %%
 %% @doc This systest_sut on_join callback sets up a single connection and
@@ -161,6 +162,11 @@ set_policy(Node, Pattern, HAMode) ->
 set_policy(Node, Pattern, HAMode, HAParams) ->
     set_policy0(Node, Pattern, [{<<"ha-mode">>,   HAMode},
                                 {<<"ha-params">>, HAParams}]).
+
+set_policy(Node, Pattern, HAMode, HAParams, HASyncMode) ->
+    set_policy0(Node, Pattern, [{<<"ha-mode">>,      HAMode},
+                                {<<"ha-params">>,    HAParams},
+                                {<<"ha-sync-mode">>, HASyncMode}]).
 
 set_policy0(Node, Pattern, Definition) ->
     ok = rpc:call(Node, rabbit_policy, set,
