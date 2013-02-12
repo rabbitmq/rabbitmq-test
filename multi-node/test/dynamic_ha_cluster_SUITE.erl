@@ -84,9 +84,16 @@ change_policy_test(Config) ->
     clear_policy(A, ?POLICY),
     assert_slaves(A, ?QNAME, {A, ''}),
 
-    %% Test switching "away" from an unmirrored node
+    %% Test switching "away" from an unmirrored node which is not synced.
+    amqp_channel:call(ACh, #'confirm.select'{}),
+    amqp_channel:cast(ACh, #'basic.publish'{routing_key = ?QNAME}, #amqp_msg{}),
+    amqp_channel:wait_for_confirms(ACh),
     set_policy(A, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
     assert_slaves(A, ?QNAME, {A, [B, C]}, [{A, [B]}, {A, [C]}]),
+
+    %% When the queue syncs the master should die.
+    amqp_channel:cast(ACh, #'queue.purge'{queue = ?QNAME}),
+    assert_slaves(A, ?QNAME, {B, [C]}),
 
     ok.
 
