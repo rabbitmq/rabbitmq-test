@@ -25,7 +25,10 @@
 -define(MESSAGE_COUNT, 2000).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1]).
+         eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1,
+         eager_sync_auto_on_policy_change_test/1]).
+
+-import(rabbit_ha_test_utils, [set_policy/5, a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -123,6 +126,26 @@ eager_sync_auto_test(Config) ->
     restart(B),
     wait_for_sync(C, ?QNAME_AUTO),
     consume(Ch, ?QNAME_AUTO, ?MESSAGE_COUNT),
+
+    ok.
+
+eager_sync_auto_on_policy_change_test(Config) ->
+    %% Queue is on AB but not C.
+    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
+                {{B, _BRef}, {_BConn, _BCh}},
+                {{C, _CRef}, {_CConn, Ch}}]} =
+        rabbit_ha_test_utils:cluster_members(Config),
+
+    amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
+                                            durable = true}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
+
+    %% Sync automatically once the policy is changed to tell us to.
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
+    restart(A),
+    set_policy(A, <<"^ha.two.">>, <<"nodes">>, [a2b(A), a2b(B)],
+               <<"automatic">>),
+    wait_for_sync(C, ?QNAME),
 
     ok.
 
