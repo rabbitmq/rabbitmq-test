@@ -21,7 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
--define(MESSAGE_COUNT, 2000).
+-define(MESSAGE_COUNT, 10000).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          eager_sync_test/1, eager_sync_cancel_test/1]).
@@ -90,20 +90,28 @@ eager_sync_cancel_test(Config) ->
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
     {ok, not_syncing} = sync_cancel(C), %% Idempotence
+    eager_sync_cancel_test2(A, B, C, Ch).
 
+eager_sync_cancel_test2(A, B, C, Ch) ->
     %% Sync then cancel
     publish(Ch, ?MESSAGE_COUNT),
     restart(A),
     spawn_link(fun() -> ok = sync_nowait(C) end),
     wait_for_syncing(C),
-    ok = sync_cancel(C),
-    wait_for_running(C),
-    restart(B),
-    consume(Ch, 0),
+    case sync_cancel(C) of
+        ok ->
+            wait_for_running(C),
+            restart(B),
+            consume(Ch, 0),
 
-    {ok, not_syncing} = sync_cancel(C), %% Idempotence
-    ok.
-
+            {ok, not_syncing} = sync_cancel(C), %% Idempotence
+            ok;
+        {ok, not_syncing} ->
+            %% Damn. Syncing finished between wait_for_syncing/1 and
+            %% sync_cancel/1 above. Start again.
+            amqp_channel:call(Ch, #'queue.purge'{queue = ?QNAME}),
+            eager_sync_cancel_test2(A, B, C, Ch)
+    end.
 
 publish(Ch, Count) ->
     [amqp_channel:call(Ch,
