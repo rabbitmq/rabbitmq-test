@@ -21,7 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
--define(MESSAGE_COUNT, 10000).
+-define(MESSAGE_COUNT, 2000).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          eager_sync_test/1, eager_sync_cancel_test/1]).
