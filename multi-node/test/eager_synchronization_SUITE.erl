@@ -21,10 +21,14 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
+-define(QNAME_AUTO, <<"ha.auto.test">>).
 -define(MESSAGE_COUNT, 2000).
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         eager_sync_test/1, eager_sync_cancel_test/1]).
+         eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1,
+         eager_sync_auto_on_policy_change_test/1]).
+
+-import(rabbit_ha_test_utils, [set_policy/5, a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -51,31 +55,31 @@ eager_sync_test(Config) ->
     amqp_channel:call(Ch, #'confirm.select'{}),
 
     %% Don't sync, lose messages
-    publish(Ch, ?MESSAGE_COUNT),
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
     restart(B),
-    consume(Ch, 0),
+    consume(Ch, ?QNAME, 0),
 
     %% Sync, keep messages
-    publish(Ch, ?MESSAGE_COUNT),
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
-    ok = sync(C),
+    ok = sync(C, ?QNAME),
     restart(B),
-    consume(Ch, ?MESSAGE_COUNT),
+    consume(Ch, ?QNAME, ?MESSAGE_COUNT),
 
     %% Check the no-need-to-sync path
-    publish(Ch, ?MESSAGE_COUNT),
-    ok = sync(C),
-    consume(Ch, ?MESSAGE_COUNT),
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
+    ok = sync(C, ?QNAME),
+    consume(Ch, ?QNAME, ?MESSAGE_COUNT),
 
     %% keep unacknowledged messages
-    publish(Ch, ?MESSAGE_COUNT),
-    fetch(Ch, 2),
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
+    fetch(Ch, ?QNAME, 2),
     restart(A),
-    fetch(Ch, 3),
-    sync(C),
+    fetch(Ch, ?QNAME, 3),
+    sync(C, ?QNAME),
     restart(B),
-    consume(Ch, ?MESSAGE_COUNT),
+    consume(Ch, ?QNAME, ?MESSAGE_COUNT),
 
     ok.
 
@@ -89,22 +93,22 @@ eager_sync_cancel_test(Config) ->
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
-    {ok, not_syncing} = sync_cancel(C), %% Idempotence
+    {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
     eager_sync_cancel_test2(A, B, C, Ch).
 
 eager_sync_cancel_test2(A, B, C, Ch) ->
     %% Sync then cancel
-    publish(Ch, ?MESSAGE_COUNT),
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
-    spawn_link(fun() -> ok = sync_nowait(C) end),
-    wait_for_syncing(C),
-    case sync_cancel(C) of
+    spawn_link(fun() -> ok = sync_nowait(C, ?QNAME) end),
+    wait_for_syncing(C, ?QNAME),
+    case sync_cancel(C, ?QNAME) of
         ok ->
-            wait_for_running(C),
+            wait_for_running(C, ?QNAME),
             restart(B),
-            consume(Ch, 0),
+            consume(Ch, ?QNAME, 0),
 
-            {ok, not_syncing} = sync_cancel(C), %% Idempotence
+            {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
             ok;
         {ok, not_syncing} ->
             %% Damn. Syncing finished between wait_for_syncing/1 and
@@ -113,16 +117,57 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
             eager_sync_cancel_test2(A, B, C, Ch)
     end.
 
-publish(Ch, Count) ->
+eager_sync_auto_test(Config) ->
+    %% Queue is on AB but not C.
+    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
+                {{B, _BRef}, {_BConn, _BCh}},
+                {{C, _CRef}, {_CConn, Ch}}]} =
+        rabbit_ha_test_utils:cluster_members(Config),
+
+    amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME_AUTO,
+                                            durable = true}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
+
+    %% Sync automatically, don't lose messages
+    publish(Ch, ?QNAME_AUTO, ?MESSAGE_COUNT),
+    restart(A),
+    wait_for_sync(C, ?QNAME_AUTO),
+    restart(B),
+    wait_for_sync(C, ?QNAME_AUTO),
+    consume(Ch, ?QNAME_AUTO, ?MESSAGE_COUNT),
+
+    ok.
+
+eager_sync_auto_on_policy_change_test(Config) ->
+    %% Queue is on AB but not C.
+    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
+                {{B, _BRef}, {_BConn, _BCh}},
+                {{C, _CRef}, {_CConn, Ch}}]} =
+        rabbit_ha_test_utils:cluster_members(Config),
+
+    amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
+                                            durable = true}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
+
+    %% Sync automatically once the policy is changed to tell us to.
+    publish(Ch, ?QNAME, ?MESSAGE_COUNT),
+    restart(A),
+    set_policy(A, <<"^ha.two.">>, <<"nodes">>, [a2b(A), a2b(B)],
+               <<"automatic">>),
+    wait_for_sync(C, ?QNAME),
+
+    ok.
+
+publish(Ch, QName, Count) ->
     [amqp_channel:call(Ch,
-                       #'basic.publish'{routing_key = ?QNAME},
+                       #'basic.publish'{routing_key = QName},
                        #amqp_msg{props   = #'P_basic'{delivery_mode = 2},
                                  payload = list_to_binary(integer_to_list(I))})
      || I <- lists:seq(1, Count)],
     amqp_channel:wait_for_confirms(Ch).
 
-consume(Ch, Count) ->
-    amqp_channel:subscribe(Ch, #'basic.consume'{queue = ?QNAME, no_ack = true},
+consume(Ch, QName, Count) ->
+    amqp_channel:subscribe(Ch, #'basic.consume'{queue = QName, no_ack = true},
                            self()),
     CTag = receive #'basic.consume_ok'{consumer_tag = C} -> C end,
     [begin
@@ -135,14 +180,14 @@ consume(Ch, Count) ->
          end
      end|| I <- lists:seq(1, Count)],
     #'queue.declare_ok'{message_count = 0}
-        = amqp_channel:call(Ch, #'queue.declare'{queue   = ?QNAME,
+        = amqp_channel:call(Ch, #'queue.declare'{queue   = QName,
                                                  durable = true}),
     amqp_channel:call(Ch, #'basic.cancel'{consumer_tag = CTag}),
     ok.
 
-fetch(Ch, Count) ->
+fetch(Ch, QName, Count) ->
     [{#'basic.get_ok'{}, _} =
-         amqp_channel:call(Ch, #'basic.get'{queue = ?QNAME}) ||
+         amqp_channel:call(Ch, #'basic.get'{queue = QName}) ||
         _ <- lists:seq(1, Count)],
     ok.
 
@@ -150,41 +195,43 @@ restart(Node) ->
     rabbit_ha_test_utils:stop_app(Node),
     rabbit_ha_test_utils:start_app(Node).
 
-sync(Node) ->
-    case sync_nowait(Node) of
-        ok -> slave_synchronization_SUITE:wait_for_sync_status(
-                true, Node, ?QNAME),
+sync(Node, QName) ->
+    case sync_nowait(Node, QName) of
+        ok -> wait_for_sync(Node, QName),
               ok;
         R  -> R
     end.
 
-sync_nowait(Node) -> action(Node, sync_queue).
-sync_cancel(Node) -> action(Node, cancel_sync_queue).
+sync_nowait(Node, QName) -> action(Node, sync_queue, QName).
+sync_cancel(Node, QName) -> action(Node, cancel_sync_queue, QName).
 
-action(Node, Action) ->
+wait_for_sync(Node, QName) ->
+    slave_synchronization_SUITE:wait_for_sync_status(true, Node, QName).
+
+action(Node, Action, QName) ->
     rabbit_ha_test_utils:control_action(
-      Action, Node, [binary_to_list(?QNAME)], [{"-p", "/"}]).
+      Action, Node, [binary_to_list(QName)], [{"-p", "/"}]).
 
-queue(Node) ->
-    QName = rabbit_misc:r(<<"/">>, queue, ?QNAME),
-    {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup, [QName]),
+queue(Node, QName) ->
+    QNameRes = rabbit_misc:r(<<"/">>, queue, QName),
+    {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup, [QNameRes]),
     Q.
 
-wait_for_syncing(Node) ->
-    case status(Node) of
+wait_for_syncing(Node, QName) ->
+    case status(Node, QName) of
         {syncing, _} -> ok;
         _            -> timer:sleep(100),
-                        wait_for_syncing(Node)
+                        wait_for_syncing(Node, QName)
     end.
 
-wait_for_running(Node) ->
-    case status(Node) of
+wait_for_running(Node, QName) ->
+    case status(Node, QName) of
         running -> ok;
         _       -> timer:sleep(100),
-                   wait_for_running(Node)
+                   wait_for_running(Node, QName)
     end.
 
-status(Node) ->
+status(Node, QName) ->
     [{status, Status}] =
-        rpc:call(Node, rabbit_amqqueue, info, [queue(Node), [status]]),
+        rpc:call(Node, rabbit_amqqueue, info, [queue(Node, QName), [status]]),
     Status.
