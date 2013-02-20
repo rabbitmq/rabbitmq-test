@@ -8,7 +8,8 @@
 {time_traps, [
     {kill_multi, {minutes, 4}},
     {restarted_master, {minutes, 4}},
-    {ha_cluster_SUITE, {seconds, 100}}
+    {ha_cluster_SUITE, {seconds, 100}},
+    {eager_sync, {minutes, 3}}
 ]}.
 
 {limits, [

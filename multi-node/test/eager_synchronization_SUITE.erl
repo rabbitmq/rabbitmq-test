@@ -32,7 +32,7 @@
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
+suite() -> [{timetrap, systest:settings("time_traps.eager_sync")}].
 
 all() ->
     systest_suite:export_all(?MODULE).
