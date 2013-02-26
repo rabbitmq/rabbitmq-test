@@ -4,4 +4,7 @@
             eager_synchronization_SUITE,
             clustering_management_SUITE,
             slave_synchronization_SUITE]}.
+{aggressive_teardown, {minutes, 5}}.
+{setup_timetrap,      {minutes, 5}}.
+{teardown_timetrap,   {seconds, 100}}.
 

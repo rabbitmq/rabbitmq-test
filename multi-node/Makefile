@@ -9,12 +9,13 @@ REBAR=bin/rebar
 SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_GIT=test-lib/systest
 REBAR_LOG ?= "0"
-SYSTEST_VERSION=v0.8.3
+SYSTEST_VERSION=v0.8.4
 SYSTEST_VERBOSE ?= 'false'
 SYSTEST_DUMP ?= 'false'
 SYSTEST_LOGGING ?= 'false'
 SYSTEST_NO_COVER ?= 'false'
 SYSTEST_PROFILE ?= ''
+SYSTEST_TARGET ?= ''
 SYSTEST_EXTRA ?= ''
 
 ifneq (,$(findstring s,$(MAKEFLAGS)))
@@ -81,21 +82,35 @@ test-all: $(SYSTEST) test-compile
 	$(MAKE) -C . test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
 
 .PHONY: test-profile
+.PHONY: test-run
+.PHONY: test-shell
 ifneq ($(SYSTEST_PROFILE), '')
 test-profile: $(SYSTEST) test-compile
 	$(call systest,-P $(SYSTEST_PROFILE))
+
+ifneq ($(SYSTEST_TARGET), '')
+test-run: $(SYSTEST) test-compile
+	$(call systest,-P $(SYSTEST_PROFILE) -Z $(SYSTEST_TARGET))
+
+test-shell: $(SYSTEST) test-compile
+	$(call systest,-P $(SYSTEST_PROFILE) -s -z $(SYSTEST_TARGET))
+
+else
+test-run:
+	$(error you need to also specify SYSTEST_TARGET to run this target)
+
+test-shell:
+	$(error you need to set SYSTEST_TARGET to the sut/config name to run this target)
+
+endif
+
 else
 test-profile:
 	$(error you need to specify a SYSTEST_PROFILE to run this target)
-endif
 
-.PHONY: test-individual
-ifneq ($(SYSTEST_INDIVIDUAL), '')
-test-individual: $(SYSTEST) test-compile
-	$(call systest,-Z $(SYSTEST_INDIVIDUAL))
-else
-test-individual:
-	$(error you need to specify SYSTEST_INDIVIDUAL to run this target)
+test-run:
+	$(error you need to specify SYSTEST_PROFILE and SYSTEST_TARGET to run this target)
+
 endif
 
 .PHONY: test-compile
