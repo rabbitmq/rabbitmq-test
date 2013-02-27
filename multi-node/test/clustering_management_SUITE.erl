@@ -32,7 +32,7 @@
 
 -define(LOOP_RECURSION_DELAY, 100).
 
-suite() -> [{timetrap, {seconds, 60}}].
+suite() -> [{timetrap, systest:settings("time_traps.cluster_management")}].
 
 all() ->
     [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,

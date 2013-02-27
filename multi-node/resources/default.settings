@@ -9,6 +9,7 @@
     {kill_multi, {minutes, 6}},
     {restarted_master, {minutes, 4}},
     {ha_cluster_SUITE, {seconds, 100}},
+    {cluster_management, {minutes, 2}},
     {eager_sync, {minutes, 3}}
 ]}.
 
