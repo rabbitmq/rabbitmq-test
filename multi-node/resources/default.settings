@@ -6,7 +6,7 @@
 ]}.
 
 {time_traps, [
-    {kill_multi, {minutes, 4}},
+    {kill_multi, {minutes, 6}},
     {restarted_master, {minutes, 4}},
     {ha_cluster_SUITE, {seconds, 100}},
     {eager_sync, {minutes, 3}}
