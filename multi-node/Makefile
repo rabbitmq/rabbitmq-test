@@ -84,6 +84,7 @@ test-all: $(SYSTEST) test-compile
 .PHONY: test-profile
 .PHONY: test-run
 .PHONY: test-shell
+.PHONY: test-debug
 ifneq ($(SYSTEST_PROFILE), '')
 test-profile: $(SYSTEST) test-compile
 	$(call systest,-P $(SYSTEST_PROFILE))
@@ -95,6 +96,9 @@ test-run: $(SYSTEST) test-compile
 test-shell: $(SYSTEST) test-compile
 	$(call systest,-P $(SYSTEST_PROFILE) -s -z $(SYSTEST_TARGET))
 
+test-debug: $(SYSTEST) test-compile
+	$(call systest,-P $(SYSTEST_PROFILE) -D -Z $(SYSTEST_TARGET))
+
 else
 test-run:
 	$(error you need to also specify SYSTEST_TARGET to run this target)
@@ -102,13 +106,17 @@ test-run:
 test-shell:
 	$(error you need to set SYSTEST_TARGET to the sut/config name to run this target)
 
+test-debug:
+	$(error you need to set SYSTEST_TARGET to the sut/config name to run this target)
 endif
-
 else
 test-profile:
 	$(error you need to specify a SYSTEST_PROFILE to run this target)
 
 test-run:
+	$(error you need to specify SYSTEST_PROFILE and SYSTEST_TARGET to run this target)
+
+test-debug:
 	$(error you need to specify SYSTEST_PROFILE and SYSTEST_TARGET to run this target)
 
 endif
@@ -141,5 +149,4 @@ $(SYSTEST): systest-lib
 
 bin/%: bin systest-lib
 	cp test-lib/systest/bin/$* bin/$*
-
 
