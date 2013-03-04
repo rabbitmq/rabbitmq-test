@@ -45,16 +45,8 @@ disconnect_from_node(Node) ->
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
     systest:log("starting rabbit application on ~p~n", [NodeId]),
-    case control_action(start_app, NodeId) of
-        ok    -> wait(Node);
-        Other -> systest:log(system,
-                             "ERROR: unable to start rabbit on ~p - please "
-                             "check the node's logs for more information~n",
-                             [NodeId]),
-                %% throwing rather than using ct:fail/2 is better, as it
-                %% preseves the stack trace in the common_test error report
-                throw({start_rabbit_failed, Other})
-    end.
+    ok = control_action(start_app, NodeId),
+    wait(Node).
 
 %%
 %% @doc A systest 'on_stop' callback that stops the rabbit application
@@ -62,7 +54,7 @@ start_rabbit(Node) ->
 %% stopped on the node, which prevents the behaviour we saw in bug25070.
 stop_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    control_action(stop_app, NodeId).
+    ok = control_action(stop_app, NodeId).
 
 %%
 %% @doc runs <pre>rabbitmqctl wait</pre> against the supplied Node.
