@@ -4,6 +4,7 @@
         {handler, systest_cli},
         {link_to_parent, true},
         {detached, false},
+        {exit_on_eof, auto},
         {cover, true},
         {rpc_enabled, {true, {init, stop, []}}}
     ]},
