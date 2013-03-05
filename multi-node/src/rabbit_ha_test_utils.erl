@@ -45,7 +45,7 @@ disconnect_from_node(Node) ->
 start_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
     systest:log("starting rabbit application on ~p~n", [NodeId]),
-    control_action(start_app, NodeId),
+    ok = control_action(start_app, NodeId),
     wait(Node).
 
 %%
@@ -54,7 +54,7 @@ start_rabbit(Node) ->
 %% stopped on the node, which prevents the behaviour we saw in bug25070.
 stop_rabbit(Node) ->
     NodeId = systest:process_data(id, Node),
-    control_action(stop_app, NodeId).
+    ok = control_action(stop_app, NodeId).
 
 %%
 %% @doc runs <pre>rabbitmqctl wait</pre> against the supplied Node.
@@ -182,10 +182,10 @@ control_action(Command, Node, Args) ->
     control_action(Command, Node, Args, []).
 
 control_action(Command, Node, Args, Opts) ->
-    ok = rabbit_control_main:action(Command, Node, Args, Opts,
-                                    fun (Fmt, FmtArgs) ->
-                                            systest:log(Fmt ++ "~n", FmtArgs)
-                                    end).
+    rabbit_control_main:action(Command, Node, Args, Opts,
+                               fun (Fmt, FmtArgs) ->
+                                       systest:log(Fmt ++ "~n", FmtArgs)
+                               end).
 
 cluster_status(Node) ->
     {rpc:call(Node, rabbit_mnesia, cluster_nodes, [all]),
