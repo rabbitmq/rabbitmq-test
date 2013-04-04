@@ -87,29 +87,23 @@ test-all: $(SYSTEST) test-compile
 ifneq ($(SYSTEST_PROFILE), '')
 test-profile: $(SYSTEST) test-compile
 	$(call systest,-P $(SYSTEST_PROFILE))
+else
+test-profile:
+	$(error you need to specify a SYSTEST_PROFILE to run this target)
+endif
 
 ifneq ($(SYSTEST_TARGET), '')
 test-run: $(SYSTEST) test-compile
-	$(call systest,-P $(SYSTEST_PROFILE) -Z $(SYSTEST_TARGET))
+	$(call systest,-Z $(SYSTEST_TARGET))
 
 test-shell: $(SYSTEST) test-compile
 	$(call systest,-P $(SYSTEST_PROFILE) -s -z $(SYSTEST_TARGET))
-
 else
 test-run:
 	$(error you need to also specify SYSTEST_TARGET to run this target)
 
 test-shell:
 	$(error you need to set SYSTEST_TARGET to the sut/config name to run this target)
-
-endif
-else
-test-profile:
-	$(error you need to specify a SYSTEST_PROFILE to run this target)
-
-test-run:
-	$(error you need to specify SYSTEST_PROFILE and SYSTEST_TARGET to run this target)
-
 endif
 
 .PHONY: test-compile
