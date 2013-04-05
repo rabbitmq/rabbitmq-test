@@ -6,6 +6,6 @@
             slave_synchronization_SUITE]}.
 {aggressive_teardown, {minutes, 5}}.
 {setup_timetrap,      {minutes, 5}}.
-{teardown_timetrap,   {seconds, 100}}.
+{teardown_timetrap,   {minutes, 3}}.
 {execution_timetrap,  {hours, 1}}.
 
