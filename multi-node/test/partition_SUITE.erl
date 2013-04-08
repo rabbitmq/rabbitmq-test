@@ -21,7 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         detection/1, autoheal/1]).
+         ignore/1, pause/1, autoheal/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -37,7 +37,7 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-detection(Config) ->
+ignore(Config) ->
     SUT = systest:active_sut(Config),
     [{A, _ARef},
      {B, _BRef},
@@ -47,6 +47,23 @@ detection(Config) ->
     [] = partitions(A),
     [C] = partitions(B),
     [B] = partitions(C),
+    ok.
+
+pause(Config) ->
+    SUT = systest:active_sut(Config),
+    [{A, _ARef},
+     {B, BRef},
+     {C, CRef}] = systest:list_processes(SUT),
+    [set_mode(N, pause_minority) || N <- [A, B, C]],
+    true = rabbit:is_running(A),
+
+    systest:kill_and_wait(BRef),
+    timer:sleep(5000),
+    true = rabbit:is_running(A),
+
+    systest:kill_and_wait(CRef),
+    timer:sleep(5000),
+    false = rabbit:is_running(A),
     ok.
 
 autoheal(Config) ->
