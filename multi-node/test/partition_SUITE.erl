@@ -72,11 +72,16 @@ autoheal(Config) ->
      {B, _BRef},
      {C, _CRef}] = systest:list_processes(SUT),
     [set_mode(N, autoheal) || N <- [A, B, C]],
-    disconnect(B, C),
-    timer:sleep(5000),
-    [] = partitions(A),
-    [] = partitions(B),
-    [] = partitions(C),
+    Test = fun (Pairs) ->
+                   [disconnect(X, Y) || {X, Y} <- Pairs],
+                   timer:sleep(5000),
+                   [] = partitions(A),
+                   [] = partitions(B),
+                   [] = partitions(C)
+           end,
+    Test([{B, C}]),
+    Test([{A, C}, {B, C}]),
+    Test([{A, B}, {A, C}, {B, C}]),
     ok.
 
 set_mode(Node, Mode) ->
