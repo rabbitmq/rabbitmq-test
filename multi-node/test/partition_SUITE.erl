@@ -42,7 +42,7 @@ ignore(Config) ->
     [{A, _ARef},
      {B, _BRef},
      {C, _CRef}] = systest:list_processes(SUT),
-    disconnect(B, C),
+    disconnect([{B, C}]),
     timer:sleep(5000),
     [] = partitions(A),
     [C] = partitions(B),
@@ -73,7 +73,7 @@ autoheal(Config) ->
      {C, _CRef}] = systest:list_processes(SUT),
     [set_mode(N, autoheal) || N <- [A, B, C]],
     Test = fun (Pairs) ->
-                   [disconnect(X, Y) || {X, Y} <- Pairs],
+                   disconnect(Pairs),
                    timer:sleep(5000),
                    [] = partitions(A),
                    [] = partitions(B),
@@ -88,8 +88,20 @@ set_mode(Node, Mode) ->
     rpc:call(Node, application, set_env,
              [rabbit, cluster_partition_handling, Mode, infinity]).
 
-disconnect(From, Node) ->
-    rpc:call(From, erlang, disconnect_node, [Node]).
+%% We turn off auto_connect and wait a little while to make it more
+%% like a real partition, and since Mnesia has problems with very
+%% short partitions (and rabbit_node_monitor will in various ways attempt to
+%% reconnect immediately).
+disconnect(Pairs) ->
+    {Xs, Ys} = lists:unzip(Pairs),
+    Nodes = lists:usort(Xs ++ Ys),
+    [dist_auto_connect(N, never) || N <- Nodes],
+    [rpc:call(X, erlang, disconnect_node, [Y]) || {X, Y} <- Pairs],
+    timer:sleep(1000),
+    [dist_auto_connect(N, always) || N <- Nodes].
+
+dist_auto_connect(Node, Val) ->
+    rpc:call(Node, application, set_env, [kernel, dist_auto_connect, Val]).
 
 partitions(Node) ->
     {Node, Partitions} =
