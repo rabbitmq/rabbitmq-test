@@ -21,7 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         ignore/1, pause/1, pause_disconnected/1, autoheal/1]).
+         ignore/1, pause_on_down/1, pause_on_disconnected/1, autoheal/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
