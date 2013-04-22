@@ -21,7 +21,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         ignore/1, pause/1, autoheal/1]).
+         ignore/1, pause/1, pause_disconnected/1, autoheal/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -42,14 +42,14 @@ ignore(Config) ->
     [{A, _ARef},
      {B, _BRef},
      {C, _CRef}] = systest:list_processes(SUT),
-    disconnect([{B, C}]),
+    disconnect_reconnect([{B, C}]),
     timer:sleep(5000),
     [] = partitions(A),
     [C] = partitions(B),
     [B] = partitions(C),
     ok.
 
-pause(Config) ->
+pause_on_down(Config) ->
     SUT = systest:active_sut(Config),
     [{A, _ARef},
      {B, BRef},
@@ -66,6 +66,19 @@ pause(Config) ->
     false = rabbit:is_running(A),
     ok.
 
+pause_on_disconnected(Config) ->
+    SUT = systest:get_system_under_test(Config),
+    [{A, _ARef},
+     {B, _BRef},
+     {C, _CRef}] = systest:list_processes(SUT),
+    [set_mode(N, pause_minority) || N <- [A, B, C]],
+    [(true = rabbit:is_running(N)) || N <- [A, B, C]],
+    disconnect([{A, B}, {A, C}]),
+    timer:sleep(1000),
+    [(true = rabbit:is_running(N)) || N <- [B, C]],
+    false = rabbit:is_running(A),
+    ok.
+
 autoheal(Config) ->
     SUT = systest:active_sut(Config),
     [{A, _ARef},
@@ -73,7 +86,7 @@ autoheal(Config) ->
      {C, _CRef}] = systest:list_processes(SUT),
     [set_mode(N, autoheal) || N <- [A, B, C]],
     Test = fun (Pairs) ->
-                   disconnect(Pairs),
+                   disconnect_reconnect(Pairs),
                    timer:sleep(5000),
                    [] = partitions(A),
                    [] = partitions(B),
@@ -92,16 +105,20 @@ set_mode(Node, Mode) ->
 %% like a real partition, and since Mnesia has problems with very
 %% short partitions (and rabbit_node_monitor will in various ways attempt to
 %% reconnect immediately).
+disconnect_reconnect(Pairs) ->
+    disconnect(Pairs),
+    timer:sleep(1000),
+    dist_auto_connect(Pairs, always).
+
 disconnect(Pairs) ->
+    dist_auto_connect(Pairs, never),
+    [rpc:call(X, erlang, disconnect_node, [Y]) || {X, Y} <- Pairs].
+
+dist_auto_connect(Pairs, Val) ->
     {Xs, Ys} = lists:unzip(Pairs),
     Nodes = lists:usort(Xs ++ Ys),
-    [dist_auto_connect(N, never) || N <- Nodes],
-    [rpc:call(X, erlang, disconnect_node, [Y]) || {X, Y} <- Pairs],
-    timer:sleep(1000),
-    [dist_auto_connect(N, always) || N <- Nodes].
-
-dist_auto_connect(Node, Val) ->
-    rpc:call(Node, application, set_env, [kernel, dist_auto_connect, Val]).
+    [rpc:call(Node, application, set_env, [kernel, dist_auto_connect, Val])
+     || Node <- Nodes].
 
 partitions(Node) ->
     {Node, Partitions} =
