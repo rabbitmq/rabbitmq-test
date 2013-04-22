@@ -74,9 +74,14 @@ pause_on_disconnected(Config) ->
     [set_mode(N, pause_minority) || N <- [A, B, C]],
     [(true = rabbit:is_running(N)) || N <- [A, B, C]],
     disconnect([{A, B}, {A, C}]),
-    timer:sleep(1000),
+    timer:sleep(5000),
     [(true = rabbit:is_running(N)) || N <- [B, C]],
     false = rabbit:is_running(A),
+    reconnect([{A, B}, {A, C}]),
+    timer:sleep(5000),
+    [(true = rabbit:is_running(N)) || N <- [A, B, C]],
+    Status = rpc:call(A, rabbit_mnesia, status, []),
+    [] = proplists:get_value(partitions, Status),
     ok.
 
 autoheal(Config) ->
@@ -108,11 +113,14 @@ set_mode(Node, Mode) ->
 disconnect_reconnect(Pairs) ->
     disconnect(Pairs),
     timer:sleep(1000),
-    dist_auto_connect(Pairs, always).
+    reconnect(Pairs).
 
 disconnect(Pairs) ->
     dist_auto_connect(Pairs, never),
     [rpc:call(X, erlang, disconnect_node, [Y]) || {X, Y} <- Pairs].
+
+reconnect(Pairs) ->
+    dist_auto_connect(Pairs, always).
 
 dist_auto_connect(Pairs, Val) ->
     {Xs, Ys} = lists:unzip(Pairs),
