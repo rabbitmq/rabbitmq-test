@@ -72,9 +72,9 @@ profile and runs all tests in all suite modules using all the
 available configuration files.
 
 To run an individual test suite or test case, the makefile provides
-a 'test-run' target. Test cases are specified as `<suite>:<case>` so
-to run the 'rapid_redeclare' test case alone, you would invoke make
-like so:
+a 'test-run' target. Test targets are specified as either `<suite>`
+or `<suite>:<case>`, so to run the 'rapid_redeclare' test case alone,
+you would invoke make like so:
 
     $ make test-run \
           SYSTEST_TARGET="simple_ha_cluster_SUITE:rapid_redeclare"

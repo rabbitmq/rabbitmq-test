@@ -46,9 +46,9 @@ end_per_suite(_Config) ->
     ok.
 
 join_and_part_cluster(Config) ->
-    [Rabbit, Hare, Cottontail] = cluster_members(Config),
+    [Flopsy, Mopsy, Cottontail] = cluster_members(Config),
     assert_not_clustered(Flopsy),
-    assert_not_clustered(Hare),
+    assert_not_clustered(Mopsy),
     assert_not_clustered(Cottontail),
 
     stop_join_start(Flopsy, Cottontail),
