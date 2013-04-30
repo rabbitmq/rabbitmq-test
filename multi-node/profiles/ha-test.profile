@@ -8,4 +8,6 @@
 {setup_timetrap,      {minutes, 5}}.
 {teardown_timetrap,   {minutes, 3}}.
 {execution_timetrap,  {hours, 1}}.
+{log_dir, "./logs"}.
+{output_dir, "./logs"}.
 
