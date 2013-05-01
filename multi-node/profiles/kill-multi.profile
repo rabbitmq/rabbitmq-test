@@ -7,4 +7,7 @@
 {execution_timetrap,  {hours, 1}}.
 {log_dir, "./logs"}.
 {output_dir, "./logs"}.
+{hooks,     [cth_surefire,
+             {cth_log_redirect, [], 100},
+             {systest_cth, [], 1000}]}.
 

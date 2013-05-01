@@ -79,7 +79,9 @@ $(TEMP_DIRS):
 # Cover seems to reliably hang multi_node_deaths_SUITE
 test-all: $(SYSTEST) test-compile
 	$(MAKE) -C . test-profile SYSTEST_PROFILE=ha-test
+	cp `find . -name ha-test.xml` ./logs/
 	$(MAKE) -C . test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
+	cp `find . -name 'kill-multi.xml'` ./logs/
 
 .PHONY: test-profile
 .PHONY: test-run
