@@ -68,6 +68,9 @@ endef
 .PHONY: all
 all: test-all
 
+.PHONY: ci
+ci: clean-surefire-artefacts test-all
+
 .PHONY: clean
 clean:
 	rm -rf $(TEMP_DIRS)
@@ -76,12 +79,22 @@ $(TEMP_DIRS):
 	mkdir -p $@
 
 .PHONY: test-all
+.PHONY: clean-surefire-artefacts
+.PHONY: ha-test
+.PHONY: kill-multi
 # Cover seems to reliably hang multi_node_deaths_SUITE
-test-all: $(SYSTEST) test-compile
+test-all: ha-test kill-multi
+
+clean-surefire-artefacts:
+	rm -rf ./logs/
+
+ha-test: $(SYSTEST) test-compile
 	$(MAKE) -C . test-profile SYSTEST_PROFILE=ha-test
-	cp `find . -name ha-test.xml` ./logs/
+	cp `find . -name "$@.xml"` ./logs/
+
+kill-multi: $(SYSTEST) test-compile
 	$(MAKE) -C . test-profile SYSTEST_PROFILE=kill-multi SYSTEST_NO_COVER=1
-	cp `find . -name 'kill-multi.xml'` ./logs/
+	cp `find . -name "$@.xml"` ./logs/
 
 .PHONY: test-profile
 .PHONY: test-run
