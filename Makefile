@@ -86,9 +86,6 @@ run-qpid-testsuite: qpid_testsuite
 multi-node-tests:
 	$(MAKE) -C multi-node all
 
-ci: full
-	$(MAKE) -C multi-node ci
-
 clean:
 	rm -rf qpid_testsuite
 	$(MAKE) -C multi-node clean
