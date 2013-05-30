@@ -4,7 +4,7 @@
             eager_synchronization_SUITE,
             clustering_management_SUITE,
             slave_synchronization_SUITE]}.
-{hooks,     [cth_surefire,
+{hooks,     [{cth_surefire, [{path, "../ha-test.xml"}], 100},
              {cth_log_redirect, [], 100},
              {systest_cth, [], 1000}]}.
 {aggressive_teardown, {minutes, 5}}.
