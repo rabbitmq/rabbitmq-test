@@ -26,7 +26,7 @@
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1,
-         eager_sync_auto_on_policy_change_test/1]).
+         eager_sync_auto_on_policy_change_test/1, eager_sync_requeue_test/1]).
 
 -import(rabbit_ha_test_utils, [set_policy/5, a2b/1]).
 
@@ -155,6 +155,30 @@ eager_sync_auto_on_policy_change_test(Config) ->
     set_policy(A, <<"^ha.two.">>, <<"nodes">>, [a2b(A), a2b(B)],
                <<"automatic">>),
     wait_for_sync(C, ?QNAME),
+
+    ok.
+
+eager_sync_requeue_test(Config) ->
+    %% Queue is on AB but not C.
+    {_Cluster, [{{_A, _ARef}, {_AConn, ACh}},
+                {{B,  _BRef}, {_BConn, _BCh}},
+                {{C,  _CRef}, {_CConn, Ch}}]} =
+        rabbit_ha_test_utils:cluster_members(Config),
+
+    amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
+                                            durable = true}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
+
+    publish(Ch, ?QNAME, 2),
+    {#'basic.get_ok'{delivery_tag = TagA}, _} =
+        amqp_channel:call(Ch, #'basic.get'{queue = ?QNAME}),
+    {#'basic.get_ok'{delivery_tag = TagB}, _} =
+        amqp_channel:call(Ch, #'basic.get'{queue = ?QNAME}),
+    amqp_channel:cast(Ch, #'basic.reject'{delivery_tag = TagA, requeue = true}),
+    restart(B),
+    ok = sync(C, ?QNAME),
+    amqp_channel:cast(Ch, #'basic.reject'{delivery_tag = TagB, requeue = true}),
+    consume(Ch, ?QNAME, 2),
 
     ok.
 
