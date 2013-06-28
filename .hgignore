@@ -6,3 +6,4 @@ syntax: regexp
 ^multi-node/bin/
 ^multi-node/ebin/
 ^multi-node/test-ebin/
+^multi-node/logs/
