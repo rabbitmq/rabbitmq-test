@@ -158,13 +158,12 @@ forget_cluster_node_test(Config) ->
     stop_join_start(Bunny, Hare),
     stop_join_start(Rabbit, Hare),
     assert_clustered([Rabbit, Hare, Bunny]),
-    ok = stop_app(Rabbit),
     ok = stop_app(Hare),
+    ok = stop_app(Rabbit),
     ok = stop_app(Bunny),
-    %% Rabbit was not the second-to-last to go down
-    assert_failure(fun () -> forget_cluster_node(Rabbit, Bunny, true) end),
     %% This is fine but we need the flag
     assert_failure(fun () -> forget_cluster_node(Hare, Bunny) end),
+    %% Hare was not the second-to-last to go down
     ok = forget_cluster_node(Hare, Bunny, true),
     ok = start_app(Hare),
     ok = start_app(Rabbit),
