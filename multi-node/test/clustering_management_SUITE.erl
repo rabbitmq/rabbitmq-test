@@ -59,6 +59,11 @@ join_and_part_cluster(Config) ->
       {[Bunny, Hare, Rabbit], [Bunny, Rabbit], [Bunny, Hare, Rabbit]},
       [Rabbit, Hare, Bunny]),
 
+    %% Allow clustering with already clustered node
+    ok = stop_app(Rabbit),
+    {ok, already_member} = join_cluster(Rabbit, Hare),
+    ok = start_app(Rabbit),
+
     stop_reset_start(Rabbit),
     assert_not_clustered(Rabbit),
     assert_cluster_status({[Bunny, Hare], [Bunny], [Bunny, Hare]},
@@ -86,19 +91,6 @@ join_cluster_bad_operations(Config) ->
     assert_failure(fun () -> join_cluster(Rabbit, Rabbit) end),
     ok = start_app(Rabbit),
     assert_not_clustered(Rabbit),
-
-    %% Fail if trying to cluster with already clustered node
-    stop_join_start(Rabbit, Hare),
-    assert_clustered([Rabbit, Hare]),
-    ok = stop_app(Rabbit),
-    assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
-    ok = start_app(Rabbit),
-    assert_clustered([Rabbit, Hare]),
-
-    %% Cleanup
-    stop_reset_start(Rabbit),
-    assert_not_clustered(Rabbit),
-    assert_not_clustered(Hare),
 
     %% Do not let the node leave the cluster or reset if it's the only
     %% ram node
@@ -349,8 +341,6 @@ force_reset_test(Config) ->
                           [Hare]),
     %% %% ...but it isn't
     assert_cluster_status({[Rabbit], [Rabbit], []}, [Rabbit]),
-    %% Hare still thinks Rabbit is in the cluster
-    assert_failure(fun () -> join_cluster(Rabbit, Hare) end),
     %% We can rejoin Rabbit and Hare
     update_cluster_nodes(Rabbit, Hare),
     start_app(Rabbit),
