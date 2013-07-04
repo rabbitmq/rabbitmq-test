@@ -59,10 +59,16 @@ join_and_part_cluster(Config) ->
       {[Cottontail, Mopsy, Flopsy], [Cottontail, Flopsy], [Cottontail, Mopsy, Flopsy]},
       [Flopsy, Mopsy, Cottontail]),
 
+    %% Allow clustering with already clustered node
+    ok = stop_app(Flopsy),
+    {ok, already_member} = join_cluster(Flopsy, Mopsy),
+    ok = start_app(Flopsy),
+
     stop_reset_start(Flopsy),
     assert_not_clustered(Flopsy),
-    assert_cluster_status({[Cottontail, Mopsy], [Cottontail], [Cottontail, Mopsy]},
-                          [Mopsy, Cottontail]),
+    assert_cluster_status(
+      {[Cottontail, Mopsy], [Cottontail], [Cottontail, Mopsy]},
+      [Mopsy, Cottontail]),
 
     stop_reset_start(Mopsy),
     assert_not_clustered(Mopsy),
@@ -86,19 +92,6 @@ join_cluster_bad_operations(Config) ->
     assert_failure(fun () -> join_cluster(Flopsy, Flopsy) end),
     ok = start_app(Flopsy),
     assert_not_clustered(Flopsy),
-
-    %% Fail if trying to cluster with already clustered node
-    stop_join_start(Flopsy, Mopsy),
-    assert_clustered([Flopsy, Mopsy]),
-    ok = stop_app(Flopsy),
-    assert_failure(fun () -> join_cluster(Flopsy, Mopsy) end),
-    ok = start_app(Flopsy),
-    assert_clustered([Flopsy, Mopsy]),
-
-    %% Cleanup
-    stop_reset_start(Flopsy),
-    assert_not_clustered(Flopsy),
-    assert_not_clustered(Mopsy),
 
     %% Do not let the node leave the cluster or reset if it's the only
     %% ram node
@@ -349,8 +342,6 @@ force_reset_test(Config) ->
                           [Mopsy]),
     %% %% ...but it isn't
     assert_cluster_status({[Flopsy], [Flopsy], []}, [Flopsy]),
-    %% Mopsy still thinks Flopsy is in the cluster
-    assert_failure(fun () -> join_cluster(Flopsy, Mopsy) end),
     %% We can rejoin Flopsy and Mopsy
     update_cluster_nodes(Flopsy, Mopsy),
     start_app(Flopsy),
