@@ -151,13 +151,12 @@ forget_cluster_node_test(Config) ->
     stop_join_start(Cottontail, Mopsy),
     stop_join_start(Flopsy, Mopsy),
     assert_clustered([Flopsy, Mopsy, Cottontail]),
-    ok = stop_app(Flopsy),
     ok = stop_app(Mopsy),
+    ok = stop_app(Flopsy),
     ok = stop_app(Cottontail),
-    %% Flopsy was not the second-to-last to go down
-    assert_failure(fun () -> forget_cluster_node(Flopsy, Cottontail, true) end),
     %% This is fine but we need the flag
     assert_failure(fun () -> forget_cluster_node(Mopsy, Cottontail) end),
+    %% Mopsy was not the second-to-last to go down
     ok = forget_cluster_node(Mopsy, Cottontail, true),
     ok = start_app(Mopsy),
     ok = start_app(Flopsy),
