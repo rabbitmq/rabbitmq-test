@@ -96,11 +96,15 @@ prepare: create_ssl_certs
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-node cleandb start-background-node
 	$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
@@ -109,6 +113,8 @@ start-app:
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		start-rabbit-on-node
 
 stop-app:
@@ -128,6 +134,8 @@ restart-secondary-node:
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-node start-background-node
 	$(COVER_REENABLE_SECONDARY)
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
@@ -154,11 +162,15 @@ cleanup:
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-rabbit-on-node stop-node
 	-$(MAKE) -C $(BROKER_DIR) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 
 create_ssl_certs:
