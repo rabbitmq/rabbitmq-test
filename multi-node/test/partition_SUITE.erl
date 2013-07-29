@@ -129,6 +129,4 @@ dist_auto_connect(Pairs, Val) ->
      || Node <- Nodes].
 
 partitions(Node) ->
-    {Node, Partitions} =
-        rpc:call(Node, rabbit_node_monitor, partitions, []),
-    Partitions.
+    rpc:call(Node, rabbit_node_monitor, partitions, []).
