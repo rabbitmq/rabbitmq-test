@@ -170,7 +170,7 @@ set_policy(Node, Pattern, HAMode, HAParams, HASyncMode) ->
 
 set_policy0(Node, Pattern, Definition) ->
     ok = rpc:call(Node, rabbit_policy, set,
-                  [<<"/">>, Pattern, Pattern, Definition, undefined]).
+                  [<<"/">>, Pattern, Pattern, Definition, 0, <<"queues">>]).
 
 clear_policy(Node, Pattern) ->
     ok = rpc:call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
