@@ -92,7 +92,7 @@ autoheal(Config) ->
     [set_mode(N, autoheal) || N <- [A, B, C]],
     Test = fun (Pairs) ->
                    disconnect_reconnect(Pairs),
-                   timer:sleep(5000),
+                   timer:sleep(10000), %% TODO can't we wait for startup here?
                    [] = partitions(A),
                    [] = partitions(B),
                    [] = partitions(C)
