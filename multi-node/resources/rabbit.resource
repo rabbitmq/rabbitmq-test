@@ -131,16 +131,16 @@
   {change_cluster_test, three_node_cluster_plus_two}]}.
 
 {clustering_management_cluster, [
-    {sut, [{localhost, [flopsy, mopsy, cottontail]}]},
+    {sut, [{localhost, [rabbit1, hare1, bunny1]}]},
     {processes, [
-        {flopsy, [rabbit_node, connected]},
-        {mopsy, [rabbit_node, connected]},
-        {cottontail, [rabbit_node, connected]}
+        {rabbit1, [rabbit_node, connected]},
+        {hare1, [rabbit_node, connected]},
+        {bunny1, [rabbit_node, connected]}
     ]},
     {user_data, [
-        {flopsy, [{amqp_port, 55672}]},
-        {mopsy, [{amqp_port, 55673}]},
-        {cottontail, [{amqp_port, 55674}]}
+        {rabbit1, [{amqp_port, 55672}]},
+        {hare1, [{amqp_port, 55673}]},
+        {bunny1, [{amqp_port, 55674}]}
     ]}
 ]}.
 
