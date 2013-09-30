@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2013 GoPivotal, Inc.  All rights reserved.
 %%
--module(rabbit_ha_test_consumer).
+-module(rabbit_test_consumer).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
@@ -23,7 +23,7 @@ await_response(ConsumerPid) ->
     await_response(ConsumerPid, infinity).
 
 await_response(ConsumerPid, Timeout) ->
-    case rabbit_ha_test_utils:await_response(ConsumerPid, Timeout) of
+    case rabbit_test_utils:await_response(ConsumerPid, Timeout) of
         {error, timeout} -> throw(lost_contact_with_consumer);
         {error, Reason}  -> error(Reason);
         ok               -> ok

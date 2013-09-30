@@ -41,7 +41,7 @@
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          change_policy_test/1, change_cluster_test/1, rapid_change_test/1]).
 
--import(rabbit_ha_test_utils, [set_policy/3, set_policy/4, clear_policy/2,
+-import(rabbit_test_utils, [set_policy/3, set_policy/4, clear_policy/2,
                                a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
@@ -110,8 +110,8 @@ change_cluster_test(Config) ->
     %% Add D and E, D joins in
     ok = systest:activate_process(DRef),
     ok = systest:activate_process(ERef),
-    rabbit_ha_test_utils:cluster(D, A),
-    rabbit_ha_test_utils:cluster(E, A),
+    rabbit_test_utils:cluster(D, A),
+    rabbit_test_utils:cluster(E, A),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
 
     %% Remove D, E does not join in

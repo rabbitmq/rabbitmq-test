@@ -171,24 +171,24 @@ forget_cluster_node_removes_things_test(Config) ->
     {_Cluster, [{{Flopsy, FlopsyRef}, _},
                 {{Mopsy,   MopsyRef},   _},
                 {{_Cottontail, _CottontailRef}, _}
-               ]} = rabbit_ha_test_utils:cluster_members(Config),
+               ]} = rabbit_test_utils:cluster_members(Config),
 
     stop_join_start(Flopsy, Mopsy),
-    {_RConn, RCh} = rabbit_ha_test_utils:connect(FlopsyRef),
+    {_RConn, RCh} = rabbit_test_utils:connect(FlopsyRef),
     #'queue.declare_ok'{} =
         amqp_channel:call(RCh, #'queue.declare'{queue   = <<"test">>,
                                                 durable = true}),
 
     ok = stop_app(Flopsy),
 
-    {_HConn, HCh} = rabbit_ha_test_utils:connect(MopsyRef),
+    {_HConn, HCh} = rabbit_test_utils:connect(MopsyRef),
     {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
         (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
                                                        durable = true})),
 
     ok = forget_cluster_node(Mopsy, Flopsy),
 
-    {_HConn2, HCh2} = rabbit_ha_test_utils:connect(MopsyRef),
+    {_HConn2, HCh2} = rabbit_test_utils:connect(MopsyRef),
     #'queue.declare_ok'{} =
         amqp_channel:call(HCh2, #'queue.declare'{queue   = <<"test">>,
                                                  durable = true}),
@@ -377,7 +377,7 @@ wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) ->
     end.
 
 verify_status_equal(Node, Status, AllNodes) ->
-    NodeStatus = sort_cluster_status(rabbit_ha_test_utils:cluster_status(Node)),
+    NodeStatus = sort_cluster_status(rabbit_test_utils:cluster_status(Node)),
     (AllNodes =/= [Node]) =:= rpc:call(Node, rabbit_mnesia, is_clustered, [])
         andalso NodeStatus =:= Status.
 
@@ -398,26 +398,26 @@ assert_failure(Fun) ->
     end.
 
 stop_app(Node) ->
-    rabbit_ha_test_utils:control_action(stop_app, Node).
+    rabbit_test_utils:control_action(stop_app, Node).
 
 start_app(Node) ->
-    rabbit_ha_test_utils:control_action(start_app, Node).
+    rabbit_test_utils:control_action(start_app, Node).
 
 join_cluster(Node, To) ->
     join_cluster(Node, To, false).
 
 join_cluster(Node, To, Ram) ->
-    rabbit_ha_test_utils:control_action(
+    rabbit_test_utils:control_action(
       join_cluster, Node, [atom_to_list(To)], [{"--ram", Ram}]).
 
 reset(Node) ->
-    rabbit_ha_test_utils:control_action(reset, Node).
+    rabbit_test_utils:control_action(reset, Node).
 
 force_reset(Node) ->
-    rabbit_ha_test_utils:control_action(force_reset, Node).
+    rabbit_test_utils:control_action(force_reset, Node).
 
 forget_cluster_node(Node, Removee, RemoveWhenOffline) ->
-    rabbit_ha_test_utils:control_action(
+    rabbit_test_utils:control_action(
       forget_cluster_node, Node, [atom_to_list(Removee)],
       [{"--offline", RemoveWhenOffline}]).
 
@@ -425,11 +425,11 @@ forget_cluster_node(Node, Removee) ->
     forget_cluster_node(Node, Removee, false).
 
 change_cluster_node_type(Node, Type) ->
-    rabbit_ha_test_utils:control_action(change_cluster_node_type, Node,
+    rabbit_test_utils:control_action(change_cluster_node_type, Node,
                                         [atom_to_list(Type)]).
 
 update_cluster_nodes(Node, DiscoveryNode) ->
-    rabbit_ha_test_utils:control_action(update_cluster_nodes, Node,
+    rabbit_test_utils:control_action(update_cluster_nodes, Node,
                                         [atom_to_list(DiscoveryNode)]).
 
 stop_join_start(Node, ClusterTo, Ram) ->

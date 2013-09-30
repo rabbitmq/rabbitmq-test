@@ -1,12 +1,12 @@
-{application, rabbit_ha_test,
+{application, rabbitmq_test,
  [
-  {description, ""},
+  {description, "RabbitMQ Integration Test Library (and tests)"},
   {vsn, "1"},
   {registered, []},
   {applications, [
                   kernel,
                   stdlib
                  ]},
-  {mod, { rabbit_ha_test_app, []}},
+  {mod, { rabbit_test_app, []}},
   {env, []}
  ]}.

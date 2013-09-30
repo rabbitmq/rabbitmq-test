@@ -46,7 +46,7 @@ killing_multiple_intermediate_nodes(Config) ->
           {{_, Slave3}, {_Slave3Connection, _Slave3Channel}},
           {_Slave4, {_Slave4Connection, Slave4Channel}},
           {_Producer, {_ProducerConnection, ProducerChannel}}]} =
-                    rabbit_ha_test_utils:cluster_members(Config),
+                    rabbit_test_utils:cluster_members(Config),
 
     Queue = <<"ha.all.test">>,
     amqp_channel:call(MasterChannel, #'queue.declare'{queue       = Queue,
@@ -63,10 +63,10 @@ killing_multiple_intermediate_nodes(Config) ->
 
     Msgs = systest:settings("message_volumes.kill_multi"),
 
-    ConsumerPid = rabbit_ha_test_consumer:create(Slave4Channel,
+    ConsumerPid = rabbit_test_consumer:create(Slave4Channel,
                                                  Queue, self(), false, Msgs),
 
-    ProducerPid = rabbit_ha_test_producer:create(ProducerChannel,
+    ProducerPid = rabbit_test_producer:create(ProducerChannel,
                                                  Queue, self(), false, Msgs),
 
     %% create a killer for the master and the first 3 slaves
@@ -77,7 +77,7 @@ killing_multiple_intermediate_nodes(Config) ->
                                          {Slave3, 300}]],
 
     %% verify that the consumer got all msgs, or die, or time out
-    rabbit_ha_test_producer:await_response(ProducerPid),
-    rabbit_ha_test_consumer:await_response(ConsumerPid),
+    rabbit_test_producer:await_response(ProducerPid),
+    rabbit_test_consumer:await_response(ConsumerPid),
     ok.
 

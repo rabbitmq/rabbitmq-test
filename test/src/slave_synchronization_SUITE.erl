@@ -39,7 +39,7 @@ slave_synchronization(Config) ->
     {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
                 {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
                 _Unused]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     Queue = <<"ha.two.test">>,
     #'queue.declare_ok'{} =
@@ -48,7 +48,7 @@ slave_synchronization(Config) ->
 
     %% The comments on the right are the queue length and the pending acks on
     %% the master.
-    rabbit_ha_test_utils:stop_app(Slave),
+    rabbit_test_utils:stop_app(Slave),
 
     %% We get and ack one message when the slave is down, and check that when we
     %% start the slave it's not marked as synced until ack the message.  We also
@@ -57,7 +57,7 @@ slave_synchronization(Config) ->
     {#'basic.get_ok'{delivery_tag = Tag1}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 0 - 1
 
-    rabbit_ha_test_utils:start_app(Slave),
+    rabbit_test_utils:start_app(Slave),
 
     slave_unsynced(Master, Queue),
     send_dummy_message(Channel, Queue),                                 % 1 - 1
@@ -69,8 +69,8 @@ slave_synchronization(Config) ->
 
     %% We restart the slave and we send a message, so that the slave will only
     %% have one of the messages.
-    rabbit_ha_test_utils:stop_app(Slave),
-    rabbit_ha_test_utils:start_app(Slave),
+    rabbit_test_utils:stop_app(Slave),
+    rabbit_test_utils:start_app(Slave),
 
     send_dummy_message(Channel, Queue),                                 % 2 - 0
 
@@ -97,7 +97,7 @@ slave_synchronization_ttl(Config) ->
     {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
                 {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
                 {{_DLX,   _DRef}, {_DLXConnection,   DLXChannel}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     %% We declare a DLX queue to wait for messages to be TTL'ed
     DLXQueue = <<"dlx-queue">>,
@@ -120,18 +120,18 @@ slave_synchronization_ttl(Config) ->
     slave_synced(Master, Queue),
 
     %% All unknown
-    rabbit_ha_test_utils:stop_app(Slave),
+    rabbit_test_utils:stop_app(Slave),
     send_dummy_message(Channel, Queue),
     send_dummy_message(Channel, Queue),
-    rabbit_ha_test_utils:start_app(Slave),
+    rabbit_test_utils:start_app(Slave),
     slave_unsynced(Master, Queue),
     wait_for_messages(DLXQueue, DLXChannel, 2),
     slave_synced(Master, Queue),
 
     %% 1 unknown, 1 known
-    rabbit_ha_test_utils:stop_app(Slave),
+    rabbit_test_utils:stop_app(Slave),
     send_dummy_message(Channel, Queue),
-    rabbit_ha_test_utils:start_app(Slave),
+    rabbit_test_utils:start_app(Slave),
     slave_unsynced(Master, Queue),
     send_dummy_message(Channel, Queue),
     slave_unsynced(Master, Queue),

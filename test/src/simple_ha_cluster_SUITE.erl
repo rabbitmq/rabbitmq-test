@@ -27,7 +27,7 @@
          confirms_survive_policy/1,
          rapid_redeclare/1]).
 
--import(rabbit_ha_test_utils, [set_policy/4, a2b/1]).
+-import(rabbit_test_utils, [set_policy/4, a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -44,7 +44,7 @@ end_per_suite(_Config) ->
     ok.
 
 rapid_redeclare(Config) ->
-    {_, [{_, {_, Ch}}|_]} = rabbit_ha_test_utils:cluster_members(Config),
+    {_, [{_, {_, Ch}}|_]} = rabbit_test_utils:cluster_members(Config),
     Queue = <<"ha.all.test">>,
     [begin
          amqp_channel:call(Ch, #'queue.declare'{queue  = Queue,
@@ -68,7 +68,7 @@ consume_survives(Config, DeathFun) ->
       [{{Node1,_}, {_Conn1, Channel1}},
        {{Node2,_}, {_Conn2, Channel2}},
        {{Node3,_}, {_Conn3, Channel3}}
-            ]} = rabbit_ha_test_utils:cluster_members(Config),
+            ]} = rabbit_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
     Queue = <<"ha.all.test">>,
@@ -78,24 +78,24 @@ consume_survives(Config, DeathFun) ->
     Msgs = systest:settings("message_volumes.send_consume"),
 
     %% start up a consumer
-    ConsumerPid = rabbit_ha_test_consumer:create(Channel2, Queue,
+    ConsumerPid = rabbit_test_consumer:create(Channel2, Queue,
                                                  self(), false, Msgs),
 
     %% send a bunch of messages from the producer
-    ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
+    ProducerPid = rabbit_test_producer:create(Channel3, Queue,
                                                  self(), false, Msgs),
     DeathFun(Node1, [Node2, Node3]),
     %% verify that the consumer got all msgs, or die - the await_response
     %% calls throw an exception if anything goes wrong....
-    rabbit_ha_test_consumer:await_response(ConsumerPid),
-    rabbit_ha_test_producer:await_response(ProducerPid),
+    rabbit_test_consumer:await_response(ConsumerPid),
+    rabbit_test_producer:await_response(ProducerPid),
     ok.
 
 confirms_survive(Config, DeathFun) ->
     {_Cluster,
         [{{Master, _}, {_MasterConnection, MasterChannel}},
          {{Producer,_},{_ProducerConnection, ProducerChannel}}|_]
-            } = rabbit_ha_test_utils:cluster_members(Config),
+            } = rabbit_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
     Queue = <<"ha.all.test">>,
@@ -106,10 +106,10 @@ confirms_survive(Config, DeathFun) ->
     Msgs = systest:settings("message_volumes.producer_confirms"),
 
     %% send a bunch of messages from the producer
-    ProducerPid = rabbit_ha_test_producer:create(ProducerChannel, Queue,
+    ProducerPid = rabbit_test_producer:create(ProducerChannel, Queue,
                                                  self(), true, Msgs),
     DeathFun(Master, [Producer]),
-    rabbit_ha_test_producer:await_response(ProducerPid),
+    rabbit_test_producer:await_response(ProducerPid),
     ok.
 
 

@@ -34,16 +34,16 @@
             {args, ["stop", "-n", "${proc.id}"]}
         ]}
     ]},
-    {on_start, [{local, rabbit_ha_test_utils, start_rabbit, []}]},
-    {on_stop,  [{local, rabbit_ha_test_utils, stop_rabbit, []}]}
+    {on_start, [{local, rabbit_test_utils, start_rabbit, []}]},
+    {on_stop,  [{local, rabbit_test_utils, stop_rabbit, []}]}
 ]}.
 
 {connected, [
     {on_join, [
-        {local, rabbit_ha_test_utils, connect_to_node, []}
+        {local, rabbit_test_utils, connect_to_node, []}
     ]},
     {on_stop, [
-        {local, rabbit_ha_test_utils, disconnect_from_node, []}
+        {local, rabbit_test_utils, disconnect_from_node, []}
     ]}
 ]}.
 
@@ -68,8 +68,8 @@
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes
         %% are up and running, so at this point we can cluster them...
-        {local, rabbit_ha_test_utils, make_cluster, []},
-        {local, rabbit_ha_test_utils, declare_ha_policies, []}
+        {local, rabbit_test_utils, make_cluster, []},
+        {local, rabbit_test_utils, declare_ha_policies, []}
     ]}
 ]}.
 
@@ -96,8 +96,8 @@
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes
         %% are up and running, so at this point we can cluster them...
-        {local, rabbit_ha_test_utils, make_cluster, []},
-        {local, rabbit_ha_test_utils, declare_ha_policies, []}
+        {local, rabbit_test_utils, make_cluster, []},
+        {local, rabbit_test_utils, declare_ha_policies, []}
     ]}
 ]}.
 
@@ -122,7 +122,7 @@
     {on_start, [
         %% NB: cluster on_start callbacks execute once *all* our nodes
         %% are up and running, so at this point we can cluster them...
-        {local, rabbit_ha_test_utils, make_cluster, []}
+        {local, rabbit_test_utils, make_cluster, []}
     ]}
 ]}.
 

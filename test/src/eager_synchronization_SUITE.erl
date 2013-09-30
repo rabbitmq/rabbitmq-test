@@ -28,7 +28,7 @@
          eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1,
          eager_sync_auto_on_policy_change_test/1, eager_sync_requeue_test/1]).
 
--import(rabbit_ha_test_utils, [set_policy/5, a2b/1]).
+-import(rabbit_test_utils, [set_policy/5, a2b/1]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -48,7 +48,7 @@ eager_sync_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
                 {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -88,7 +88,7 @@ eager_sync_cancel_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
                 {{C, _CRef}, {_Conn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -122,7 +122,7 @@ eager_sync_auto_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
                 {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME_AUTO,
                                             durable = true}),
@@ -143,7 +143,7 @@ eager_sync_auto_on_policy_change_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
                 {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -163,7 +163,7 @@ eager_sync_requeue_test(Config) ->
     {_Cluster, [{{_A, _ARef}, {_AConn, ACh}},
                 {{B,  _BRef}, {_BConn, _BCh}},
                 {{C,  _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -216,8 +216,8 @@ fetch(Ch, QName, Count) ->
     ok.
 
 restart(Node) ->
-    rabbit_ha_test_utils:stop_app(Node),
-    rabbit_ha_test_utils:start_app(Node).
+    rabbit_test_utils:stop_app(Node),
+    rabbit_test_utils:start_app(Node).
 
 sync(Node, QName) ->
     case sync_nowait(Node, QName) of
@@ -233,7 +233,7 @@ wait_for_sync(Node, QName) ->
     slave_synchronization_SUITE:wait_for_sync_status(true, Node, QName).
 
 action(Node, Action, QName) ->
-    rabbit_ha_test_utils:control_action(
+    rabbit_test_utils:control_action(
       Action, Node, [binary_to_list(QName)], [{"-p", "/"}]).
 
 queue(Node, QName) ->

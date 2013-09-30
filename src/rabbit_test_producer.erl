@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2013 GoPivotal, Inc.  All rights reserved.
 %%
--module(rabbit_ha_test_producer).
+-module(rabbit_test_producer).
 
 -export([await_response/1, await_response/2, start/5, create/5]).
 
@@ -25,7 +25,7 @@ await_response(ProducerPid) ->
 await_response(ProducerPid, Timeout) ->
     systest:log("waiting for producer pid ~p (timeout = ~p)~n",
                 [ProducerPid, Timeout]),
-    case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
+    case rabbit_test_utils:await_response(ProducerPid, Timeout) of
         {error, timeout} -> throw(lost_contact_with_producer);
         ok               -> ok
     end.
@@ -34,7 +34,7 @@ create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
     ProducerPid = spawn(?MODULE, start, [Channel, Queue, TestPid,
                                          Confirm, MsgsToSend]),
     StartTimeout = 10000,
-    case rabbit_ha_test_utils:await_response(ProducerPid, StartTimeout) of
+    case rabbit_test_utils:await_response(ProducerPid, StartTimeout) of
         started -> ProducerPid;
         Other   -> throw({producer_not_started, Other})
     end.
