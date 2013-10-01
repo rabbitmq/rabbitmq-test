@@ -102,7 +102,15 @@ join_cluster_bad_operations(Config) ->
     assert_failure(fun () -> reset(Rabbit) end),
     ok = start_app(Hare),
     assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+                          [Rabbit, Hare]),
+
+    %% Cannot start RAM-only node first
+    ok = stop_app(Rabbit),
+    ok = stop_app(Hare),
+    assert_failure(fun () -> start_app(Hare) end),
+    ok = start_app(Rabbit),
+    ok = start_app(Hare),
+    ok.
 
 %% This tests that the nodes in the cluster are notified immediately of a node
 %% join, and not just after the app is started.
