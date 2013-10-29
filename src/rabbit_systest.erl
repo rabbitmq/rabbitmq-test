@@ -15,11 +15,7 @@
 %%
 -module(rabbit_systest).
 
--export([profile_test/2, cover_dirs/1, package_test/2]).
-
-profile_test(Profile, Opts) ->
-    prepare(),
-    systest_runner:execute([{profile, Profile}|Opts] ++ verbosity()).
+-export([cover_dirs/1, profile_test/2, package_test/2]).
 
 cover_dirs(Base) ->
     case file:list_dir(Base) of
@@ -30,12 +26,16 @@ cover_dirs(Base) ->
             []
     end.
 
-absolutify(Base, Dirs) ->
-    [filename:absname(filename:join([Base, D, "ebin"])) || D <- Dirs].
+profile_test(Profile, Opts) ->
+    prepare(),
+    systest_runner:execute([{profile, Profile}|Opts] ++ verbosity()).
 
 package_test(TestSuite, Opts) ->
     prepare(),
     systest_runner:execute([{testsuite, TestSuite}|Opts] ++ verbosity()).
+
+absolutify(Base, Dirs) ->
+    [filename:absname(filename:join([Base, D, "ebin"])) || D <- Dirs].
 
 verbosity() ->
     case os:getenv("SYSTEST_VERBOSE") of
@@ -51,3 +51,4 @@ prepare() ->
     os:putenv("PACKAGE_DIR", Cwd),
     os:putenv("RABBITMQ_BROKER_DIR",
               filename:absname(filename:join([Cwd, "..", "rabbitmq-server"]))).
+
