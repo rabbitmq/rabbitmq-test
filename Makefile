@@ -117,6 +117,15 @@ start-app:
 		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		start-rabbit-on-node
 
+start-app-with-config:
+	$(MAKE) -C $(BROKER_DIR) \
+		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
+		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
+		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
+		RABBITMQ_CONFIG_FILE=${RABBIT_CONFIG_FILE} \
+		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
+		start-rabbit-on-node
+
 stop-app:
 	$(MAKE) -C $(BROKER_DIR) stop-rabbit-on-node
 
