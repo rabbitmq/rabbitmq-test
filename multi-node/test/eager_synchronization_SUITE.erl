@@ -242,20 +242,20 @@ queue(Node, QName) ->
     Q.
 
 wait_for_syncing(Node, QName) ->
-    case status(Node, QName) of
+    case state(Node, QName) of
         {syncing, _} -> ok;
-        _            -> timer:sleep(100),
+        A            -> timer:sleep(100),
                         wait_for_syncing(Node, QName)
     end.
 
 wait_for_running(Node, QName) ->
-    case status(Node, QName) of
+    case state(Node, QName) of
         running -> ok;
-        _       -> timer:sleep(100),
+        A       -> timer:sleep(100),
                    wait_for_running(Node, QName)
     end.
 
-status(Node, QName) ->
-    [{status, Status}] =
-        rpc:call(Node, rabbit_amqqueue, info, [queue(Node, QName), [status]]),
-    Status.
+state(Node, QName) ->
+    [{state, State}] =
+        rpc:call(Node, rabbit_amqqueue, info, [queue(Node, QName), [state]]),
+    State.
