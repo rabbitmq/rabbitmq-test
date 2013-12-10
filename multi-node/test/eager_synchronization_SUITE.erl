@@ -244,14 +244,14 @@ queue(Node, QName) ->
 wait_for_syncing(Node, QName) ->
     case state(Node, QName) of
         {syncing, _} -> ok;
-        A            -> timer:sleep(100),
+        _            -> timer:sleep(100),
                         wait_for_syncing(Node, QName)
     end.
 
 wait_for_running(Node, QName) ->
     case state(Node, QName) of
         running -> ok;
-        A       -> timer:sleep(100),
+        _       -> timer:sleep(100),
                    wait_for_running(Node, QName)
     end.
 
