@@ -138,9 +138,9 @@
         {bunny1, [rabbit_node, connected]}
     ]},
     {user_data, [
-        {rabbit1, [{amqp_port, 55672}]},
-        {hare1, [{amqp_port, 55673}]},
-        {bunny1, [{amqp_port, 55674}]}
+        {rabbit1, [{amqp_port, 10672}]},
+        {hare1, [{amqp_port, 10673}]},
+        {bunny1, [{amqp_port, 10674}]}
     ]}
 ]}.
 

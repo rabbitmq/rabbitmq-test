@@ -101,18 +101,24 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
     spawn_link(fun() -> ok = sync_nowait(C, ?QNAME) end),
-    wait_for_syncing(C, ?QNAME),
-    case sync_cancel(C, ?QNAME) of
+    case wait_for_syncing(C, ?QNAME, 1) of
         ok ->
-            wait_for_running(C, ?QNAME),
-            restart(B),
-            consume(Ch, ?QNAME, 0),
+            case sync_cancel(C, ?QNAME) of
+                ok ->
+                    wait_for_running(C, ?QNAME),
+                    restart(B),
+                    consume(Ch, ?QNAME, 0),
 
-            {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
-            ok;
-        {ok, not_syncing} ->
-            %% Damn. Syncing finished between wait_for_syncing/1 and
-            %% sync_cancel/1 above. Start again.
+                    {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
+                    ok;
+                {ok, not_syncing} ->
+                    %% Damn. Syncing finished between wait_for_syncing/3 and
+                    %% sync_cancel/2 above. Start again.
+                    amqp_channel:call(Ch, #'queue.purge'{queue = ?QNAME}),
+                    eager_sync_cancel_test2(A, B, C, Ch)
+            end;
+        synced_already ->
+            %% Damn. Syncing finished before wait_for_syncing/3. Start again.
             amqp_channel:call(Ch, #'queue.purge'{queue = ?QNAME}),
             eager_sync_cancel_test2(A, B, C, Ch)
     end.
@@ -241,21 +247,23 @@ queue(Node, QName) ->
     {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup, [QNameRes]),
     Q.
 
-wait_for_syncing(Node, QName) ->
-    case status(Node, QName) of
-        {syncing, _} -> ok;
-        _            -> timer:sleep(100),
-                        wait_for_syncing(Node, QName)
+wait_for_syncing(Node, QName, Target) ->
+    case state(Node, QName) of
+        {{syncing, _}, _} -> ok;
+        {running, Target} -> synced_already;
+        _                 -> timer:sleep(100),
+                             wait_for_syncing(Node, QName, Target)
     end.
 
 wait_for_running(Node, QName) ->
-    case status(Node, QName) of
-        running -> ok;
-        _       -> timer:sleep(100),
-                   wait_for_running(Node, QName)
+    case state(Node, QName) of
+        {running, _} -> ok;
+        _            -> timer:sleep(100),
+                        wait_for_running(Node, QName)
     end.
 
-status(Node, QName) ->
-    [{status, Status}] =
-        rpc:call(Node, rabbit_amqqueue, info, [queue(Node, QName), [status]]),
-    Status.
+state(Node, QName) ->
+    [{state, State}, {synchronised_slave_pids, Pids}] =
+        rpc:call(Node, rabbit_amqqueue, info,
+                 [queue(Node, QName), [state, synchronised_slave_pids]]),
+    {State, length(Pids)}.
