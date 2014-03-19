@@ -4,7 +4,7 @@ include ../umbrella.mk
 	prepare restart-app stop-app start-app \
 	start-secondary-app stop-secondary-app \
 	restart-secondary-node cleanup force-snapshot \
-	multi-node-tests enable-ha disable-ha
+	enable-ha disable-ha
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
