@@ -22,7 +22,7 @@
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          consume_survives_stop/1, consume_survives_sigkill/1,
-         consume_survives_policy/1,
+         consume_survives_policy/1, auto_resume/1,
          confirms_survive_stop/1, confirms_survive_sigkill/1,
          confirms_survive_policy/1,
          rapid_redeclare/1]).
@@ -53,17 +53,18 @@ rapid_redeclare(Config) ->
      end || _I <- lists:seq(1, 20)],
     ok.
 
-consume_survives_stop(Config)    -> consume_survives(Config, fun stop/3).
-consume_survives_sigkill(Config) -> consume_survives(Config, fun sigkill/3).
-consume_survives_policy(Config)  -> consume_survives(Config, fun policy/3).
+consume_survives_stop(Cf)    -> consume_survives(Cf, fun stop/3,    false).
+consume_survives_sigkill(Cf) -> consume_survives(Cf, fun sigkill/3, false).
+consume_survives_policy(Cf)  -> consume_survives(Cf, fun policy/3,  false).
+auto_resume(Cf)              -> consume_survives(Cf, fun sigkill/3, true).
 
-confirms_survive_stop(Config)    -> confirms_survive(Config, fun stop/3).
-confirms_survive_sigkill(Config) -> confirms_survive(Config, fun sigkill/3).
-confirms_survive_policy(Config)  -> confirms_survive(Config, fun policy/3).
+confirms_survive_stop(Cf)    -> confirms_survive(Cf, fun stop/3).
+confirms_survive_sigkill(Cf) -> confirms_survive(Cf, fun sigkill/3).
+confirms_survive_policy(Cf)  -> confirms_survive(Cf, fun policy/3).
 
 %%----------------------------------------------------------------------------
 
-consume_survives(Config, DeathFun) ->
+consume_survives(Config, DeathFun, AutoResume) ->
     {_Cluster,
       [{{Node1, Node1Pid}, {_Conn1, Channel1}},
        {{Node2, _Node2Pid}, {_Conn2, Channel2}},
@@ -79,7 +80,7 @@ consume_survives(Config, DeathFun) ->
 
     %% start up a consumer
     ConsumerPid = rabbit_ha_test_consumer:create(Channel2, Queue,
-                                                 self(), false, Msgs),
+                                                 self(), AutoResume, Msgs),
 
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
@@ -100,8 +101,8 @@ confirms_survive(Config, DeathFun) ->
     %% declare the queue on the master, mirrored to the two slaves
     Queue = <<"ha.all.test">>,
     amqp_channel:call(Node1Channel,#'queue.declare'{queue       = Queue,
-                                                     auto_delete = false,
-                                                     durable     = true}),
+                                                    auto_delete = false,
+                                                    durable     = true}),
 
     Msgs = systest:settings("message_volumes.producer_confirms"),
 
