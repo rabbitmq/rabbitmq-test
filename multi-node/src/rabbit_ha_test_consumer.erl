@@ -30,8 +30,9 @@ await_response(ConsumerPid, Timeout) ->
     end.
 
 create(Channel, Queue, TestPid, AutoResume, ExpectingMsgs) ->
-    ConsumerPid = spawn(?MODULE, start, [TestPid, Channel, Queue, AutoResume,
-                                         ExpectingMsgs + 1, ExpectingMsgs]),
+    ConsumerPid = spawn_link(?MODULE, start,
+                             [TestPid, Channel, Queue, AutoResume,
+                              ExpectingMsgs + 1, ExpectingMsgs]),
     amqp_channel:subscribe(
       Channel, consume_method(Queue, AutoResume), ConsumerPid),
     ConsumerPid.
