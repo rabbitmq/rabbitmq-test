@@ -100,7 +100,7 @@ resubscribe(TestPid, Channel, Queue, AutoResume, LowestSeen, MsgsToConsume) ->
 consume_method(Queue, AutoResume) ->
     Args = case AutoResume of
                false -> [];
-               true  -> [{<<"recover-on-ha-failover">>, bool, true}]
+               true  -> [{<<"cancel-on-ha-failover">>, bool, false}]
            end,
     #'basic.consume'{queue     = Queue,
                      arguments = Args}.
