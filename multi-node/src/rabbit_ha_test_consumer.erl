@@ -29,31 +29,29 @@ await_response(ConsumerPid, Timeout) ->
         ok               -> ok
     end.
 
-create(Channel, Queue, TestPid, NoAck, ExpectingMsgs) ->
-    ConsumerPid = spawn(?MODULE, start, [TestPid, Channel, Queue, NoAck,
-                                         ExpectingMsgs + 1, ExpectingMsgs]),
-    amqp_channel:subscribe(Channel,
-                           #'basic.consume'{queue    = Queue,
-                                            no_local = false,
-                                            no_ack   = NoAck},
-                           ConsumerPid),
+create(Channel, Queue, TestPid, CancelOnFailover, ExpectingMsgs) ->
+    ConsumerPid = spawn_link(?MODULE, start,
+                             [TestPid, Channel, Queue, CancelOnFailover,
+                              ExpectingMsgs + 1, ExpectingMsgs]),
+    amqp_channel:subscribe(
+      Channel, consume_method(Queue, CancelOnFailover), ConsumerPid),
     ConsumerPid.
 
-start(TestPid, _Channel, _Queue, _NoAck, _LowestSeen, 0) ->
+start(TestPid, _Channel, _Queue, _CancelOnFailover, _LowestSeen, 0) ->
     consumer_reply(TestPid, ok);
-start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
+start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
     systest:log("consumer awaiting ~p messages "
-                "(lowest seen = ~p, no-ack = ~p)~n",
-                [MsgsToConsume, LowestSeen, NoAck]),
+                "(lowest seen = ~p, cancel-on-failover = ~p)~n",
+                [MsgsToConsume, LowestSeen, CancelOnFailover]),
     receive
         #'basic.consume_ok'{} ->
-            start(TestPid, Channel, Queue, NoAck,
+            start(TestPid, Channel, Queue, CancelOnFailover,
                   LowestSeen, MsgsToConsume);
         {Delivery = #'basic.deliver'{ redelivered = Redelivered },
          #amqp_msg{payload = Payload}} ->
             MsgNum = list_to_integer(binary_to_list(Payload)),
 
-            maybe_ack(Delivery, Channel, NoAck),
+            ack(Delivery, Channel),
 
             %% we can receive any message we've already seen and,
             %% because of the possibility of multiple requeuings, we
@@ -63,13 +61,13 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
             if
                 MsgNum + 1 == LowestSeen ->
                     start(TestPid, Channel, Queue,
-                             NoAck, MsgNum, MsgsToConsume - 1);
+                             CancelOnFailover, MsgNum, MsgsToConsume - 1);
                 MsgNum >= LowestSeen ->
                     systest:log("consumer ~p ignoring redelivery of msg ~p~n",
                                 [self(), MsgNum]),
                     true = Redelivered, %% ASSERTION
                     start(TestPid, Channel, Queue,
-                             NoAck, LowestSeen, MsgsToConsume);
+                             CancelOnFailover, LowestSeen, MsgsToConsume);
                 true ->
                     %% We received a message we haven't seen before,
                     %% but it is not the next message in the expected
@@ -77,33 +75,36 @@ start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
                     consumer_reply(TestPid,
                                    {error, {unexpected_message, MsgNum}})
             end;
-        #'basic.cancel'{} ->
+        #'basic.cancel'{} when CancelOnFailover ->
             systest:log("consumer ~p received basic.cancel: "
                         "resubscribing to ~p on ~p~n",
                         [self(), Queue, Channel]),
-            resubscribe(TestPid, Channel, Queue, NoAck,
-                        LowestSeen, MsgsToConsume)
+            resubscribe(TestPid, Channel, Queue, CancelOnFailover,
+                        LowestSeen, MsgsToConsume);
+        #'basic.cancel'{} ->
+            exit(cancel_received_without_cancel_on_failover)
     end.
 
 %%
 %% Private API
 %%
 
-resubscribe(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume) ->
-    amqp_channel:subscribe(Channel,
-                           #'basic.consume'{queue    = Queue,
-                                            no_local = false,
-                                            no_ack   = NoAck},
-                           self()),
+resubscribe(TestPid, Channel, Queue, CancelOnFailover, LowestSeen,
+            MsgsToConsume) ->
+    amqp_channel:subscribe(
+      Channel, consume_method(Queue, CancelOnFailover), self()),
     ok = receive #'basic.consume_ok'{} -> ok
          end,
     systest:log("re-subscripting complete (~p received basic.consume_ok)",
                 [self()]),
-    start(TestPid, Channel, Queue, NoAck, LowestSeen, MsgsToConsume).
+    start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
 
-maybe_ack(_Delivery, _Channel, true) ->
-    ok;
-maybe_ack(#'basic.deliver'{delivery_tag = DeliveryTag}, Channel, false) ->
+consume_method(Queue, CancelOnFailover) ->
+    Args = [{<<"x-cancel-on-ha-failover">>, bool, CancelOnFailover}],
+    #'basic.consume'{queue     = Queue,
+                     arguments = Args}.
+
+ack(#'basic.deliver'{delivery_tag = DeliveryTag}, Channel) ->
     systest:log("consumer ~p sending basic.ack for ~p on ~p~n",
                 [self(), DeliveryTag, Channel]),
     amqp_channel:call(Channel, #'basic.ack'{delivery_tag = DeliveryTag}),

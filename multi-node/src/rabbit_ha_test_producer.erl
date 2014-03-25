@@ -31,8 +31,8 @@ await_response(ProducerPid, Timeout) ->
     end.
 
 create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
-    ProducerPid = spawn(?MODULE, start, [Channel, Queue, TestPid,
-                                         Confirm, MsgsToSend]),
+    ProducerPid = spawn_link(?MODULE, start, [Channel, Queue, TestPid,
+                                              Confirm, MsgsToSend]),
     StartTimeout = 10000,
     case rabbit_ha_test_utils:await_response(ProducerPid, StartTimeout) of
         started -> ProducerPid;
