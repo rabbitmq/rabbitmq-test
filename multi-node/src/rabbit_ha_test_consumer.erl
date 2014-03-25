@@ -100,7 +100,7 @@ resubscribe(TestPid, Channel, Queue, CancelOnFailover, LowestSeen,
     start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
 
 consume_method(Queue, CancelOnFailover) ->
-    Args = [{<<"cancel-on-ha-failover">>, bool, CancelOnFailover}],
+    Args = [{<<"x-cancel-on-ha-failover">>, bool, CancelOnFailover}],
     #'basic.consume'{queue     = Queue,
                      arguments = Args}.
 
