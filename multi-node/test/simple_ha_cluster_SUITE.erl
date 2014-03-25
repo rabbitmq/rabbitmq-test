@@ -22,7 +22,7 @@
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
          consume_survives_stop/1, consume_survives_sigkill/1,
-         consume_survives_policy/1, auto_resume/1,
+         consume_survives_policy/1, auto_resume/1, auto_resume_no_ccn_client/1,
          confirms_survive_stop/1, confirms_survive_sigkill/1,
          confirms_survive_policy/1,
          rapid_redeclare/1]).
@@ -53,10 +53,12 @@ rapid_redeclare(Config) ->
      end || _I <- lists:seq(1, 20)],
     ok.
 
-consume_survives_stop(Cf)    -> consume_survives(Cf, fun stop/3,    true).
-consume_survives_sigkill(Cf) -> consume_survives(Cf, fun sigkill/3, true).
-consume_survives_policy(Cf)  -> consume_survives(Cf, fun policy/3,  true).
-auto_resume(Cf)              -> consume_survives(Cf, fun sigkill/3, false).
+consume_survives_stop(Cf)     -> consume_survives(Cf, fun stop/3,    true).
+consume_survives_sigkill(Cf)  -> consume_survives(Cf, fun sigkill/3, true).
+consume_survives_policy(Cf)   -> consume_survives(Cf, fun policy/3,  true).
+auto_resume(Cf)               -> consume_survives(Cf, fun sigkill/3, false).
+auto_resume_no_ccn_client(Cf) ->
+    consume_survives(Cf, fun sigkill/3, false, false).
 
 confirms_survive_stop(Cf)    -> confirms_survive(Cf, fun stop/3).
 confirms_survive_sigkill(Cf) -> confirms_survive(Cf, fun sigkill/3).
@@ -65,9 +67,12 @@ confirms_survive_policy(Cf)  -> confirms_survive(Cf, fun policy/3).
 %%----------------------------------------------------------------------------
 
 consume_survives(Config, DeathFun, CancelOnFailover) ->
+    consume_survives(Config, DeathFun, CancelOnFailover, true).
+
+consume_survives(Config, DeathFun, CancelOnFailover, CCNSupported) ->
     {_Cluster,
       [{{Node1, Node1Pid}, {_Conn1, Channel1}},
-       {{Node2, _Node2Pid}, {_Conn2, Channel2}},
+       {{Node2, Node2Pid}, {_Conn2, Channel2}},
        {{Node3, _Node3Pid}, {_Conn3, Channel3}}
             ]} = rabbit_ha_test_utils:cluster_members(Config),
 
@@ -79,8 +84,12 @@ consume_survives(Config, DeathFun, CancelOnFailover) ->
     Msgs = systest:settings("message_volumes.send_consume"),
 
     %% start up a consumer
+    ConsCh = case CCNSupported of
+                 true  -> Channel2;
+                 false -> open_incapable_channel(Node2Pid)
+             end,
     ConsumerPid = rabbit_ha_test_consumer:create(
-                    Channel2, Queue, self(), CancelOnFailover, Msgs),
+                    ConsCh, Queue, self(), CancelOnFailover, Msgs),
 
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
@@ -119,3 +128,13 @@ sigkill(Node, NodePid, _Rest) -> kill_after(50, Node, NodePid, sigkill).
 policy(Node, _NodePid, Rest)  -> Nodes = [a2b(N) || N <- Rest],
                                  set_policy(
                                    Node, <<"^ha.all.">>, <<"nodes">>, Nodes).
+
+open_incapable_channel(NodePid) ->
+    Props = [{<<"capabilities">>, table, []}],
+    UserData = systest:read_process_user_data(NodePid),
+    NodePort = ?REQUIRE(amqp_port, UserData),
+    {ok, ConsConn} =
+        amqp_connection:start(#amqp_params_network{port              = NodePort,
+                                                   client_properties = Props}),
+    {ok, Ch} = amqp_connection:open_channel(ConsConn),
+    Ch.
