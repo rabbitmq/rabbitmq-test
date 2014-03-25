@@ -29,23 +29,23 @@ await_response(ConsumerPid, Timeout) ->
         ok               -> ok
     end.
 
-create(Channel, Queue, TestPid, AutoResume, ExpectingMsgs) ->
+create(Channel, Queue, TestPid, CancelOnFailover, ExpectingMsgs) ->
     ConsumerPid = spawn_link(?MODULE, start,
-                             [TestPid, Channel, Queue, AutoResume,
+                             [TestPid, Channel, Queue, CancelOnFailover,
                               ExpectingMsgs + 1, ExpectingMsgs]),
     amqp_channel:subscribe(
-      Channel, consume_method(Queue, AutoResume), ConsumerPid),
+      Channel, consume_method(Queue, CancelOnFailover), ConsumerPid),
     ConsumerPid.
 
-start(TestPid, _Channel, _Queue, _AutoResume, _LowestSeen, 0) ->
+start(TestPid, _Channel, _Queue, _CancelOnFailover, _LowestSeen, 0) ->
     consumer_reply(TestPid, ok);
-start(TestPid, Channel, Queue, AutoResume, LowestSeen, MsgsToConsume) ->
+start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
     systest:log("consumer awaiting ~p messages "
-                "(lowest seen = ~p, auto-resume = ~p)~n",
-                [MsgsToConsume, LowestSeen, AutoResume]),
+                "(lowest seen = ~p, cancel-on-failover = ~p)~n",
+                [MsgsToConsume, LowestSeen, CancelOnFailover]),
     receive
         #'basic.consume_ok'{} ->
-            start(TestPid, Channel, Queue, AutoResume,
+            start(TestPid, Channel, Queue, CancelOnFailover,
                   LowestSeen, MsgsToConsume);
         {Delivery = #'basic.deliver'{ redelivered = Redelivered },
          #amqp_msg{payload = Payload}} ->
@@ -61,13 +61,13 @@ start(TestPid, Channel, Queue, AutoResume, LowestSeen, MsgsToConsume) ->
             if
                 MsgNum + 1 == LowestSeen ->
                     start(TestPid, Channel, Queue,
-                             AutoResume, MsgNum, MsgsToConsume - 1);
+                             CancelOnFailover, MsgNum, MsgsToConsume - 1);
                 MsgNum >= LowestSeen ->
                     systest:log("consumer ~p ignoring redelivery of msg ~p~n",
                                 [self(), MsgNum]),
                     true = Redelivered, %% ASSERTION
                     start(TestPid, Channel, Queue,
-                             AutoResume, LowestSeen, MsgsToConsume);
+                             CancelOnFailover, LowestSeen, MsgsToConsume);
                 true ->
                     %% We received a message we haven't seen before,
                     %% but it is not the next message in the expected
@@ -75,33 +75,32 @@ start(TestPid, Channel, Queue, AutoResume, LowestSeen, MsgsToConsume) ->
                     consumer_reply(TestPid,
                                    {error, {unexpected_message, MsgNum}})
             end;
-        #'basic.cancel'{} when AutoResume ->
-            exit(cancel_received_in_auto_resume_mode);
-        #'basic.cancel'{} ->
+        #'basic.cancel'{} when CancelOnFailover ->
             systest:log("consumer ~p received basic.cancel: "
                         "resubscribing to ~p on ~p~n",
                         [self(), Queue, Channel]),
-            resubscribe(TestPid, Channel, Queue, AutoResume,
-                        LowestSeen, MsgsToConsume)
+            resubscribe(TestPid, Channel, Queue, CancelOnFailover,
+                        LowestSeen, MsgsToConsume);
+        #'basic.cancel'{} ->
+            exit(cancel_received_without_cancel_on_failover)
     end.
 
 %%
 %% Private API
 %%
 
-resubscribe(TestPid, Channel, Queue, AutoResume, LowestSeen, MsgsToConsume) ->
-    amqp_channel:subscribe(Channel, consume_method(Queue, AutoResume), self()),
+resubscribe(TestPid, Channel, Queue, CancelOnFailover, LowestSeen,
+            MsgsToConsume) ->
+    amqp_channel:subscribe(
+      Channel, consume_method(Queue, CancelOnFailover), self()),
     ok = receive #'basic.consume_ok'{} -> ok
          end,
     systest:log("re-subscripting complete (~p received basic.consume_ok)",
                 [self()]),
-    start(TestPid, Channel, Queue, AutoResume, LowestSeen, MsgsToConsume).
+    start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
 
-consume_method(Queue, AutoResume) ->
-    Args = case AutoResume of
-               false -> [];
-               true  -> [{<<"cancel-on-ha-failover">>, bool, false}]
-           end,
+consume_method(Queue, CancelOnFailover) ->
+    Args = [{<<"cancel-on-ha-failover">>, bool, CancelOnFailover}],
     #'basic.consume'{queue     = Queue,
                      arguments = Args}.
 

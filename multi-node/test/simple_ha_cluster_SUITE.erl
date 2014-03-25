@@ -53,10 +53,10 @@ rapid_redeclare(Config) ->
      end || _I <- lists:seq(1, 20)],
     ok.
 
-consume_survives_stop(Cf)    -> consume_survives(Cf, fun stop/3,    false).
-consume_survives_sigkill(Cf) -> consume_survives(Cf, fun sigkill/3, false).
-consume_survives_policy(Cf)  -> consume_survives(Cf, fun policy/3,  false).
-auto_resume(Cf)              -> consume_survives(Cf, fun sigkill/3, true).
+consume_survives_stop(Cf)    -> consume_survives(Cf, fun stop/3,    true).
+consume_survives_sigkill(Cf) -> consume_survives(Cf, fun sigkill/3, true).
+consume_survives_policy(Cf)  -> consume_survives(Cf, fun policy/3,  true).
+auto_resume(Cf)              -> consume_survives(Cf, fun sigkill/3, false).
 
 confirms_survive_stop(Cf)    -> confirms_survive(Cf, fun stop/3).
 confirms_survive_sigkill(Cf) -> confirms_survive(Cf, fun sigkill/3).
@@ -64,7 +64,7 @@ confirms_survive_policy(Cf)  -> confirms_survive(Cf, fun policy/3).
 
 %%----------------------------------------------------------------------------
 
-consume_survives(Config, DeathFun, AutoResume) ->
+consume_survives(Config, DeathFun, CancelOnFailover) ->
     {_Cluster,
       [{{Node1, Node1Pid}, {_Conn1, Channel1}},
        {{Node2, _Node2Pid}, {_Conn2, Channel2}},
@@ -79,8 +79,8 @@ consume_survives(Config, DeathFun, AutoResume) ->
     Msgs = systest:settings("message_volumes.send_consume"),
 
     %% start up a consumer
-    ConsumerPid = rabbit_ha_test_consumer:create(Channel2, Queue,
-                                                 self(), AutoResume, Msgs),
+    ConsumerPid = rabbit_ha_test_consumer:create(
+                    Channel2, Queue, self(), CancelOnFailover, Msgs),
 
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
