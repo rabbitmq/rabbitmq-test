@@ -18,8 +18,10 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("systest/include/systest.hrl").
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1]).
--export([basic_enable/1, transitive_dependency_handling/1]).
+-export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
+         init_per_testcase/2, end_per_testcase/2]).
+-export([basic_enable/1, transitive_dependency_handling/1,
+         offline_must_be_explicit/1]).
 
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
@@ -30,6 +32,13 @@ init_per_suite(Config) ->
     Config.
 
 end_per_suite(_Config) ->
+    ok.
+
+init_per_testcase(_TC, Config) ->
+    file:delete(enabled_plugins_file()),
+    Config.
+
+end_per_testcase(_, _) ->
     ok.
 
 basic_enable(Config) ->
@@ -53,6 +62,17 @@ transitive_dependency_handling(Config) ->
     verify_app_running(amqp_client, A),  %% federation requires amqp_client
     ok.
 
+offline_must_be_explicit(Config) ->
+    SUT = systest:active_sut(Config),
+    [{A, ARef},
+     {_B, _BRef}] = systest:list_processes(SUT),
+    systest:stop_and_wait(ARef),
+    try
+        enable(rabbitmq_shovel, A),
+        exit({node_offline, "without --offline, rabbitmq-plugins should crash"})
+    catch _:{error_string, _} -> ok
+    end.
+
 verify_app_running(App, Node) ->
     {App, _, _} = lists:keyfind(App, 1, get_running_apps(Node)).
 
@@ -68,17 +88,18 @@ enable(Plugin, Node) ->
 disable(Plugin, Node) ->
     plugin_action(disable, Node, [atom_to_list(Plugin)]).
 
-%plugin_action(Command, Node) ->
-%    plugin_action(Command, Node, [], []).
-
 plugin_action(Command, Node, Args) ->
     plugin_action(Command, Node, Args, []).
 
 plugin_action(Command, Node, Args, Opts) ->
-    {ok, File} = rpc:call(Node, application, get_env,
-                          [rabbit, enabled_plugins_file]),
+    %% rpc:call(Node, application, get_env,
+    %%              [rabbit, enabled_plugins_file]),
+    File = enabled_plugins_file(),
     {_, PDir} = systest:env("RABBITMQ_BROKER_DIR"),
     Dir = filename:join(PDir, "plugins"),
-    systest:log("PDir: ~p~nDir: ~p~nFile:~p~n", [PDir, Dir, File]),
     rabbit_plugins_main:action(Command, Node, Args, Opts, File, Dir).
+
+enabled_plugins_file() ->
+    {_, PkgDir} = systest:env("PACKAGE_DIR"),
+    filename:join([PkgDir, "resources", "enabled-plugins"]).
 

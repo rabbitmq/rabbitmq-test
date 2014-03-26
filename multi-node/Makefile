@@ -62,6 +62,7 @@ define systest
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 	ERL_FLAGS="-pa lib -pa ebin -pa $(RABBIT_SERVER)/ebin -pz $(CLIENT_DIR)/dist/amqp_client/ebin -pa test-ebin" \
 	RABBITMQ_BROKER_DIR=$(BROKER_DIR) \
+	PACKAGE_DIR=`pwd` \
 		$(SYSTEST) $(SYSTEST_QUIET) $(NOISE) $(OPERATOR_LOG) $(DUMP) $(1) $(SYSTEST_COVER) $(EXTRA_FLAGS)
 endef
 
