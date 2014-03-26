@@ -39,8 +39,9 @@ basic_enable(Config) ->
     [{A, _ARef},
      {_B, _BRef}] = systest:list_processes(SUT),
     enable(rabbitmq_shovel, A),
-    Info = rpc:call(A, rabbit_misc, which_applications, []),
-    systest:console("Info: ~p~n", [Info]),
+    AppInfo = rpc:call(A, rabbit_misc, which_applications, []),
+    systest:log("Running Applications: ~p~n", [AppInfo]),
+    {rabbitmq_shovel, _, _} = lists:keyfind(rabbitmq_shovel, 1, AppInfo),
     ok.
 
 enable(Plugin, Node) ->
@@ -53,9 +54,10 @@ plugin_action(Command, Node, Args) ->
     plugin_action(Command, Node, Args, []).
 
 plugin_action(Command, Node, Args, Opts) ->
-    {ok, Dir}  = rpc:call(Node, application, get_env,
-                          [rabbit, plugins_expand_dir]),
     {ok, File} = rpc:call(Node, application, get_env,
                           [rabbit, enabled_plugins_file]),
+    {_, PDir} = systest:env("RABBITMQ_BROKER_DIR"),
+    Dir = filename:join(PDir, "plugins"),
+    systest:log("PDir: ~p~nDir: ~p~nFile:~p~n", [PDir, Dir, File]),
     rabbit_plugins_main:action(Command, Node, Args, Opts, File, Dir).
 

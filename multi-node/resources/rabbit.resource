@@ -16,7 +16,7 @@
                 {"RABBITMQ_CONFIG_FILE",
                         "${ct.priv_dir}/${ct.scope}/${proc.name}-conf.config"},
                 {"RABBITMQ_PLUGINS_EXPAND_DIR",
-                    "${ct.priv_dir}/${ct.scope}/${proc.name}-plugins-scratch"},
+                    "${ct.priv_dir}/${ct.scope}/rabbitmq-plugins-scratch"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
                     "${ct.priv_dir}/${ct.scope}/enabled-plugins"},
                 {"RABBITMQ_ALLOW_INPUT", "1"},
