@@ -19,10 +19,8 @@
 -include_lib("systest/include/systest.hrl").
 
 -export([suite/0, all/0, init_per_suite/1, end_per_suite/1]).
--export([basic_enable/1]).
+-export([basic_enable/1, transitive_dependency_handling/1]).
 
-%% NB: it can take almost a minute to start and cluster 3 nodes,
-%% and then we need time left over to run the actual tests...
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
 all() ->
@@ -39,13 +37,36 @@ basic_enable(Config) ->
     [{A, _ARef},
      {_B, _BRef}] = systest:list_processes(SUT),
     enable(rabbitmq_shovel, A),
-    AppInfo = rpc:call(A, rabbit_misc, which_applications, []),
-    systest:log("Running Applications: ~p~n", [AppInfo]),
-    {rabbitmq_shovel, _, _} = lists:keyfind(rabbitmq_shovel, 1, AppInfo),
+    verify_app_running(rabbitmq_shovel, A),
     ok.
+
+transitive_dependency_handling(Config) ->
+    SUT = systest:active_sut(Config),
+    [{A, _ARef},
+     {_B, _BRef}] = systest:list_processes(SUT),
+    [begin
+         enable(P, A),
+         verify_app_running(P, A)
+     end  || P <- [rabbitmq_shovel, rabbitmq_federation]],
+    disable(rabbitmq_shovel, A),
+    verify_app_not_running(rabbitmq_shovel, A),
+    verify_app_running(amqp_client, A),  %% federation requires amqp_client
+    ok.
+
+verify_app_running(App, Node) ->
+    {App, _, _} = lists:keyfind(App, 1, get_running_apps(Node)).
+
+verify_app_not_running(App, Node) ->
+    false = lists:keyfind(App, 1, get_running_apps(Node)).
+
+get_running_apps(Node) ->
+    rpc:call(Node, rabbit_misc, which_applications, []).
 
 enable(Plugin, Node) ->
     plugin_action(enable, Node, [atom_to_list(Plugin)]).
+
+disable(Plugin, Node) ->
+    plugin_action(disable, Node, [atom_to_list(Plugin)]).
 
 %plugin_action(Command, Node) ->
 %    plugin_action(Command, Node, [], []).
