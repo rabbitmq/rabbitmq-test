@@ -18,7 +18,7 @@
                 {"RABBITMQ_PLUGINS_EXPAND_DIR",
                     "${ct.priv_dir}/${ct.scope}/${proc.name}-plugins-scratch"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
-                    "${ct.priv_dir}/${ct.scope}/${proc.name}-enabled-plugins"},
+                    "${ct.priv_dir}/${ct.scope}/enabled-plugins"},
                 {"RABBITMQ_ALLOW_INPUT", "1"},
                 {"RABBITMQ_NODENAME", "${proc.name}"},
                 {"RABBITMQ_MNESIA_DIR",
@@ -52,6 +52,20 @@
         {activate_on_start, false}
     ]}
 ]}.
+
+{two_nodes_unclustered, [
+    {sut, [{localhost, [wibble, wobble]}]},
+    {processes, [
+        {wibble, [rabbit_node]},
+        {wobble, [rabbit_node]}
+    ]},
+    {user_data, [
+        {wibble, [{amqp_port, 10672}]},
+        {wobble, [{amqp_port, 10673}]}
+    ]}
+]}.
+
+{plugin_handling_SUITE, [{all, two_nodes_unclustered}]}.
 
 {three_node_cluster, [
     {sut, [{localhost, [a, b, c]}]},
