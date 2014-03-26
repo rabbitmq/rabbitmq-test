@@ -57,7 +57,8 @@
     {sut, [{localhost, [wibble, wobble]}]},
     {processes, [
         {wibble, [rabbit_node]},
-        {wobble, [rabbit_node]}
+        {wobble, [rabbit_node]},
+        {jelly, [rabbit_node, start_cold]}
     ]},
     {user_data, [
         {wibble, [{amqp_port, 10672}]},

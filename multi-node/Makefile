@@ -1,10 +1,13 @@
 # NB: VERSION *might* be passed down from another makefile, otherwise we
 # will take it from the user - in CI in seems this will always be 0.0.0 
 VERSION ?= 0.0.0
+UMBRELLA_DIR=$(abspath ../../)
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-erlang-client)
 TEMP_DIRS=lib test-lib bin ebin test-ebin
 RABBIT_SERVER=$(abspath lib/rabbit)
+RABBIT_PLUGINS=$(RABBIT_SERVER)/plugins
+PLUGINS_SRC=$(abspath ../../rabbitmq-server/plugins-src)
 REBAR=bin/rebar
 SYSTEST=test-lib/systest/priv/bin/systest
 SYSTEST_GIT=test-lib/systest
@@ -108,13 +111,19 @@ test-shell:
 endif
 
 .PHONY: test-compile
-test-compile: $(REBAR) $(RABBIT_SERVER) test-ebin
+test-compile: $(REBAR) $(RABBIT_SERVER) $(RABBIT_PLUGINS) test-ebin
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 		$(REBAR) -C systest.config skip_deps=true compile -v $(REBAR_LOG)
 	cp -R ebin test-ebin
 
 $(RABBIT_SERVER): $(CLIENT_DIR)/dist lib
 	ln -fs $(BROKER_DIR) $@
+
+$(RABBIT_PLUGINS): $(RABBIT_SERVER) $(PLUGINS_SRC)
+	make -C $(RABBIT_SERVER)
+
+$(PLUGINS_SRC):
+	ln -fs $(UMBRELLA_DIR) $@
 
 $(CLIENT_DIR)/dist:
 	$(MAKE) -C $(CLIENT_DIR)

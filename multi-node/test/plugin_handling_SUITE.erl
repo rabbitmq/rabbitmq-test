@@ -88,12 +88,14 @@ enable(Plugin, Node) ->
 disable(Plugin, Node) ->
     plugin_action(disable, Node, [atom_to_list(Plugin)]).
 
+enable_offline(Plugin, Node) ->
+    plugin_action(enable, Node, [atom_to_list(Plugin)],
+                  [{"--offline", true}]).
+
 plugin_action(Command, Node, Args) ->
     plugin_action(Command, Node, Args, []).
 
 plugin_action(Command, Node, Args, Opts) ->
-    %% rpc:call(Node, application, get_env,
-    %%              [rabbit, enabled_plugins_file]),
     File = enabled_plugins_file(),
     {_, PDir} = systest:env("RABBITMQ_BROKER_DIR"),
     Dir = filename:join(PDir, "plugins"),
