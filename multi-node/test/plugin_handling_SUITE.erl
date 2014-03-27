@@ -31,15 +31,19 @@ suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
 all() ->
     [{group, with_running_nodes},
-     management_extension_handling,
      {group, with_offline_nodes}].
 
 groups() ->
     [{with_running_nodes, [shuffle],
       [basic_enable,
        transitive_dependency_handling]},
-     {with_offline_nodes, [shuffle],
-      [offline_must_be_explicit]}].
+     {with_offline_nodes, [parallel],
+      [{group, offline_changes},
+       {group, management}]},
+     {offline_changes, [shuffle],
+      [offline_must_be_explicit]},
+     {management, [sequence],
+      [management_extension_handling]}].
 
 %% Setup/Teardown
 
@@ -55,29 +59,10 @@ init_per_group(_Group, Config) ->
 end_per_group(_Group, Config) ->
     {save_config, Config}.
 
-init_per_testcase(TC, Config) ->
+init_per_testcase(_TC, Config) ->
     file:delete(enabled_plugins_file()),
-    [{Node1, _}, {Node2, _}] = systest:list_processes(plugin_handling),
-    Config2 = case TC of
-                  management_extension_handling ->
-                      rabbit_ha_test_utils:stop_app(Node1),
-                      [{stopped, Node1}];
-                  _ ->
-                      []
-              end,
-    [{node1, Node1}, {node2, Node2}] ++ Config2 ++ Config.
+    Config.
 
-%% TODO: consider putting mgmt_extension_handling into another group
-
-end_per_testcase(management_extension_handling, _Config) ->
-    [{Node1, _}|_] = systest:list_processes(plugin_handling),
-    try
-        %% this *can* fail in the testcase, if not it'll fail here
-        %% and we want to remain as oblivious as we possibly can
-        rabbit_ha_test_utils:start_app(Node1),
-        ok
-    catch _:_ -> ok
-    end;
 end_per_testcase(_, _) ->
     ok.
 
@@ -119,14 +104,14 @@ offline_must_be_explicit(Config) ->
 
 management_extension_handling(Config) ->
     SUT = systest:active_sut(Config),
-    [{C, _ARef},
-     {_B, _BRef}] = systest:list_processes(SUT),
-    enable_offline(rabbitmq_management, C),
-    enable_offline(rabbitmq_shovel_management, C),
-    rabbit_ha_test_utils:start_app(C),
-    verify_app_running(rabbitmq_shovel_management, C),
-    disable(rabbitmq_shovel_management, C),
-    verify_app_not_running(rabbitmq_shovel_management, C),
+    [{Node, Ref}] = systest:list_processes(SUT),
+    enable_offline(rabbitmq_management, Node),
+    enable_offline(rabbitmq_shovel_management, Node),
+
+    systest:activate_process(Ref),
+    verify_app_running(rabbitmq_shovel_management, Node),
+    disable(rabbitmq_shovel_management, Node),
+    verify_app_not_running(rabbitmq_shovel_management, Node),
     ok.
 
 verify_app_running(App, Node) ->

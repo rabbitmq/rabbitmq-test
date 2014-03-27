@@ -77,6 +77,19 @@
     ]}
 ]}.
 
+%% TODO: fix https://github.com/nebularis/systest/issues/73 since
+%% it's quite annoying to have all these duplicated config elements
+
+{management_extension_handling, [
+    {sut, [{localhost, [mgmt]}]},
+    {processes, [
+        {mgmt, [rabbit_node, start_cold]}
+    ]},
+    {user_data, [
+        {mgmt, [{amqp_port, 10676}]}
+    ]}
+]}.
+
 {three_node_cluster, [
     {sut, [{localhost, [a, b, c]}]},
     {processes, [
