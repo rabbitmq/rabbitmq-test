@@ -60,9 +60,9 @@ end_per_group(_Group, Config) ->
     {save_config, Config}.
 
 init_per_testcase(_TC, Config) ->
-    file:delete(enabled_plugins_file()),
     SUT = systest:active_sut(Config),
     [{N, Ref}] = systest:list_processes(SUT),
+    file:delete(enabled_plugins_file(N)),
     [{node, N}, {node_ref, Ref}|Config].
 
 end_per_testcase(_, _) ->
@@ -109,7 +109,11 @@ management_extension_handling(Config) ->
     ok.
 
 verify_app_running(App, Node) ->
-    {App, _, _} = lists:keyfind(App, 1, get_running_apps(Node)).
+    Running = get_running_apps(Node),
+    case lists:keyfind(App, 1, Running) of
+        {App, _, _} -> ok;
+        false       -> ct:fail("~p not running: ~p~n", [App, Running])
+    end.
 
 verify_app_not_running(App, Node) ->
     false = lists:keyfind(App, 1, get_running_apps(Node)).
@@ -125,18 +129,22 @@ disable(Plugin, Node) ->
 
 enable_offline(Plugin, Node) ->
     plugin_action(enable, Node, [atom_to_list(Plugin)],
-                  [{"--offline", true}]).
+                  [{"--offline", true}]),
+    {ok, Bin} = file:read_file(enabled_plugins_file(Node)),
+    systest:log("enabled-plugins changed:~n~s~n", [Bin]),
+    ok.
 
 plugin_action(Command, Node, Args) ->
     plugin_action(Command, Node, Args, []).
 
 plugin_action(Command, Node, Args, Opts) ->
-    File = enabled_plugins_file(),
+    File = enabled_plugins_file(Node),
     {_, PDir} = systest:env("RABBITMQ_BROKER_DIR"),
     Dir = filename:join(PDir, "plugins"),
     rabbit_plugins_main:action(Command, Node, Args, Opts, File, Dir).
 
-enabled_plugins_file() ->
+enabled_plugins_file(Node) ->
     {_, PkgDir} = systest:env("PACKAGE_DIR"),
-    filename:join([PkgDir, "resources", "enabled-plugins"]).
+    filename:join([PkgDir, "resources",
+                   atom_to_list(Node) ++ "-enabled-plugins"]).
 
