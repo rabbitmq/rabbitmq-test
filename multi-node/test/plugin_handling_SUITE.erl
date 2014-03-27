@@ -61,7 +61,9 @@ end_per_group(_Group, Config) ->
 
 init_per_testcase(_TC, Config) ->
     file:delete(enabled_plugins_file()),
-    Config.
+    SUT = systest:active_sut(Config),
+    [{N, Ref}] = systest:list_processes(SUT),
+    [{node, N}, {node_ref, Ref}|Config].
 
 end_per_testcase(_, _) ->
     ok.
@@ -69,46 +71,38 @@ end_per_testcase(_, _) ->
 %% Test Cases
 
 basic_enable(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, _ARef},
-     {_B, _BRef}] = systest:list_processes(SUT),
-    enable(rabbitmq_shovel, A),
-    verify_app_running(rabbitmq_shovel, A),
+    Node = ?config(node, Config),
+    enable(rabbitmq_shovel, Node),
+    verify_app_running(rabbitmq_shovel, Node),
     ok.
 
 transitive_dependency_handling(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, _ARef},
-     {_B, _BRef}] = systest:list_processes(SUT),
+    Node = ?config(node, Config),
     [begin
-         enable(P, A),
-         verify_app_running(P, A)
+         enable(P, Node),
+         verify_app_running(P, Node)
      end  || P <- [rabbitmq_shovel, rabbitmq_federation]],
-    disable(rabbitmq_shovel, A),
-    verify_app_not_running(rabbitmq_shovel, A),
-    verify_app_running(amqp_client, A),  %% federation requires amqp_client
+    disable(rabbitmq_shovel, Node),
+    verify_app_not_running(rabbitmq_shovel, Node),
+    verify_app_running(amqp_client, Node),  %% federation requires amqp_client
     ok.
 
 offline_must_be_explicit(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, _ARef},
-     {_B, _BRef}] = systest:list_processes(SUT),
-    rabbit_ha_test_utils:stop_app(A),
+    Node = ?config(node, Config),
     try
-        enable(rabbitmq_shovel, A),
+        enable(rabbitmq_shovel, Node),
         exit({node_offline, "without --offline, rabbitmq-plugins should crash"})
     catch _:{error_string, _} -> ok
-    after
-        rabbit_ha_test_utils:start_app(A)
     end.
 
 management_extension_handling(Config) ->
-    SUT = systest:active_sut(Config),
-    [{Node, Ref}] = systest:list_processes(SUT),
+    Node = ?config(node, Config),
+    Ref  = ?config(node_ref, Config),
     enable_offline(rabbitmq_management, Node),
     enable_offline(rabbitmq_shovel_management, Node),
 
     systest:activate_process(Ref),
+    verify_app_running(rabbitmq_shovel, Node),
     verify_app_running(rabbitmq_shovel_management, Node),
     disable(rabbitmq_shovel_management, Node),
     verify_app_not_running(rabbitmq_shovel_management, Node),

@@ -54,26 +54,22 @@
 ]}.
 
 {plugin_handling, [
-    {sut, [{localhost, [wibble, wobble]}]},
+    {sut, [{localhost, [wibble]}]},
     {processes, [
-        {wibble, [rabbit_node]},
-        {wobble, [rabbit_node]}
+        {wibble, [rabbit_node]}
     ]},
     {user_data, [
-        {wibble, [{amqp_port, 10672}]},
-        {wobble, [{amqp_port, 10673}]}
+        {wibble, [{amqp_port, 10672}]}
     ]}
 ]}.
 
 {with_offline_nodes, [
-    {sut, [{localhost, [offline1, offline2]}]},
+    {sut, [{localhost, [offline]}]},
     {processes, [
-        {offline1, [rabbit_node, start_cold]},
-        {offline2, [rabbit_node, start_cold]}
+        {offline, [rabbit_node, start_cold]}
     ]},
     {user_data, [
-        {offline1, [{amqp_port, 10674}]},
-        {offline2, [{amqp_port, 10675}]}
+        {offline, [{amqp_port, 10674}]}
     ]}
 ]}.
 
