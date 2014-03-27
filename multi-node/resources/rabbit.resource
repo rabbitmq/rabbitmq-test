@@ -53,12 +53,11 @@
     ]}
 ]}.
 
-{two_nodes_unclustered, [
+{plugin_handling, [
     {sut, [{localhost, [wibble, wobble]}]},
     {processes, [
         {wibble, [rabbit_node]},
-        {wobble, [rabbit_node]},
-        {jelly, [rabbit_node, start_cold]}
+        {wobble, [rabbit_node]}
     ]},
     {user_data, [
         {wibble, [{amqp_port, 10672}]},
@@ -66,7 +65,17 @@
     ]}
 ]}.
 
-{plugin_handling_SUITE, [{all, two_nodes_unclustered}]}.
+{with_offline_nodes, [
+    {sut, [{localhost, [offline1, offline2]}]},
+    {processes, [
+        {offline1, [rabbit_node, start_cold]},
+        {offline2, [rabbit_node, start_cold]}
+    ]},
+    {user_data, [
+        {offline1, [{amqp_port, 10674}]},
+        {offline2, [{amqp_port, 10675}]}
+    ]}
+]}.
 
 {three_node_cluster, [
     {sut, [{localhost, [a, b, c]}]},

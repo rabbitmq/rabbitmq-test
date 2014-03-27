@@ -137,7 +137,7 @@ $(SYSTEST_GIT):
 	git clone -b stable https://github.com/nebularis/systest.git test-lib/systest
 	git --git-dir=test-lib/systest/.git \
 		--work-tree=test-lib/systest \
-		checkout $(SYSTEST_VERSION)
+		checkout release-0.8.9
 
 $(SYSTEST): systest-lib
 	PATH="bin:${PATH}" $(MAKE) -C test-lib/systest
