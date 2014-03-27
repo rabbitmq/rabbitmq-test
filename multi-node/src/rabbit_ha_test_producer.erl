@@ -26,7 +26,7 @@ await_response(ProducerPid, Timeout) ->
     systest:log("waiting for producer pid ~p (timeout = ~p)~n",
                 [ProducerPid, Timeout]),
     case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
-        ok                -> exit({boom, bah});
+        ok                -> ok;
         {error, _} = Else -> exit(Else);
         Else              -> exit({weird_response, Else})
     end.
