@@ -27,8 +27,8 @@ await_response(ProducerPid, Timeout) ->
                 [ProducerPid, Timeout]),
     case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
         ok                -> ok;
-        {error, _} = Else -> exit(Else);
-        Else              -> exit({weird_response, Else})
+        {error, _} = Else -> ct:fail(Else);
+        Else              -> ct:fail({weird_response, Else})
     end.
 
 create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
