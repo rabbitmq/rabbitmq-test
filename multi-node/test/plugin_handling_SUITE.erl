@@ -49,10 +49,6 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-init_per_group(with_offline_nodes=Group, Config) ->
-    [rabbit_ha_test_utils:stop_app(Node) ||
-        {Node, _} <- systest:list_processes(Group)],
-    Config;
 init_per_group(_Group, Config) ->
     Config.
 
