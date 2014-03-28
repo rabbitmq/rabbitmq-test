@@ -26,7 +26,8 @@
 -export([basic_enable/1, runtime_boot_step_handling/1,
          transitive_dependency_handling/1, manual_changes_then_disable/1,
          manual_changes_then_enable/1, offline_must_be_explicit/1,
-         management_extension_handling/1]).
+         management_extension_handling/1,
+         offline_changes_ignore_running_broker/1]).
 
 %% Configuration
 
@@ -48,6 +49,7 @@ groups() ->
        {group, with_offline_nodes}]},
      {with_running_nodes, [shuffle],
       [basic_enable,
+       offline_changes_ignore_running_broker,
        runtime_boot_step_handling,
        transitive_dependency_handling,
        manual_changes_then_disable,
@@ -110,6 +112,20 @@ basic_enable(Config) ->
     rabbit_ha_test_utils:stop_app(Node),
     rabbit_ha_test_utils:start_app(Node),
     verify_app_running(rabbitmq_shovel, Node),
+    ok.
+
+offline_changes_ignore_running_broker(Config) ->
+    Node = ?config(node, Config),
+    enable(rabbitmq_federation, Node, Config),
+    verify_app_running(rabbitmq_federation, Node),
+    disable_offline(rabbitmq_federation, Node, Config),
+    verify_app_running(rabbitmq_federation, Node),
+    disable(rabbitmq_federation, Node, Config),
+    verify_app_not_running(rabbitmq_federation, Node),
+    enable_offline(rabbitmq_federation, Node, Config),
+    verify_app_not_running(rabbitmq_federation, Node),
+    enable(rabbitmq_federation, Node, Config),
+    verify_app_running(rabbitmq_federation, Node),
     ok.
 
 runtime_boot_step_handling(Config) ->
@@ -208,6 +224,10 @@ enable_offline(Plugin, Node, Config) ->
     {ok, Bin} = file:read_file(File),
     systest:log("~s changed: ~s~n", [File, Bin]),
     ok.
+
+disable_offline(Plugin, Node, Config) ->
+    plugin_action(enable, Node, [atom_to_list(Plugin)],
+                  [{"--offline", true}], Config).
 
 plugin_action(Command, Node, Args, Config) ->
     plugin_action(Command, Node, Args, [], Config).
