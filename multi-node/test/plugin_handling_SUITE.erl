@@ -32,11 +32,13 @@
 suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 
 all() ->
-    [{group, with_running_nodes},
-     {group, with_offline_nodes}].
+    [{group, all_tests}].
 
 groups() ->
-    [{with_running_nodes, [shuffle],
+    [{all_tests, [parallel],
+      [{group, with_running_nodes},
+       {group, with_offline_nodes}]},
+     {with_running_nodes, [shuffle],
       [basic_enable,
        runtime_boot_step_handling,
        transitive_dependency_handling,
