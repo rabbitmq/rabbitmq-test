@@ -25,7 +25,8 @@
          init_per_testcase/2, end_per_testcase/2]).
 -export([basic_enable/1, runtime_boot_step_handling/1,
          transitive_dependency_handling/1, manual_changes_then_disable/1,
-         offline_must_be_explicit/1, management_extension_handling/1]).
+         manual_changes_then_enable/1, offline_must_be_explicit/1,
+         management_extension_handling/1]).
 
 %% Configuration
 
@@ -49,7 +50,8 @@ groups() ->
       [basic_enable,
        runtime_boot_step_handling,
        transitive_dependency_handling,
-       manual_changes_then_disable]},
+       manual_changes_then_disable,
+       manual_changes_then_enable]},
      {with_offline_nodes, [parallel],
       [{group, offline_changes},
        {group, management_plugins}]},
@@ -86,6 +88,17 @@ init_per_testcase(_TC, Config) ->
     Config2.
 
 end_per_testcase(_, Config) ->
+    Node = ?config(node, Config),
+    case net_adm:ping(Node) of
+        pong ->  %% using ping saves a few seconds on each test run
+            case rpc:call(Node, rabbit_plugins, active, [], 3000) of
+                {badrpc, _}   -> ok;
+                ActivePlugins -> [disable(P, Node, Config) ||
+                                     P <- ActivePlugins]
+            end;
+        pang ->
+            ok
+    end,
     Config.
 
 %% Test Cases
@@ -126,6 +139,14 @@ manual_changes_then_disable(Config) ->
     verify_app_not_running(rabbitmq_shovel, Node),
     enable_offline(rabbitmq_shovel, rabbit_nodes:make(foobar), Config),
     disable(rabbitmq_shovel, Node, Config),
+    ok.
+
+manual_changes_then_enable(Config) ->
+    Node = ?config(node, Config),
+    verify_app_not_running(rabbitmq_federation, Node),
+    enable_offline(rabbitmq_federation, rabbit_nodes:make(foobar), Config),
+    enable(rabbitmq_federation, Node, Config),
+    verify_app_running(rabbitmq_federation, Node),
     ok.
 
 offline_must_be_explicit(Config) ->
