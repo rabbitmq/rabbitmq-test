@@ -107,6 +107,9 @@ basic_enable(Config) ->
     Node = ?config(node, Config),
     enable(rabbitmq_shovel, Node, Config),
     verify_app_running(rabbitmq_shovel, Node),
+    rabbit_ha_test_utils:stop_app(Node),
+    rabbit_ha_test_utils:start_app(Node),
+    verify_app_running(rabbitmq_shovel, Node),
     ok.
 
 runtime_boot_step_handling(Config) ->
