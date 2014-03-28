@@ -14,11 +14,11 @@
             {environment, [
                 {"RABBITMQ_LOG_BASE", "${ct.priv_dir}/${ct.scope}"},
                 {"RABBITMQ_CONFIG_FILE",
-                        "${ct.priv_dir}/${ct.scope}/${proc.name}-conf.config"},
+                 "%{PACKAGE_DIR}/resources/${proc.name}"},
                 {"RABBITMQ_PLUGINS_EXPAND_DIR",
-                    "${ct.priv_dir}/${ct.scope}/rabbitmq-plugins-scratch"},
+                 "%{PACKAGE_DIR}/test/data/plugins"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
-                    "${ct.priv_dir}/${ct.scope}/enabled-plugins"},
+                 "%{PACKAGE_DIR}/test/data/${ct.scope}/enabled-plugins"},
                 {"RABBITMQ_ALLOW_INPUT", "1"},
                 {"RABBITMQ_NODENAME", "${proc.name}"},
                 {"RABBITMQ_MNESIA_DIR",
@@ -76,7 +76,7 @@
 %% TODO: fix https://github.com/nebularis/systest/issues/73 since
 %% it's quite annoying to have all these duplicated config elements
 
-{management_extension_handling, [
+{management_plugins, [
     {sut, [{localhost, [mgmt]}]},
     {processes, [
         {mgmt, [rabbit_node, start_cold]}

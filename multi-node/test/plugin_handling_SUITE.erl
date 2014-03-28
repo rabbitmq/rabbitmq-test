@@ -16,6 +16,7 @@
 -module(plugin_handling_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("systest/include/systest.hrl").
 
 -export([suite/0, all/0, groups/0]).
@@ -39,73 +40,87 @@ groups() ->
        transitive_dependency_handling]},
      {with_offline_nodes, [parallel],
       [{group, offline_changes},
-       {group, management}]},
+       {group, management_plugins}]},
      {offline_changes, [shuffle],
       [offline_must_be_explicit]},
-     {management, [sequence],
+     {management_plugins, [sequence],
       [management_extension_handling]}].
 
 %% Setup/Teardown
 
 init_per_suite(Config) ->
+    inets:start(temporary),
+    DataDir = proplists:get_value(data_dir, Config, "/tmp"),
+    inets:start(httpc, [{data_dir, DataDir}]),
+    [{current_scope, ?MODULE}|Config].
+
+end_per_suite(Config) ->
+    inets:stop(),
     Config.
 
-end_per_suite(_Config) ->
-    ok.
+init_per_group(Group, Config) ->
+    [{current_scope, Group}|Config].
 
-init_per_group(_Group, Config) ->
+end_per_group(_, Config) ->
     Config.
-
-end_per_group(_Group, Config) ->
-    {save_config, Config}.
 
 init_per_testcase(_TC, Config) ->
-    SUT = systest:active_sut(Config),
+    SUT = systest:get_system_under_test(Config),
     [{N, Ref}] = systest:list_processes(SUT),
-    file:delete(enabled_plugins_file(N)),
-    [{node, N}, {node_ref, Ref}|Config].
+    Config2 = [{node, N}, {node_ref, Ref}|Config],
+    File = enabled_plugins_file(Config2),
+    file:delete(File),
+    filelib:ensure_dir(File),
+    Config2.
 
-end_per_testcase(_, _) ->
-    ok.
+end_per_testcase(_, Config) ->
+    Config.
 
 %% Test Cases
 
 basic_enable(Config) ->
     Node = ?config(node, Config),
-    enable(rabbitmq_shovel, Node),
+    enable(rabbitmq_shovel, Node, Config),
     verify_app_running(rabbitmq_shovel, Node),
     ok.
 
 transitive_dependency_handling(Config) ->
     Node = ?config(node, Config),
     [begin
-         enable(P, Node),
+         enable(P, Node, Config),
          verify_app_running(P, Node)
      end  || P <- [rabbitmq_shovel, rabbitmq_federation]],
-    disable(rabbitmq_shovel, Node),
+    disable(rabbitmq_shovel, Node, Config),
     verify_app_not_running(rabbitmq_shovel, Node),
     verify_app_running(amqp_client, Node),  %% federation requires amqp_client
     ok.
 
 offline_must_be_explicit(Config) ->
-    Node = ?config(node, Config),
     try
-        enable(rabbitmq_shovel, Node),
+        enable(rabbitmq_shovel, rabbit_nodes:make(nonode), Config),
         exit({node_offline, "without --offline, rabbitmq-plugins should crash"})
-    catch _:{error_string, _} -> ok
+    catch throw:{error_string, _} -> ok
     end.
 
 management_extension_handling(Config) ->
     Node = ?config(node, Config),
     Ref  = ?config(node_ref, Config),
-    enable_offline(rabbitmq_management, Node),
-    enable_offline(rabbitmq_shovel_management, Node),
+    enable_offline(rabbitmq_management, Node, Config),
+    systest:activate_process(Ref),  %% start the node
+    verify_app_running(rabbitmq_management, Node),
 
-    systest:activate_process(Ref),
-    verify_app_running(rabbitmq_shovel, Node),
+    enable(rabbitmq_shovel_management, Node, Config),
     verify_app_running(rabbitmq_shovel_management, Node),
-    disable(rabbitmq_shovel_management, Node),
+
+    disable(rabbitmq_shovel_management, Node, Config),
     verify_app_not_running(rabbitmq_shovel_management, Node),
+    verify_app_running(rabbitmq_management, Node),
+
+    %% port is configured in multi-node/resources/mgmt.config
+    %% and the location passed via multi-node/resources/rabbit.resource
+    {ok, {{_, Code, _}, _Headers, _Body}} =
+        httpc:request("http://127.0.0.1:10001"),
+    ?assertEqual(Code, 200),
     ok.
 
 verify_app_running(App, Node) ->
@@ -121,30 +136,31 @@ verify_app_not_running(App, Node) ->
 get_running_apps(Node) ->
     rpc:call(Node, rabbit_misc, which_applications, []).
 
-enable(Plugin, Node) ->
-    plugin_action(enable, Node, [atom_to_list(Plugin)]).
+enable(Plugin, Node, Config) ->
+    plugin_action(enable, Node, [atom_to_list(Plugin)], Config).
 
-disable(Plugin, Node) ->
-    plugin_action(disable, Node, [atom_to_list(Plugin)]).
+disable(Plugin, Node, Config) ->
+    plugin_action(disable, Node, [atom_to_list(Plugin)], Config).
 
-enable_offline(Plugin, Node) ->
+enable_offline(Plugin, Node, Config) ->
     plugin_action(enable, Node, [atom_to_list(Plugin)],
-                  [{"--offline", true}]),
-    {ok, Bin} = file:read_file(enabled_plugins_file(Node)),
-    systest:log("enabled-plugins changed:~n~s~n", [Bin]),
+                  [{"--offline", true}], Config),
+    File = enabled_plugins_file(Config),
+    {ok, Bin} = file:read_file(File),
+    systest:log("~s changed: ~s~n", [File, Bin]),
     ok.
 
-plugin_action(Command, Node, Args) ->
-    plugin_action(Command, Node, Args, []).
+plugin_action(Command, Node, Args, Config) ->
+    plugin_action(Command, Node, Args, [], Config).
 
-plugin_action(Command, Node, Args, Opts) ->
-    File = enabled_plugins_file(Node),
+plugin_action(Command, Node, Args, Opts, Config) ->
+    File = enabled_plugins_file(Config),
     {_, PDir} = systest:env("RABBITMQ_BROKER_DIR"),
     Dir = filename:join(PDir, "plugins"),
     rabbit_plugins_main:action(Command, Node, Args, Opts, File, Dir).
 
-enabled_plugins_file(Node) ->
-    {_, PkgDir} = systest:env("PACKAGE_DIR"),
-    filename:join([PkgDir, "resources",
-                   atom_to_list(Node) ++ "-enabled-plugins"]).
+enabled_plugins_file(Config) ->
+    {_, Dir} = systest:env("PACKAGE_DIR"),
+    Scope = ?config(current_scope, Config),
+    filename:join([Dir, "test", "data", Scope, "enabled-plugins"]).
 
