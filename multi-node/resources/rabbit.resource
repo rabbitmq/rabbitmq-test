@@ -53,7 +53,7 @@
     ]}
 ]}.
 
-{plugin_handling, [
+{with_running_nodes, [
     {sut, [{localhost, [wibble]}]},
     {processes, [
         {wibble, [rabbit_node]}

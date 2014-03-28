@@ -23,7 +23,8 @@
 -export([init_per_suite/1, end_per_suite/1,
          init_per_group/2, end_per_group/2,
          init_per_testcase/2, end_per_testcase/2]).
--export([basic_enable/1, transitive_dependency_handling/1,
+-export([basic_enable/1, runtime_boot_step_handling/1,
+         transitive_dependency_handling/1, manual_changes_then_disable/1,
          offline_must_be_explicit/1, management_extension_handling/1]).
 
 %% Configuration
@@ -37,7 +38,9 @@ all() ->
 groups() ->
     [{with_running_nodes, [shuffle],
       [basic_enable,
-       transitive_dependency_handling]},
+       runtime_boot_step_handling,
+       transitive_dependency_handling,
+       manual_changes_then_disable]},
      {with_offline_nodes, [parallel],
       [{group, offline_changes},
        {group, management_plugins}]},
@@ -84,6 +87,20 @@ basic_enable(Config) ->
     verify_app_running(rabbitmq_shovel, Node),
     ok.
 
+runtime_boot_step_handling(Config) ->
+    Node = ?config(node, Config),
+    ExchangePlugin = rabbitmq_consistent_hash_exchange,
+
+    enable(ExchangePlugin, Node, Config),
+    Exchanges = rpc:call(Node, rabbit_registry, lookup_all, [exchange]),
+    ?assertMatch({_, rabbit_exchange_type_consistent_hash},
+                 lists:keyfind('x-consistent-hash', 1, Exchanges)),
+
+    disable(ExchangePlugin, Node, Config),
+    Exchanges2 = rpc:call(Node, rabbit_registry, lookup_all, [exchange]),
+    ?assertMatch(false, lists:keymember('x-consistent-hash', 1, Exchanges2)),
+    ok.
+
 transitive_dependency_handling(Config) ->
     Node = ?config(node, Config),
     [begin
@@ -93,6 +110,13 @@ transitive_dependency_handling(Config) ->
     disable(rabbitmq_shovel, Node, Config),
     verify_app_not_running(rabbitmq_shovel, Node),
     verify_app_running(amqp_client, Node),  %% federation requires amqp_client
+    ok.
+
+manual_changes_then_disable(Config) ->
+    Node = ?config(node, Config),
+    verify_app_not_running(rabbitmq_shovel, Node),
+    enable_offline(rabbitmq_shovel, rabbit_nodes:make(foobar), Config),
+    disable(rabbitmq_shovel, Node, Config),
     ok.
 
 offline_must_be_explicit(Config) ->
@@ -122,6 +146,8 @@ management_extension_handling(Config) ->
         httpc:request("http://127.0.0.1:10001"),
     ?assertEqual(Code, 200),
     ok.
+
+%% Utilities
 
 verify_app_running(App, Node) ->
     Running = get_running_apps(Node),
