@@ -34,6 +34,13 @@ suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
 all() ->
     [{group, all_tests}].
 
+%% We have three nodes - defined in rabbit.resources by the two main
+%% test groups for all_tests and the sub-group management_plugins.
+%% Note that we run some groups (and sub-groups) in parallel, which is
+%% fine so long as no sharing (e.g., of the enabled-plugins file) occurs
+%% between them. To ensure we've not overlooked any such inter-dependencies
+%% between test cases, they're run in a random order (i.e., with 'shuffle').
+
 groups() ->
     [{all_tests, [parallel],
       [{group, with_running_nodes},
