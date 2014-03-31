@@ -39,7 +39,7 @@ all() ->
     [{group, all_tests}].
 
 %% We have three nodes - defined in rabbit.resources by the two main
-%% test groups for all_tests and the sub-group management_plugins.
+%% test sub-groups for all_tests and the sub-group management_plugins.
 %% Note that we run some groups (and sub-groups) in parallel, which is
 %% fine so long as no sharing (e.g., of the enabled-plugins file) occurs
 %% between them. To ensure we've not overlooked any such inter-dependencies
@@ -100,11 +100,9 @@ end_per_testcase(_, Config) ->
     %% and left stuff active on a potentially running node.
     Node = ?config(node, Config),
     case net_adm:ping(Node) of
-        pong ->  %% using ping saves a few seconds on each test run
-            plugin_action(disable, Node,
-                          [atom_to_list(P) || P <- list_plugins()], Config);
-        pang ->
-            ok
+        pong -> plugin_action(disable, Node,
+                              [atom_to_list(P) || P <- list_plugins()], Config);
+        pang -> ok
     end,
     Config.
 
@@ -194,7 +192,7 @@ offline_changes_reflected_after_restart(Config) ->
     verify_app_running(rabbitmq_mqtt, Node),
     rabbit_ha_test_utils:stop_app(Node).
 
-%% Special case (management extensions) - these run in their own node
+%% Special case (management extensions)
 
 management_extension_handling(Config) ->
     Node = ?config(node, Config),
