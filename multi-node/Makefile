@@ -4,7 +4,7 @@ VERSION ?= 0.0.0
 UMBRELLA_DIR=$(abspath ../../)
 BROKER_DIR=$(abspath ../../rabbitmq-server)
 CLIENT_DIR=$(abspath ../../rabbitmq-erlang-client)
-TEMP_DIRS=lib test-lib bin ebin test-ebin
+TEMP_DIRS=lib test-lib bin ebin test-ebin test/data
 RABBIT_SERVER=$(abspath lib/rabbit)
 RABBIT_PLUGINS=$(RABBIT_SERVER)/plugins
 PLUGINS_SRC=$(abspath ../../rabbitmq-server/plugins-src)
@@ -74,6 +74,7 @@ all: test-all
 
 .PHONY: clean
 clean:
+	rm -f $(PLUGINS_SRC)
 	rm -rf $(TEMP_DIRS)
 
 $(TEMP_DIRS):
@@ -115,6 +116,7 @@ test-compile: $(REBAR) $(RABBIT_SERVER) $(RABBIT_PLUGINS) test-ebin
 	ERL_LIBS="$(CLIENT_DIR)/dist:lib:${ERL_LIBS}" \
 		$(REBAR) -C systest.config skip_deps=true compile -v $(REBAR_LOG)
 	cp -R ebin test-ebin
+	rm $(PLUGINS_SRC)
 
 $(RABBIT_SERVER): $(CLIENT_DIR)/dist lib
 	ln -fs $(BROKER_DIR) $@
