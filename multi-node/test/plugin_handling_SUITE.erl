@@ -18,6 +18,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("systest/include/systest.hrl").
+-include_lib("rabbit/include/rabbit.hrl").
 
 -export([suite/0, all/0, groups/0]).
 -export([init_per_suite/1, end_per_suite/1,
@@ -100,11 +101,8 @@ end_per_testcase(_, Config) ->
     Node = ?config(node, Config),
     case net_adm:ping(Node) of
         pong ->  %% using ping saves a few seconds on each test run
-            case rpc:call(Node, rabbit_plugins, active, [], 3000) of
-                {badrpc, _}   -> ok;
-                ActivePlugins -> [disable(P, Node, Config) ||
-                                     P <- ActivePlugins]
-            end;
+            plugin_action(disable, Node,
+                          [atom_to_list(P) || P <- list_plugins()], Config);
         pang ->
             ok
     end,
@@ -184,7 +182,7 @@ manual_changes_then_enable(Config) ->
 offline_must_be_explicit(Config) ->
     try
         enable(rabbitmq_shovel, rabbit_nodes:make(nonode), Config),
-        exit({node_offline, "without --offline, rabbitmq-plugins should crash"})
+        exit({node_offline, "without --offline, rabbitmq-plugins should abort"})
     catch throw:{error_string, _} -> ok
     end.
 
@@ -220,6 +218,11 @@ management_extension_handling(Config) ->
     ok.
 
 %% Utilities
+
+list_plugins() ->
+    {_, Dir} = systest:env("RABBITMQ_BROKER_DIR"),
+    PluginsDir = filename:join(Dir, "plugins"),
+    [Plugin#plugin.name || Plugin <- rabbit_plugins:list(PluginsDir)].
 
 verify_app_running(App, Node) ->
     Running = get_running_apps(Node),

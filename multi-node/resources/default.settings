@@ -9,7 +9,7 @@
     {kill_multi, {minutes, 12}},
     {restarted_master, {minutes, 4}},
     {ha_cluster_SUITE, {seconds, 100}},
-    {plugin_handling_SUITE, {seconds, 60}},
+    {plugin_handling_SUITE, {seconds, 90}},
     {cluster_management, {minutes, 2}},
     {eager_sync, {minutes, 3}}
 ]}.
