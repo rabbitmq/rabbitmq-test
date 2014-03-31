@@ -27,11 +27,12 @@
          transitive_dependency_handling/1, manual_changes_then_disable/1,
          manual_changes_then_enable/1, offline_must_be_explicit/1,
          management_extension_handling/1,
-         offline_changes_ignore_running_broker/1]).
+         offline_changes_reflected_after_restart/1,
+         running_broker_offline_changes/1]).
 
 %% Configuration
 
-suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
+suite() -> [{timetrap, systest:settings("time_traps.plugin_handling_SUITE")}].
 
 all() ->
     [{group, all_tests}].
@@ -49,7 +50,7 @@ groups() ->
        {group, with_offline_nodes}]},
      {with_running_nodes, [shuffle],
       [basic_enable,
-       offline_changes_ignore_running_broker,
+       running_broker_offline_changes,
        runtime_boot_step_handling,
        transitive_dependency_handling,
        manual_changes_then_disable,
@@ -58,7 +59,8 @@ groups() ->
       [{group, offline_changes},
        {group, management_plugins}]},
      {offline_changes, [shuffle],
-      [offline_must_be_explicit]},
+      [offline_must_be_explicit,
+       offline_changes_reflected_after_restart]},
      {management_plugins, [sequence],
       [management_extension_handling]}].
 
@@ -75,7 +77,10 @@ end_per_suite(Config) ->
     Config.
 
 init_per_group(Group, Config) ->
-    [{current_scope, Group}|Config].
+    case ?config(Group, Config) of
+        Pid when is_pid(Pid) -> [{current_scope, Group}|Config];
+        _                    -> Config
+    end.
 
 end_per_group(_, Config) ->
     Config.
@@ -90,6 +95,8 @@ init_per_testcase(_TC, Config) ->
     Config2.
 
 end_per_testcase(_, Config) ->
+    %% ensure that we cleanup after any tests that failed
+    %% and left stuff active on a potentially running node.
     Node = ?config(node, Config),
     case net_adm:ping(Node) of
         pong ->  %% using ping saves a few seconds on each test run
@@ -103,7 +110,7 @@ end_per_testcase(_, Config) ->
     end,
     Config.
 
-%% Test Cases
+%% Online Test Cases
 
 basic_enable(Config) ->
     Node = ?config(node, Config),
@@ -114,16 +121,20 @@ basic_enable(Config) ->
     verify_app_running(rabbitmq_shovel, Node),
     ok.
 
-offline_changes_ignore_running_broker(Config) ->
+running_broker_offline_changes(Config) ->
     Node = ?config(node, Config),
     enable(rabbitmq_federation, Node, Config),
     verify_app_running(rabbitmq_federation, Node),
+
     disable_offline(rabbitmq_federation, Node, Config),
     verify_app_running(rabbitmq_federation, Node),
+
     disable(rabbitmq_federation, Node, Config),
     verify_app_not_running(rabbitmq_federation, Node),
+
     enable_offline(rabbitmq_federation, Node, Config),
     verify_app_not_running(rabbitmq_federation, Node),
+
     enable(rabbitmq_federation, Node, Config),
     verify_app_running(rabbitmq_federation, Node),
     ok.
@@ -168,12 +179,24 @@ manual_changes_then_enable(Config) ->
     verify_app_running(rabbitmq_federation, Node),
     ok.
 
+%% Offline Test Cases
+
 offline_must_be_explicit(Config) ->
     try
         enable(rabbitmq_shovel, rabbit_nodes:make(nonode), Config),
         exit({node_offline, "without --offline, rabbitmq-plugins should crash"})
     catch throw:{error_string, _} -> ok
     end.
+
+offline_changes_reflected_after_restart(Config) ->
+    Node = ?config(node, Config),
+    Ref  = ?config(node_ref, Config),
+    enable_offline(rabbitmq_mqtt, Node, Config),
+    systest:activate_process(Ref),
+    verify_app_running(rabbitmq_mqtt, Node),
+    rabbit_ha_test_utils:stop_app(Node).
+
+%% Special case (management extensions) - these run in their own node
 
 management_extension_handling(Config) ->
     Node = ?config(node, Config),

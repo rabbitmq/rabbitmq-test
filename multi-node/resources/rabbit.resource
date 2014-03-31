@@ -16,7 +16,7 @@
                 {"RABBITMQ_CONFIG_FILE",
                  "%{PACKAGE_DIR}/resources/${proc.name}"},
                 {"RABBITMQ_PLUGINS_EXPAND_DIR",
-                 "%{PACKAGE_DIR}/test/data/plugins"},
+                 "%{PACKAGE_DIR}/test/data/${ct.scope}/plugins"},
                 {"RABBITMQ_ENABLED_PLUGINS_FILE",
                  "%{PACKAGE_DIR}/test/data/${ct.scope}/enabled-plugins"},
                 {"RABBITMQ_ALLOW_INPUT", "1"},
