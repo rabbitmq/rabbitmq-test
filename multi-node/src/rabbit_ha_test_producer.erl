@@ -111,7 +111,7 @@ drain_confirms(ConfirmState) ->
                         end,
                     drain_confirms(ConfirmState1)
             after
-                15000 ->
+                60000 ->
                     ConfirmState
             end
     end.
