@@ -11,7 +11,7 @@
 %% The Original Code is RabbitMQ.
 %%
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
-%% Copyright (c) 2007-2013 GoPivotal, Inc.  All rights reserved.
+%% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
 -module(clustering_management_SUITE).
 
@@ -399,9 +399,10 @@ assert_not_clustered(Node) ->
 
 assert_failure(Fun) ->
     case catch Fun() of
-        {error, Reason}            -> Reason;
-        {badrpc, {'EXIT', Reason}} -> Reason;
-        Other                      -> exit({expected_failure, Other})
+        {error, Reason}                -> Reason;
+        {badrpc, {'EXIT', Reason}}     -> Reason;
+        {badrpc_multi, Reason, _Nodes} -> Reason;
+        Other                          -> exit({expected_failure, Other})
     end.
 
 stop_app(Node) ->

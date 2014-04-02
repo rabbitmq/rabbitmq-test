@@ -1,12 +1,12 @@
 
 {message_volumes, [
     {kill_multi, 2000},
-    {send_consume, 200},
+    {send_consume, 2000},
     {producer_confirms, 2000}
 ]}.
 
 {time_traps, [
-    {kill_multi, {minutes, 6}},
+    {kill_multi, {minutes, 12}},
     {restarted_master, {minutes, 4}},
     {ha_cluster_SUITE, {seconds, 100}},
     {cluster_management, {minutes, 2}},

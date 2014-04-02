@@ -11,7 +11,7 @@
 %% The Original Code is RabbitMQ.
 %%
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
-%% Copyright (c) 2007-2013 GoPivotal, Inc.  All rights reserved.
+%% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
 -module(rabbit_ha_test_producer).
 
@@ -26,13 +26,14 @@ await_response(ProducerPid, Timeout) ->
     systest:log("waiting for producer pid ~p (timeout = ~p)~n",
                 [ProducerPid, Timeout]),
     case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
-        {error, timeout} -> throw(lost_contact_with_producer);
-        ok               -> ok
+        ok                -> ok;
+        {error, _} = Else -> ct:fail(Else);
+        Else              -> ct:fail({weird_response, Else})
     end.
 
 create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
-    ProducerPid = spawn(?MODULE, start, [Channel, Queue, TestPid,
-                                         Confirm, MsgsToSend]),
+    ProducerPid = spawn_link(?MODULE, start, [Channel, Queue, TestPid,
+                                              Confirm, MsgsToSend]),
     StartTimeout = 10000,
     case rabbit_ha_test_utils:await_response(ProducerPid, StartTimeout) of
         started -> ProducerPid;
@@ -110,7 +111,7 @@ drain_confirms(ConfirmState) ->
                         end,
                     drain_confirms(ConfirmState1)
             after
-                15000 ->
+                60000 ->
                     ConfirmState
             end
     end.

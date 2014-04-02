@@ -11,7 +11,7 @@
 %% The Original Code is RabbitMQ.
 %%
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
-%% Copyright (c) 2007-2013 GoPivotal, Inc.  All rights reserved.
+%% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
 -module(partition_SUITE).
 
@@ -92,7 +92,7 @@ autoheal(Config) ->
     [set_mode(N, autoheal) || N <- [A, B, C]],
     Test = fun (Pairs) ->
                    disconnect_reconnect(Pairs),
-                   timer:sleep(10000), %% TODO can't we wait for startup here?
+                   await_startup([A, B, C]),
                    [] = partitions(A),
                    [] = partitions(B),
                    [] = partitions(C)
@@ -130,3 +130,13 @@ dist_auto_connect(Pairs, Val) ->
 
 partitions(Node) ->
     rpc:call(Node, rabbit_node_monitor, partitions, []).
+
+await_startup([]) ->
+    ok;
+await_startup([Node | Rest]) ->
+    case rpc:call(Node, rabbit, is_running, []) of
+        true -> await_startup(Rest);
+        _    -> timer:sleep(100),
+                await_startup([Node | Rest])
+    end.
+
