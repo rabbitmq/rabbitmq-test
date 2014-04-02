@@ -27,7 +27,7 @@
          confirms_survive_policy/1,
          rapid_redeclare/1]).
 
--import(rabbit_ha_test_utils, [set_policy/4, a2b/1]).
+-import(rabbit_ha_test_utils, [set_policy/4, a2b/1, kill_after/4]).
 
 %% NB: it can take almost a minute to start and cluster 3 nodes,
 %% and then we need time left over to run the actual tests...
@@ -53,21 +53,21 @@ rapid_redeclare(Config) ->
      end || _I <- lists:seq(1, 20)],
     ok.
 
-consume_survives_stop(Config)    -> consume_survives(Config, fun stop/2).
-consume_survives_sigkill(Config) -> consume_survives(Config, fun sigkill/2).
-consume_survives_policy(Config)  -> consume_survives(Config, fun policy/2).
+consume_survives_stop(Config)    -> consume_survives(Config, fun stop/3).
+consume_survives_sigkill(Config) -> consume_survives(Config, fun sigkill/3).
+consume_survives_policy(Config)  -> consume_survives(Config, fun policy/3).
 
-confirms_survive_stop(Config)    -> confirms_survive(Config, fun stop/2).
-confirms_survive_sigkill(Config) -> confirms_survive(Config, fun sigkill/2).
-confirms_survive_policy(Config)  -> confirms_survive(Config, fun policy/2).
+confirms_survive_stop(Config)    -> confirms_survive(Config, fun stop/3).
+confirms_survive_sigkill(Config) -> confirms_survive(Config, fun sigkill/3).
+confirms_survive_policy(Config)  -> confirms_survive(Config, fun policy/3).
 
 %%----------------------------------------------------------------------------
 
 consume_survives(Config, DeathFun) ->
     {_Cluster,
-      [{{Node1,_}, {_Conn1, Channel1}},
-       {{Node2,_}, {_Conn2, Channel2}},
-       {{Node3,_}, {_Conn3, Channel3}}
+      [{{Node1, Node1Pid}, {_Conn1, Channel1}},
+       {{Node2, _Node2Pid}, {_Conn2, Channel2}},
+       {{Node3, _Node3Pid}, {_Conn3, Channel3}}
             ]} = rabbit_ha_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
@@ -84,7 +84,7 @@ consume_survives(Config, DeathFun) ->
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
                                                  self(), false, Msgs),
-    DeathFun(Node1, [Node2, Node3]),
+    DeathFun(Node1, Node1Pid, [Node2, Node3]),
     %% verify that the consumer got all msgs, or die - the await_response
     %% calls throw an exception if anything goes wrong....
     rabbit_ha_test_consumer:await_response(ConsumerPid),
@@ -93,27 +93,28 @@ consume_survives(Config, DeathFun) ->
 
 confirms_survive(Config, DeathFun) ->
     {_Cluster,
-        [{{Master, _}, {_MasterConnection, MasterChannel}},
-         {{Producer,_},{_ProducerConnection, ProducerChannel}}|_]
+        [{{Node1, Node1Pid}, {_Node1Connection, Node1Channel}},
+         {{Node2, _Node2Pid},{_Node2Connection, Node2Channel}}|_]
             } = rabbit_ha_test_utils:cluster_members(Config),
 
     %% declare the queue on the master, mirrored to the two slaves
     Queue = <<"ha.all.test">>,
-    amqp_channel:call(MasterChannel,#'queue.declare'{queue       = Queue,
+    amqp_channel:call(Node1Channel,#'queue.declare'{queue       = Queue,
                                                      auto_delete = false,
                                                      durable     = true}),
 
     Msgs = systest:settings("message_volumes.producer_confirms"),
 
     %% send a bunch of messages from the producer
-    ProducerPid = rabbit_ha_test_producer:create(ProducerChannel, Queue,
+    ProducerPid = rabbit_ha_test_producer:create(Node2Channel, Queue,
                                                  self(), true, Msgs),
-    DeathFun(Master, [Producer]),
+    DeathFun(Node1, Node1Pid, [Node2]),
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
 
-stop(Node, _Rest)    -> systest:kill_after(50, Node, stop).
-sigkill(Node, _Rest) -> systest:kill_after(50, Node, sigkill).
-policy(Node, Rest)   -> Nodes = [a2b(N) || N <- Rest],
-                        set_policy(Node, <<"^ha.all.">>, <<"nodes">>, Nodes).
+stop(Node, NodePid, _Rest)    -> kill_after(50, Node, NodePid, stop).
+sigkill(Node, NodePid, _Rest) -> kill_after(50, Node, NodePid, sigkill).
+policy(Node, _NodePid, Rest)  -> Nodes = [a2b(N) || N <- Rest],
+                                 set_policy(
+                                   Node, <<"^ha.all.">>, <<"nodes">>, Nodes).

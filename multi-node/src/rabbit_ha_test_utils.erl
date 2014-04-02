@@ -224,6 +224,17 @@ stop_app(Node) -> control_action(stop_app, Node).
 
 start_app(Node) -> control_action(start_app, Node).
 
+kill_after(Time, Node, NodePid, Method) when is_atom(Node), is_pid(NodePid) ->
+    systest:kill_after(Time, NodePid, Method),
+    wait_down(Node).
+
+wait_down(Node) ->
+    case net_adm:ping(Node) of
+        pong -> timer:sleep(25),
+                wait_down(Node);
+        pang -> ok
+    end.
+
 %%
 %% Private API
 %%

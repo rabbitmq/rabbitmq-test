@@ -40,10 +40,10 @@ killing_multiple_intermediate_nodes() ->
 
 killing_multiple_intermediate_nodes(Config) ->
     {_Cluster,
-         [{{_, Master}, {_MasterConnection, MasterChannel}},
-          {{_, Slave1}, {_Slave1Connection, _Slave1Channel}},
-          {{_, Slave2}, {_Slave2Connection, _Slave2Channel}},
-          {{_, Slave3}, {_Slave3Connection, _Slave3Channel}},
+         [{{Master, MasterPid}, {_MasterConnection, MasterChannel}},
+          {{Slave1, Slave1Pid}, {_Slave1Connection, _Slave1Channel}},
+          {{Slave2, Slave2Pid}, {_Slave2Connection, _Slave2Channel}},
+          {{Slave3, Slave3Pid}, {_Slave3Connection, _Slave3Channel}},
           {_Slave4, {_Slave4Connection, Slave4Channel}},
           {_Producer, {_ProducerConnection, ProducerChannel}}]} =
                     rabbit_ha_test_utils:cluster_members(Config),
@@ -70,11 +70,12 @@ killing_multiple_intermediate_nodes(Config) ->
                                                  Queue, self(), false, Msgs),
 
     %% create a killer for the master and the first 3 slaves
-    [systest:kill_after(Time, Node) || {Node, Time} <-
-                                        [{Master, 50},
-                                         {Slave1, 100},
-                                         {Slave2, 200},
-                                         {Slave3, 300}]],
+    [rabbit_ha_test_utils:kill_after(Time, Node, NodePid, kill) ||
+        {Node, NodePid, Time} <-
+            [{Master, MasterPid, 50},
+             {Slave1, Slave1Pid, 50},
+             {Slave2, Slave2Pid, 100},
+             {Slave3, Slave3Pid, 100}]],
 
     %% verify that the consumer got all msgs, or die, or time out
     rabbit_ha_test_producer:await_response(ProducerPid),
