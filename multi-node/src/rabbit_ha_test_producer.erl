@@ -43,13 +43,11 @@ create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
 start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
     ConfirmState =
         case Confirm of
-            true ->
-                amqp_channel:register_confirm_handler(Channel, self()),
-                #'confirm.select_ok'{} =
-                    amqp_channel:call(Channel, #'confirm.select'{}),
-                gb_trees:empty();
-            false ->
-                none
+            true  -> amqp_channel:register_confirm_handler(Channel, self()),
+                     #'confirm.select_ok'{} =
+                         amqp_channel:call(Channel, #'confirm.select'{}),
+                     gb_trees:empty();
+            false -> none
         end,
     TestPid ! {self(), started},
     producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend).
@@ -59,14 +57,14 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
 %%
 
 producer(_Channel, _Queue, TestPid, ConfirmState, 0) ->
-    ConfirmState1 = drain_confirms(ConfirmState),
-    case ConfirmState1 of
-        none -> TestPid ! {self(), ok};
-        ok   -> TestPid ! {self(), ok};
-        _    -> TestPid ! {self(), {error, {missing_confirms,
-                                            lists:sort(
-                                              gb_trees:keys(ConfirmState1))}}}
-    end;
+    Msg = case drain_confirms(ConfirmState) of
+              none -> ok;
+              ok   -> ok;
+              CS   -> {error, {missing_confirms,
+                               lists:sort(gb_trees:keys(CS))}}
+          end,
+    TestPid ! {self(), Msg};
+
 producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend) ->
     Method = #'basic.publish'{exchange    = <<"">>,
                               routing_key = Queue,
@@ -87,45 +85,36 @@ maybe_record_confirm(none, _, _) ->
     none;
 maybe_record_confirm(ConfirmState, Channel, MsgsToSend) ->
     SeqNo = amqp_channel:next_publish_seqno(Channel),
-    systest:log("acquired next seqno ~p from channel ~p~n",
-                [SeqNo, Channel]),
+    systest:log("acquired next seqno ~p from channel ~p~n", [SeqNo, Channel]),
     gb_trees:insert(SeqNo, MsgsToSend, ConfirmState).
 
 drain_confirms(none) ->
     none;
 drain_confirms(ConfirmState) ->
     case gb_trees:is_empty(ConfirmState) of
-        true ->
-            ok;
-        false ->
-            systest:log("awaiting basic.ack~n", []),
-            receive
-                #'basic.ack'{delivery_tag = DeliveryTag,
-                             multiple     = IsMulti} ->
-                    ConfirmState1 =
-                        case IsMulti of
-                            false ->
-                                gb_trees:delete(DeliveryTag, ConfirmState);
-                            true ->
-                                multi_confirm(DeliveryTag, ConfirmState)
-                        end,
-                    drain_confirms(ConfirmState1)
-            after
-                60000 ->
-                    ConfirmState
-            end
+        true  -> ok;
+        false -> systest:log("awaiting basic.ack~n", []),
+                 receive
+                     #'basic.ack'{delivery_tag = DeliveryTag,
+                                  multiple     = IsMulti} ->
+                         drain_confirms(delete_confirms(DeliveryTag, IsMulti,
+                                                        ConfirmState))
+                 after
+                     60000 -> ConfirmState
+                 end
     end.
+
+delete_confirms(DeliveryTag, false, ConfirmState) ->
+    gb_trees:delete(DeliveryTag, ConfirmState);
+delete_confirms(DeliveryTag, true, ConfirmState) ->
+    multi_confirm(DeliveryTag, ConfirmState).
 
 multi_confirm(DeliveryTag, ConfirmState) ->
     case gb_trees:is_empty(ConfirmState) of
-        true ->
-            ConfirmState;
-        false ->
-            {Key, _, ConfirmState1} = gb_trees:take_smallest(ConfirmState),
-            case Key =< DeliveryTag of
-                true ->
-                    multi_confirm(DeliveryTag, ConfirmState1);
-                false ->
-                    ConfirmState
-            end
+        true  -> ConfirmState;
+        false -> {Key, _, ConfirmState1} = gb_trees:take_smallest(ConfirmState),
+                 case Key =< DeliveryTag of
+                     true  -> multi_confirm(DeliveryTag, ConfirmState1);
+                     false -> ConfirmState
+                 end
     end.
