@@ -56,12 +56,14 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
 %% Private API
 %%
 
+producer(_Channel, _Queue, TestPid, none, 0) ->
+    TestPid ! {self(), ok};
 producer(_Channel, _Queue, TestPid, ConfirmState, 0) ->
-    Msg = case drain_confirms(ConfirmState) of
-              none -> ok;
-              ok   -> ok;
-              CS   -> {error, {missing_confirms,
-                               lists:sort(gb_trees:keys(CS))}}
+    Msg = case drain_confirms(no_nacks, ConfirmState) of
+              no_nacks    -> ok;
+              nacks       -> {error, received_nacks};
+              {Nacks, CS} -> {error, {missing_confirms, Nacks,
+                                      lists:sort(gb_trees:keys(CS))}}
           end,
     TestPid ! {self(), Msg};
 
@@ -88,19 +90,23 @@ maybe_record_confirm(ConfirmState, Channel, MsgsToSend) ->
     systest:log("acquired next seqno ~p from channel ~p~n", [SeqNo, Channel]),
     gb_trees:insert(SeqNo, MsgsToSend, ConfirmState).
 
-drain_confirms(none) ->
-    none;
-drain_confirms(ConfirmState) ->
+drain_confirms(Nacks, ConfirmState) ->
     case gb_trees:is_empty(ConfirmState) of
-        true  -> ok;
-        false -> systest:log("awaiting basic.ack~n", []),
+        true  -> Nacks;
+        false -> systest:log("awaiting basic.ack/nack~n", []),
                  receive
                      #'basic.ack'{delivery_tag = DeliveryTag,
                                   multiple     = IsMulti} ->
-                         drain_confirms(delete_confirms(DeliveryTag, IsMulti,
+                         drain_confirms(Nacks,
+                                        delete_confirms(DeliveryTag, IsMulti,
+                                                        ConfirmState));
+                     #'basic.nack'{delivery_tag = DeliveryTag,
+                                   multiple     = IsMulti} ->
+                         drain_confirms(nacks,
+                                        delete_confirms(DeliveryTag, IsMulti,
                                                         ConfirmState))
                  after
-                     60000 -> ConfirmState
+                     60000 -> {Nacks, ConfirmState}
                  end
     end.
 
