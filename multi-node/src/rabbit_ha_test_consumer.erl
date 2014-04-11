@@ -37,16 +37,19 @@ create(Channel, Queue, TestPid, CancelOnFailover, ExpectingMsgs) ->
       Channel, consume_method(Queue, CancelOnFailover), ConsumerPid),
     ConsumerPid.
 
-start(TestPid, _Channel, _Queue, _CancelOnFailover, _LowestSeen, 0) ->
-    consumer_reply(TestPid, ok);
 start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
-    systest:log("consumer awaiting ~p messages "
-                "(lowest seen = ~p, cancel-on-failover = ~p)~n",
-                [MsgsToConsume, LowestSeen, CancelOnFailover]),
+    systest:log("consumer ~p on ~p awaiting ~w messages "
+                "(lowest seen = ~w, cancel-on-failover = ~w)~n",
+                [self(), Channel, MsgsToConsume, LowestSeen, CancelOnFailover]),
+    run(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
+
+run(TestPid, _Channel, _Queue, _CancelOnFailover, _LowestSeen, 0) ->
+    consumer_reply(TestPid, ok);
+run(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
     receive
         #'basic.consume_ok'{} ->
-            start(TestPid, Channel, Queue, CancelOnFailover,
-                  LowestSeen, MsgsToConsume);
+            run(TestPid, Channel, Queue,
+                CancelOnFailover, LowestSeen, MsgsToConsume);
         {Delivery = #'basic.deliver'{ redelivered = Redelivered },
          #amqp_msg{payload = Payload}} ->
             MsgNum = list_to_integer(binary_to_list(Payload)),
@@ -60,14 +63,15 @@ start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
             %% counter.
             if
                 MsgNum + 1 == LowestSeen ->
-                    start(TestPid, Channel, Queue,
-                             CancelOnFailover, MsgNum, MsgsToConsume - 1);
+                    run(TestPid, Channel, Queue,
+                        CancelOnFailover, MsgNum, MsgsToConsume - 1);
                 MsgNum >= LowestSeen ->
-                    systest:log("consumer ~p ignoring redelivery of msg ~p~n",
-                                [self(), MsgNum]),
+                    systest:log("consumer ~p on ~p ignoring redeliverd msg "
+                                "~p~n",
+                                [self(), Channel, MsgNum]),
                     true = Redelivered, %% ASSERTION
-                    start(TestPid, Channel, Queue,
-                             CancelOnFailover, LowestSeen, MsgsToConsume);
+                    run(TestPid, Channel, Queue,
+                        CancelOnFailover, LowestSeen, MsgsToConsume);
                 true ->
                     %% We received a message we haven't seen before,
                     %% but it is not the next message in the expected
@@ -76,9 +80,9 @@ start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
                                    {error, {unexpected_message, MsgNum}})
             end;
         #'basic.cancel'{} when CancelOnFailover ->
-            systest:log("consumer ~p received basic.cancel: "
+            systest:log("consumer ~p on ~p received basic.cancel: "
                         "resubscribing to ~p on ~p~n",
-                        [self(), Queue, Channel]),
+                        [self(), Channel, Queue, Channel]),
             resubscribe(TestPid, Channel, Queue, CancelOnFailover,
                         LowestSeen, MsgsToConsume);
         #'basic.cancel'{} ->
@@ -95,8 +99,9 @@ resubscribe(TestPid, Channel, Queue, CancelOnFailover, LowestSeen,
       Channel, consume_method(Queue, CancelOnFailover), self()),
     ok = receive #'basic.consume_ok'{} -> ok
          end,
-    systest:log("re-subscripting complete (~p received basic.consume_ok)",
-                [self()]),
+    systest:log("re-subscripting consumer ~p on ~p complete "
+                "(received basic.consume_ok)",
+                [self(), Channel]),
     start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
 
 consume_method(Queue, CancelOnFailover) ->
@@ -105,8 +110,6 @@ consume_method(Queue, CancelOnFailover) ->
                      arguments = Args}.
 
 ack(#'basic.deliver'{delivery_tag = DeliveryTag}, Channel) ->
-    systest:log("consumer ~p sending basic.ack for ~p on ~p~n",
-                [self(), DeliveryTag, Channel]),
     amqp_channel:call(Channel, #'basic.ack'{delivery_tag = DeliveryTag}),
     ok.
 
