@@ -50,6 +50,7 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
             false -> none
         end,
     TestPid ! {self(), started},
+    systest:log("publishing ~w msgs on ~p~n", [MsgsToSend, Channel]),
     producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend).
 
 %%
@@ -58,7 +59,8 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
 
 producer(_Channel, _Queue, TestPid, none, 0) ->
     TestPid ! {self(), ok};
-producer(_Channel, _Queue, TestPid, ConfirmState, 0) ->
+producer(Channel, _Queue, TestPid, ConfirmState, 0) ->
+    systest:log("awaiting confirms on channel ~p~n", [Channel]),
     Msg = case drain_confirms(no_nacks, ConfirmState) of
               no_nacks    -> ok;
               nacks       -> {error, received_nacks};
@@ -75,7 +77,6 @@ producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend) ->
 
     ConfirmState1 = maybe_record_confirm(ConfirmState, Channel, MsgsToSend),
 
-    systest:log("publishing msg ~p on ~p~n", [MsgsToSend, Channel]),
     amqp_channel:call(Channel, Method,
                       #amqp_msg{props = #'P_basic'{delivery_mode = 2},
                                 payload = list_to_binary(
@@ -87,14 +88,12 @@ maybe_record_confirm(none, _, _) ->
     none;
 maybe_record_confirm(ConfirmState, Channel, MsgsToSend) ->
     SeqNo = amqp_channel:next_publish_seqno(Channel),
-    systest:log("acquired next seqno ~p from channel ~p~n", [SeqNo, Channel]),
     gb_trees:insert(SeqNo, MsgsToSend, ConfirmState).
 
 drain_confirms(Nacks, ConfirmState) ->
     case gb_trees:is_empty(ConfirmState) of
         true  -> Nacks;
-        false -> systest:log("awaiting basic.ack/nack~n", []),
-                 receive
+        false -> receive
                      #'basic.ack'{delivery_tag = DeliveryTag,
                                   multiple     = IsMulti} ->
                          drain_confirms(Nacks,
