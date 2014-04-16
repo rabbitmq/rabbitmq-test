@@ -169,14 +169,6 @@ federation_link_handling(Config) ->
     true = length(LinkStats1) == length(LinkStats2),
     ok.
 
-set_param(Node, Component, Name, Term) ->
-    rpc:call(Node, rabbit_runtime_parameters, set,
-             [<<"/">>, Component, Name, Term, none]).
-
-set_policy(Node, Name, Pattern, Term) ->
-    rpc:call(Node, rabbit_policy, set,
-             [<<"/">>, Name, Pattern, Term, 0, <<"exchanges">>]).
-
 runtime_boot_step_handling(Config) ->
     Node = ?config(node, Config),
     ExchangePlugin = rabbitmq_consistent_hash_exchange,
@@ -258,6 +250,14 @@ management_extension_handling(Config) ->
     ok.
 
 %% Utilities
+
+set_param(Node, Component, Name, Term) ->
+    rpc:call(Node, rabbit_runtime_parameters, set,
+             [<<"/">>, Component, Name, Term, none]).
+
+set_policy(Node, Name, Pattern, Term) ->
+    rpc:call(Node, rabbit_policy, set,
+             [<<"/">>, Name, Pattern, Term, 0, <<"exchanges">>]).
 
 list_plugins() ->
     {_, Dir} = systest:env("RABBITMQ_BROKER_DIR"),
