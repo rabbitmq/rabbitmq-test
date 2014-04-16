@@ -27,7 +27,7 @@
 -export([basic_enable/1, runtime_boot_step_handling/1,
          transitive_dependency_handling/1, manual_changes_then_disable/1,
          manual_changes_then_enable/1, offline_must_be_explicit/1,
-         management_extension_handling/1,
+         management_extension_handling/1, federation_link_handling/1,
          offline_changes_reflected_after_restart/1,
          running_broker_offline_changes/1]).
 
@@ -55,6 +55,7 @@ groups() ->
       [basic_enable,
        running_broker_offline_changes,
        runtime_boot_step_handling,
+       federation_link_handling,
        transitive_dependency_handling,
        manual_changes_then_disable,
        manual_changes_then_enable]},
@@ -91,7 +92,10 @@ end_per_group(_, Config) ->
 init_per_testcase(_TC, Config) ->
     SUT = systest:get_system_under_test(Config),
     [{N, Ref}] = systest:list_processes(SUT),
-    Config2 = [{node, N}, {node_ref, Ref}|Config],
+    Port = rabbit_ha_test_utils:amqp_port(Ref),
+    Config2 = [{node, N},
+               {node_ref, Ref},
+               {node_port, Port} | Config],
     File = enabled_plugins_file(Config2),
     file:delete(File),
     filelib:ensure_dir(File),
@@ -136,6 +140,42 @@ running_broker_offline_changes(Config) ->
     enable(rabbitmq_federation, Node, Config),
     verify_app_running(rabbitmq_federation, Node),
     ok.
+
+federation_link_handling(Config) ->
+    Node = ?config(node, Config),
+    Port = ?config(node_port, Config),
+
+    enable(rabbitmq_federation, Node, Config),
+
+    Uri = list_to_binary("amqp://guest:guest@localhost:" ++
+                             integer_to_list(Port) ++ "/%2f"),
+    ok = set_param(Node, <<"federation-upstream">>,
+                   <<"my-upstream">>, [{<<"uri">>, Uri}]),
+
+    ok = set_policy(Node, <<"federate-me">>, <<"^amq.*">>,
+                    [{<<"federation-upstream-set">>, <<"all">>}]),
+
+    timer:sleep(1000),  %% give the links some time to start up
+
+    LinkStats1 = rpc:call(Node, rabbit_federation_status, status, []),
+
+    disable(rabbitmq_federation, Node, Config),
+    verify_app_not_running(rabbitmq_federation, Node),
+
+    enable(rabbitmq_federation, Node, Config),
+    timer:sleep(500),
+
+    LinkStats2 = rpc:call(Node, rabbit_federation_status, status, []),
+    true = length(LinkStats1) == length(LinkStats2),
+    ok.
+
+set_param(Node, Component, Name, Term) ->
+    rpc:call(Node, rabbit_runtime_parameters, set,
+             [<<"/">>, Component, Name, Term, none]).
+
+set_policy(Node, Name, Pattern, Term) ->
+    rpc:call(Node, rabbit_policy, set,
+             [<<"/">>, Name, Pattern, Term, 0, <<"exchanges">>]).
 
 runtime_boot_step_handling(Config) ->
     Node = ?config(node, Config),
