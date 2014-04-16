@@ -35,15 +35,17 @@
 
 suite() -> [{timetrap, systest:settings("time_traps.plugin_handling_SUITE")}].
 
-all() ->
-    [{group, all_tests}].
+all() -> [{group, all_tests}].
 
 %% We have three nodes - defined in rabbit.resources by the two main
 %% test sub-groups for all_tests and the sub-group management_plugins.
 %% Note that we run some groups (and sub-groups) in parallel, which is
 %% fine so long as no sharing (e.g., of the enabled-plugins file) occurs
 %% between them. To ensure we've not overlooked any such inter-dependencies
-%% between test cases, they're run in a random order (i.e., with 'shuffle').
+%% between test cases, those that require isolation are run in a random
+%% order (i.e., with 'shuffle').
+%%
+%% http://www.erlang.org/doc/apps/common_test/write_test_chapter.html#test_case_groups
 
 groups() ->
     [{all_tests, [parallel],
