@@ -16,11 +16,9 @@ COVER=true
 
 ifeq ($(COVER), true)
 COVER_START=start-cover
-COVER_REENABLE_SECONDARY=$(MAKE) -C $(BROKER_DIR) start-secondary-cover
 COVER_STOP=stop-cover
 else
 COVER_START=
-COVER_REENABLE_SECONDARY=true
 COVER_STOP=
 endif
 
@@ -137,7 +135,6 @@ restart-secondary-node:
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
 		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-node start-background-node
-	$(COVER_REENABLE_SECONDARY)
 	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
 force-snapshot:
