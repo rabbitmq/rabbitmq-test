@@ -5,9 +5,3 @@ syntax: regexp
 ^dist/
 ^ebin/
 ^test/ebin/
-^multi-node/lib/
-^multi-node/test-lib/
-^multi-node/bin/
-^multi-node/ebin/
-^multi-node/test-ebin/
-^multi-node/logs/
