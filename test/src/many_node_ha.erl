@@ -13,41 +13,20 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(multi_node_deaths_SUITE).
+-module(many_node_ha).
 
--include_lib("common_test/include/ct.hrl").
+-compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
--include_lib("systest/include/systest.hrl").
-
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([all/0, init_per_suite/1, end_per_suite/1,
-         killing_multiple_intermediate_nodes/0,
-         killing_multiple_intermediate_nodes/1]).
+-import(rabbit_test_utils, [set_policy/4, a2b/1, get_cfg/2]).
 
-all() ->
-    systest_suite:export_all(?MODULE).
-
-init_per_suite(Config) ->
-    timer:start(),
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-killing_multiple_intermediate_nodes() ->
-    [{timetrap, systest:settings("time_traps.kill_multi")}].
-
-killing_multiple_intermediate_nodes(Config) ->
-    {_Cluster,
-         [{{Master, MasterPid}, {_MasterConnection, MasterChannel}},
-          {{Slave1, Slave1Pid}, {_Slave1Connection, _Slave1Channel}},
-          {{Slave2, Slave2Pid}, {_Slave2Connection, _Slave2Channel}},
-          {{Slave3, Slave3Pid}, {_Slave3Connection, _Slave3Channel}},
-          {_Slave4, {_Slave4Connection, Slave4Channel}},
-          {_Producer, {_ProducerConnection, ProducerChannel}}]} =
-                    rabbit_ha_test_utils:cluster_members(Config),
-
+kill_intermediate_with() -> cluster_abcdef.
+kill_intermediate(Nodes) ->
+    Msgs            = 20000,
+    MasterChannel   = get_cfg("a.channel", Nodes),
+    ConsumerChannel = get_cfg("e.channel", Nodes),
+    ProducerChannel = get_cfg("f.channel", Nodes),
     Queue = <<"ha.all.test">>,
     amqp_channel:call(MasterChannel, #'queue.declare'{queue       = Queue,
                                                       auto_delete = false}),
@@ -61,21 +40,18 @@ killing_multiple_intermediate_nodes(Config) ->
     %% Worse still, it assumes that killing the master will cause a
     %% failover to Slave1, and so on. Nope.
 
-    Msgs = systest:settings("message_volumes.kill_multi"),
-
-    ConsumerPid = rabbit_ha_test_consumer:create(Slave4Channel,
+    ConsumerPid = rabbit_ha_test_consumer:create(ConsumerChannel,
                                                  Queue, self(), false, Msgs),
 
     ProducerPid = rabbit_ha_test_producer:create(ProducerChannel,
                                                  Queue, self(), false, Msgs),
 
     %% create a killer for the master and the first 3 slaves
-    [rabbit_ha_test_utils:kill_after(Time, Node, NodePid, kill) ||
-        {Node, NodePid, Time} <-
-            [{Master, MasterPid, 50},
-             {Slave1, Slave1Pid, 50},
-             {Slave2, Slave2Pid, 100},
-             {Slave3, Slave3Pid, 100}]],
+    [rabbit_test_utils:kill_after(Time, Node, Nodes, sigkill) ||
+        {Node, Time} <- [{a, 50},
+                         {b, 50},
+                         {c, 100},
+                         {d, 100}]],
 
     %% verify that the consumer got all msgs, or die, or time out
     rabbit_ha_test_producer:await_response(ProducerPid),

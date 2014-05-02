@@ -13,43 +13,26 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(eager_synchronization_SUITE).
+-module(eager_sync).
 
--include_lib("common_test/include/ct.hrl").
--include_lib("systest/include/systest.hrl").
-
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
 -define(QNAME_AUTO, <<"ha.auto.test">>).
 -define(MESSAGE_COUNT, 2000).
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1,
-         eager_sync_auto_on_policy_change_test/1, eager_sync_requeue_test/1]).
+-import(rabbit_test_utils, [set_policy/5, a2b/1, get_cfg/2]).
 
--import(rabbit_ha_test_utils, [set_policy/5, a2b/1]).
-
-%% NB: it can take almost a minute to start and cluster 3 nodes,
-%% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, systest:settings("time_traps.eager_sync")}].
-
-all() ->
-    systest_suite:export_all(?MODULE).
-
-init_per_suite(Config) ->
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-eager_sync_test(Config) ->
+eager_sync_with() -> cluster_abc.
+eager_sync(Nodes) ->
     %% Queue is on AB but not C.
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
-
+    ACh = get_cfg("a.channel", Nodes),
+    Ch = get_cfg("c.channel", Nodes),
+    A = rabbit_nodes:make(a),
+    B = rabbit_nodes:make(b),
+    C = rabbit_nodes:make(c),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
@@ -83,12 +66,14 @@ eager_sync_test(Config) ->
 
     ok.
 
-eager_sync_cancel_test(Config) ->
+eager_sync_cancel_with() -> cluster_abc.
+eager_sync_cancel(Nodes) ->
     %% Queue is on AB but not C.
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_Conn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+    ACh = get_cfg("a.channel", Nodes),
+    Ch = get_cfg("c.channel", Nodes),
+    A = rabbit_nodes:make(a),
+    B = rabbit_nodes:make(b),
+    C = rabbit_nodes:make(c),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -128,7 +113,7 @@ eager_sync_auto_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
                 {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME_AUTO,
                                             durable = true}),
@@ -149,7 +134,7 @@ eager_sync_auto_on_policy_change_test(Config) ->
     {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
                 {{B, _BRef}, {_BConn, _BCh}},
                 {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -169,7 +154,7 @@ eager_sync_requeue_test(Config) ->
     {_Cluster, [{{_A, _ARef}, {_AConn, ACh}},
                 {{B,  _BRef}, {_BConn, _BCh}},
                 {{C,  _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+        rabbit_test_utils:cluster_members(Config),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),

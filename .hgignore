@@ -1,6 +1,10 @@
 syntax: regexp
 ^qpid_testsuite/
 ^certs/
+^build/
+^dist/
+^ebin/
+^test/ebin/
 ^multi-node/lib/
 ^multi-node/test-lib/
 ^multi-node/bin/
