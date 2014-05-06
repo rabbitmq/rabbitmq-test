@@ -63,6 +63,7 @@ start_node(Cfg, Base) ->
            {"RABBITMQ_NODENAME",    {"~s", [Nodename]}},
            {"RABBITMQ_NODE_PORT",   {"~B", [Port]}},
            {"RABBITMQ_PID_FILE",    PidFile},
+           {"RABBITMQ_ALLOW_INPUT", "1"}, %% Needed to make it close on our exit
            {"RABBITMQ_ENABLED_PLUGINS_FILE", "/does-not-exist"}],
           "../rabbitmq-server/scripts/rabbitmq-server"),
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s wait ~s",
@@ -123,25 +124,28 @@ kill_node(Cfg) ->
 
 execute(Cmd) -> execute([], Cmd).
 
-execute(Env, Cmd0) ->
-    Cmd = env_prefix(Env) ++ fmt(Cmd0) ++ " ; echo $?",
-    Res = os:cmd(Cmd),
-    case lists:reverse(string:tokens(Res, "\n")) of
-        ["0" | _] -> ok;
-        _         -> exit({command_failed, Cmd, Res})
+execute(Env0, Cmd0) ->
+    Env = [{K, fmt(V)} || {K, V} <- Env0],
+    Cmd = fmt(Cmd0),
+    Port = erlang:open_port(
+             {spawn, "/usr/bin/env sh -c \"" ++ Cmd ++ "\""},
+             [{env, Env}, exit_status,
+              stderr_to_stdout, use_stdio]),
+    port_receive_loop(Port, "").
+
+port_receive_loop(Port, Stdout) ->
+    receive
+        {Port, {exit_status, 0}} -> ok;
+        {Port, {exit_status, X}} -> exit({exit_status, X, Stdout});
+        {Port, {data, Out}}      -> port_receive_loop(Port, Stdout ++ Out)
     end.
 
-%%execute_bg(Cmd) -> execute_bg([], Cmd).
-
 execute_bg(Env, Cmd) ->
-    spawn(fun () ->
-                  execute(Env, Cmd),
-                  {links, Links} = process_info(self(), links),
-                  [unlink(L) || L <- Links]
-          end).
-
-env_prefix(Env) ->
-    lists:append([fmt({"export ~s=~s; ", [K, fmt(V)]}) || {K, V} <- Env]).
+    spawn_link(fun () ->
+                       execute(Env, Cmd),
+                       {links, Links} = process_info(self(), links),
+                       [unlink(L) || L <- Links]
+               end).
 
 fmt({Fmt, Args}) -> rabbit_misc:format(Fmt, Args);
 fmt(Str)         -> Str.
