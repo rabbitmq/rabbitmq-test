@@ -31,21 +31,27 @@ run(Filter) ->
     %% Umbrella does not give us -sname
     net_kernel:start([multi_node_test_runner, shortnames]),
     error_logger:tty(false),
-    io:format(user, "~nMulti-node tests~n================~n~n", []),
     ok = eunit:test(make_tests(Filter, ?TIMEOUT), []).
 
 make_tests(Filter, Timeout) ->
-    [make_test(Module, FWith, F, Timeout) ||
-        Module <- ?MODULES,
-        {FWith, _Arity} <- proplists:get_value(exports, Module:module_info()),
-        string:right(atom_to_list(FWith), 5) =:= "_with",
-        F <- [fwith_to_f(FWith)],
-        should_run(Module, F, tokens(Filter))].
+    All = [{M, FWith, F} ||
+              M <- ?MODULES,
+              {FWith, _Arity} <- proplists:get_value(exports, M:module_info()),
+              string:right(atom_to_list(FWith), 5) =:= "_with",
+              F <- [fwith_to_f(FWith)]],
+    Filtered = [Test || {M, _FWith, F} = Test <- All,
+                        should_run(M, F, tokens(Filter))],
+    io:format("~nMulti-node tests~n================~n~n", []),
+    io:format("Running ~B of ~B tests; FILTER=~s~n~n",
+              [length(Filtered), length(All), Filter]),
+    Width = lists:max([length(rabbit_misc:format("~s:~s", [M, F]))
+                       || {M, _, F} <- Filtered]),
+    [make_test(M, FWith, F, Timeout, Width) || {M, FWith, F} <- Filtered].
 
-make_test(M, FWith, F, Timeout) ->
+make_test(M, FWith, F, Timeout, Width) ->
     {setup,
      fun () ->
-             io:format(user, "~s:~s: [setup]", [M, F]),
+             io:format(user, "~s [setup]", [name(M, F, Width)]),
              setup_error_logger(M, F),
              CfgFun = case M:FWith() of
                           CfgName when is_atom(CfgName) ->
@@ -98,3 +104,7 @@ ensure_dir(Path) ->
         {ok, #file_info{type=directory}} -> ok;
         _                                -> file:make_dir(Path)
     end.
+
+name(M, F, Width) ->
+    R = rabbit_misc:format("~s:~s:", [M, F]),
+    R ++ string:chars($ , Width - length(R)).
