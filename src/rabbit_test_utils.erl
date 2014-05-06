@@ -76,12 +76,15 @@ kill_after(Time, Nodename, Cfgs, Method) ->
     kill(Nodename, Cfgs, Method).
 
 kill(Nodename, Cfgs, Method) ->
-    Cfg = find(Nodename, Cfgs),
-    kill(Cfg, Method),
-    wait_down(pget(node, Cfg)).
+    NodeCfg = find(Nodename, Cfgs),
+    kill(NodeCfg, Method).
 
-kill(NodeCfg, stop)    -> rabbit_test_configs:stop_node(NodeCfg);
-kill(NodeCfg, sigkill) -> rabbit_test_configs:kill_node(NodeCfg).
+kill(NodeCfg, Method) ->
+    kill0(NodeCfg, Method),
+    wait_down(pget(node, NodeCfg)).
+
+kill0(NodeCfg, stop)    -> rabbit_test_configs:stop_node(NodeCfg);
+kill0(NodeCfg, sigkill) -> rabbit_test_configs:kill_node(NodeCfg).
 
 wait_down(Node) ->
     case net_adm:ping(Node) of

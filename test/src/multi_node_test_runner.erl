@@ -20,9 +20,8 @@
 
 -define(TIMEOUT, 600).
 %% TODO generate this
--define(MODULES, [clustering_management, simple_ha, many_node_ha, dynamic_ha]).
-%% -define(MODULES, [clustering_management, dynamic_ha, eager_sync,
-%%                   many_node_ha, partitions, simple_ha, sync_detection]).
+-define(MODULES, [clustering_management, dynamic_ha, eager_sync,
+                  many_node_ha, partitions, simple_ha, sync_detection]).
 
 -export([run/1]).
 
