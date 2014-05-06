@@ -17,14 +17,13 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([cluster_abc/0, cluster_abcdef/0]).
+-export([cluster/1, cluster_abc/0]).
 -export([start_nodes/2, add_to_cluster/2]).
 -export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0]).
 
 -import(rabbit_test_utils, [set_policy/3, set_policy/4, set_policy/5, a2b/1]).
 
-cluster_abc()    -> cluster([a, b, c]).
-cluster_abcdef() -> cluster([a, b, c, d, e, f]).
+cluster_abc() -> cluster([a, b, c]).
 
 cluster(NodeNames) ->
     start_connections(

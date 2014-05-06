@@ -16,6 +16,8 @@
 
 -module(multi_node_test_runner).
 
+-include_lib("kernel/include/file.hrl").
+
 -define(TIMEOUT, 600).
 %% TODO generate this
 -define(MODULES, [simple_ha, many_node_ha, dynamic_ha]).
@@ -49,9 +51,15 @@ make_test(Module, FWith, F) ->
             end,
             FN = rabbit_misc:format("~s/~s:~s.log",
                                     [rabbit_test_configs:basedir(), Module, F]),
+            ensure_dir(rabbit_test_configs:basedir()),
             ok = error_logger:logfile({open, FN}),
-            CfgName = Module:FWith(),
-            Nodes = rabbit_test_configs:CfgName(),
+            CfgFun = case Module:FWith() of
+                         CfgName when is_atom(CfgName) ->
+                             fun rabbit_test_configs:CfgName/0;
+                         Else ->
+                             Else
+                     end,
+            Nodes = CfgFun(),
             try
                 Module:F(Nodes)
             after
@@ -71,3 +79,10 @@ should_run(_Module, _F, [all])       -> true;
 should_run( Module, _F, [Module])    -> true;
 should_run( Module,  F, [Module, F]) -> true;
 should_run(_Module, _F, _)           -> false.
+
+ensure_dir(Path) ->
+    case file:read_file_info(Path) of
+        {ok, #file_info{type=regular}}   -> exit({exists_as_file, Path});
+        {ok, #file_info{type=directory}} -> ok;
+        _                                -> file:make_dir(Path)
+    end.

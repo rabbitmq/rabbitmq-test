@@ -21,7 +21,9 @@
 
 -import(rabbit_test_utils, [set_policy/4, a2b/1, get_cfg/2]).
 
-kill_intermediate_with() -> cluster_abcdef.
+kill_intermediate_with() -> fun () ->
+                                    rabbit_test_configs:cluster([a,b,c,d,e,f])
+                            end.
 kill_intermediate(Nodes) ->
     Msgs            = 20000,
     MasterChannel   = get_cfg("a.channel", Nodes),
