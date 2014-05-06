@@ -20,6 +20,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -import(rabbit_test_utils, [start_app/1, stop_app/1]).
+-import(rabbit_misc, [pget/2]).
 
 -define(LOOP_RECURSION_DELAY, 100).
 
@@ -157,11 +158,8 @@ forget_cluster_node(Config) ->
     assert_clustered([Rabbit, Hare]).
 
 forget_cluster_node_removes_things_with() -> start_abc.
-forget_cluster_node_removes_things([{Rabbit0, _} = RabbitCfg,
-                                    {Hare0,   _} = HareCfg,
-                                    {_Bunny,  _}] = Config) ->
-    Rabbit = rabbit_nodes:make(Rabbit0),
-    Hare = rabbit_nodes:make(Hare0),
+forget_cluster_node_removes_things([RabbitCfg, HareCfg, _BunnyCfg] = Config) ->
+    [Rabbit, Hare, _Bunny] = cluster_members(Config),
     stop_join_start(Rabbit, Hare),
     {_RConn, RCh} = rabbit_test_utils:connect(RabbitCfg),
     #'queue.declare_ok'{} =
@@ -343,8 +341,7 @@ force_reset_test(Config) ->
 %% ----------------------------------------------------------------------------
 %% Internal utils
 
-cluster_members(Nodes) ->
-    [rabbit_nodes:make(Node) || {Node, _Cfg} <- Nodes].
+cluster_members(Nodes) -> [pget(node,Cfg) || Cfg <- Nodes].
 
 assert_cluster_status(Status0, Nodes) ->
     Status = {AllNodes, _, _} = sort_cluster_status(Status0),

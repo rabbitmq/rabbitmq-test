@@ -19,16 +19,17 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_utils, [set_policy/4, a2b/1, get_cfg/2]).
+-import(rabbit_test_utils, [set_policy/4, a2b/1]).
+-import(rabbit_misc, [pget/2]).
 
 kill_intermediate_with() -> fun () ->
                                     rabbit_test_configs:cluster([a,b,c,d,e,f])
                             end.
-kill_intermediate(Nodes) ->
+kill_intermediate([CfgA, _CfgB, _CfgC, _CfgD, CfgE, CfgF] = Nodes) ->
     Msgs            = 20000,
-    MasterChannel   = get_cfg("a.channel", Nodes),
-    ConsumerChannel = get_cfg("e.channel", Nodes),
-    ProducerChannel = get_cfg("f.channel", Nodes),
+    MasterChannel   = pget(channel, CfgA),
+    ConsumerChannel = pget(channel, CfgE),
+    ProducerChannel = pget(channel, CfgF),
     Queue = <<"ha.all.test">>,
     amqp_channel:call(MasterChannel, #'queue.declare'{queue       = Queue,
                                                       auto_delete = false}),

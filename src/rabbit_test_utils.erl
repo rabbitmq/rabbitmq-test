@@ -16,6 +16,7 @@
 -module(rabbit_test_utils).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
+-import(rabbit_misc, [pget/2]).
 
 -compile(export_all).
 
@@ -32,11 +33,11 @@ set_policy(Node, Pattern, HAMode, HAParams, HASyncMode) ->
                                 {<<"ha-sync-mode">>, HASyncMode}]).
 
 set_policy0(Node, Pattern, Definition) ->
-    ok = rpc_call(Node, rabbit_policy, set,
+    ok = rpc:call(Node, rabbit_policy, set,
                   [<<"/">>, Pattern, Pattern, Definition, 0, <<"queues">>]).
 
 clear_policy(Node, Pattern) ->
-    ok = rpc_call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
+    ok = rpc:call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
 
 control_action(Command, Node) ->
     control_action(Command, Node, [], []).
@@ -45,16 +46,16 @@ control_action(Command, Node, Args) ->
     control_action(Command, Node, Args, []).
 
 control_action(Command, Node, Args, Opts) ->
-    rpc_call(Node, rabbit_control_main, action,
+    rpc:call(Node, rabbit_control_main, action,
              [Command, Node, Args, Opts,
               fun (F, A) ->
                       error_logger:info_msg(F ++ "~n", A)
               end]).
 
 cluster_status(Node) ->
-    {rpc_call(Node, rabbit_mnesia, cluster_nodes, [all]),
-     rpc_call(Node, rabbit_mnesia, cluster_nodes, [disc]),
-     rpc_call(Node, rabbit_mnesia, cluster_nodes, [running])}.
+    {rpc:call(Node, rabbit_mnesia, cluster_nodes, [all]),
+     rpc:call(Node, rabbit_mnesia, cluster_nodes, [disc]),
+     rpc:call(Node, rabbit_mnesia, cluster_nodes, [running])}.
 
 stop_app(Node) ->
     control_action(stop_app, Node).
@@ -62,21 +63,22 @@ stop_app(Node) ->
 start_app(Node) ->
     control_action(start_app, Node).
 
-connect({_Node, Cfg}) ->
-    Port = proplists:get_value(port, Cfg),
+connect(Cfg) ->
+    Port = pget(port, Cfg),
     {ok, Conn} = amqp_connection:start(#amqp_params_network{port = Port}),
     {ok, Ch} =  amqp_connection:open_channel(Conn),
     {Conn, Ch}.
 
 %%----------------------------------------------------------------------------
 
-kill_after(Time, Node, Nodes, Method) ->
+kill_after(Time, Nodename, Cfgs, Method) ->
     timer:sleep(Time),
-    kill(Node, Nodes, Method).
+    kill(Nodename, Cfgs, Method).
 
-kill(Node, Nodes, Method) ->
-    kill({Node, proplists:get_value(Node, Nodes)}, Method),
-    wait_down(Node).
+kill(Nodename, Cfgs, Method) ->
+    Cfg = find(Nodename, Cfgs),
+    kill(Cfg, Method),
+    wait_down(pget(node, Cfg)).
 
 kill(NodeCfg, stop)    -> rabbit_test_configs:stop_node(NodeCfg);
 kill(NodeCfg, sigkill) -> rabbit_test_configs:kill_node(NodeCfg).
@@ -88,18 +90,12 @@ wait_down(Node) ->
         pang -> ok
     end.
 
-rpc_call(N, M, F, A) -> rpc:call(rabbit_nodes:make(N), M, F, A).
-
 a2b(A) -> list_to_binary(atom_to_list(A)).
 
-%%----------------------------------------------------------------------------
 
-get_cfg(Name, Props) ->
-    get_cfg0(string:tokens(Name, "."), Props).
+find(Name, Cfgs) ->
+    [Cfg] = [Cfg || Cfg <- Cfgs, pget(nodename, Cfg) =:= Name],
+    Cfg.
 
-get_cfg0([],      Thing) -> Thing;
-get_cfg0([H | T], Props) -> K = list_to_atom(H),
-                            case proplists:get_value(K, Props) of
-                                undefined -> exit({cfg_not_found, K, Props});
-                                Thing     -> get_cfg0(T, Thing)
-                            end.
+find(Nodename, Thing, Cfgs) ->
+    pget(Thing, find(Nodename, Cfgs)).

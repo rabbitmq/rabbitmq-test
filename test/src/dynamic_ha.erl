@@ -37,15 +37,15 @@
 -define(POLICY, <<"^ha.test$">>). %% " emacs
 -define(VHOST, <<"/">>).
 
--import(rabbit_test_utils, [set_policy/3, set_policy/4, clear_policy/2,
-                            a2b/1, get_cfg/2]).
+-import(rabbit_test_utils, [set_policy/3, set_policy/4, clear_policy/2, a2b/1]).
+-import(rabbit_misc, [pget/2]).
 
 change_policy_with() -> cluster_abc.
-change_policy(Nodes) ->
-    ACh = get_cfg("a.channel", Nodes),
-    A = rabbit_nodes:make(a),
-    B = rabbit_nodes:make(b),
-    C = rabbit_nodes:make(c),
+change_policy([CfgA, CfgB, CfgC]) ->
+    ACh = pget(channel, CfgA),
+    A = pget(node, CfgA),
+    B = pget(node, CfgB),
+    C = pget(node, CfgC),
 
     %% When we first declare a queue with no policy, it's not HA.
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
@@ -74,12 +74,11 @@ change_policy(Nodes) ->
     ok.
 
 change_cluster_with() -> cluster_abc.
-change_cluster(NodesABC) ->
-    ACh = get_cfg("a.channel", NodesABC),
-    A = rabbit_nodes:make(a),
-    B = rabbit_nodes:make(b),
-    C = rabbit_nodes:make(c),
-    D = rabbit_nodes:make(d),
+change_cluster([CfgA, CfgB, CfgC] = NodesABC) ->
+    ACh = pget(channel, CfgA),
+    A = pget(node, CfgA),
+    B = pget(node, CfgB),
+    C = pget(node, CfgC),
 
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, {A, ''}),
@@ -89,22 +88,23 @@ change_cluster(NodesABC) ->
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
-    NodesDE = rabbit_test_configs:start_nodes([d, e], 5675),
-    Nodes = rabbit_test_configs:add_to_cluster(NodesABC, NodesDE),
+    [CfgD, CfgE] = NodesDE = rabbit_test_configs:start_nodes([d, e], 5675),
+    D = pget(node, CfgD),
+    rabbit_test_configs:add_to_cluster(NodesABC, NodesDE),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
 
     %% Remove D, E does not join in
-    rabbit_test_configs:stop_node({d, proplists:get_value(d, Nodes)}),
+    rabbit_test_configs:stop_node(CfgD),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Clean up since we started this by hand
-    rabbit_test_configs:stop_node({e, proplists:get_value(e, Nodes)}),
+    rabbit_test_configs:stop_node(CfgE),
     ok.
 
 rapid_change_with() -> cluster_abc.
-rapid_change(Nodes) ->
-    ACh = get_cfg("a.channel", Nodes),
-    A = rabbit_nodes:make(a),
+rapid_change([CfgA, _CfgB, _CfgC]) ->
+    ACh = pget(channel, CfgA),
+    A = pget(node, CfgA),
     Self = self(),
     spawn_link(
       fun() ->

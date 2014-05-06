@@ -19,11 +19,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_utils, [set_policy/4, a2b/1, get_cfg/2]).
+-import(rabbit_test_utils, [set_policy/4, a2b/1]).
+-import(rabbit_misc, [pget/2]).
 
 rapid_redeclare_with() -> cluster_ab.
-rapid_redeclare(Nodes) ->
-    Ch = get_cfg("a.channel", Nodes),
+rapid_redeclare([CfgA | _]) ->
+    Ch = pget(channel, CfgA),
     Queue = <<"ha.all.test">>,
     [begin
          amqp_channel:call(Ch, #'queue.declare'{queue   = Queue,
@@ -58,11 +59,12 @@ confirms_survive_policy(Cf)  -> confirms_survive(Cf, fun policy/2).
 consume_survives(Nodes, DeathFun, CancelOnFailover) ->
     consume_survives(Nodes, DeathFun, CancelOnFailover, true).
 
-consume_survives(Nodes, DeathFun, CancelOnFailover, CCNSupported) ->
+consume_survives([CfgA, CfgB, CfgC] = Nodes,
+                 DeathFun, CancelOnFailover, CCNSupported) ->
     Msgs = 20000,
-    Channel1 = get_cfg("a.channel", Nodes),
-    Channel2 = get_cfg("b.channel", Nodes),
-    Channel3 = get_cfg("c.channel", Nodes),
+    Channel1 = pget(channel, CfgA),
+    Channel2 = pget(channel, CfgB),
+    Channel3 = pget(channel, CfgC),
 
     %% declare the queue on the master, mirrored to the two slaves
     Queue = <<"ha.all.test">>,
@@ -72,7 +74,7 @@ consume_survives(Nodes, DeathFun, CancelOnFailover, CCNSupported) ->
     %% start up a consumer
     ConsCh = case CCNSupported of
                  true  -> Channel2;
-                 false -> open_incapable_channel(get_cfg("b.port", Nodes))
+                 false -> open_incapable_channel(pget(port, CfgB))
              end,
     ConsumerPid = rabbit_ha_test_consumer:create(
                     ConsCh, Queue, self(), CancelOnFailover, Msgs),
@@ -87,10 +89,10 @@ consume_survives(Nodes, DeathFun, CancelOnFailover, CCNSupported) ->
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
-confirms_survive(Nodes, DeathFun) ->
+confirms_survive([CfgA, CfgB, _CfgC] = Nodes, DeathFun) ->
     Msgs = 20000,
-    Node1Channel = get_cfg("a.channel", Nodes),
-    Node2Channel = get_cfg("b.channel", Nodes),
+    Node1Channel = pget(channel, CfgA),
+    Node2Channel = pget(channel, CfgB),
 
     %% declare the queue on the master, mirrored to the two slaves
     Queue = <<"ha.all.test">>,
@@ -105,9 +107,10 @@ confirms_survive(Nodes, DeathFun) ->
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
-stop(Node, Nodes)    -> rabbit_test_utils:kill_after(50, Node, Nodes, stop).
-sigkill(Node, Nodes) -> rabbit_test_utils:kill_after(50, Node, Nodes, sigkill).
-policy(Node, [_|T])  -> Nodes = [a2b(rabbit_nodes:make(N)) || {N, _} <- T],
+stop(Name, Nodes)    -> rabbit_test_utils:kill_after(50, Name, Nodes, stop).
+sigkill(Name, Nodes) -> rabbit_test_utils:kill_after(50, Name, Nodes, sigkill).
+policy(Name, [H|T])  -> Nodes = [a2b(pget(node, Cfg)) || Cfg <- T],
+                        Node = rabbit_test_utils:find(Name, node, [H|T]),
                         set_policy(Node, <<"^ha.all.">>, <<"nodes">>, Nodes).
 
 open_incapable_channel(NodePort) ->

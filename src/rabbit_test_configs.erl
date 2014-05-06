@@ -22,6 +22,7 @@
 -export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0]).
 
 -import(rabbit_test_utils, [set_policy/3, set_policy/4, set_policy/5, a2b/1]).
+-import(rabbit_misc, [pget/2]).
 
 cluster_ab()  -> cluster([a, b]).
 cluster_abc() -> cluster([a, b, c]).
@@ -40,7 +41,8 @@ start_nodes(NodeNames, FirstPort) ->
     Already = [list_to_atom(N) || {N, _P} <- Already0],
     [check_node_not_running(Node, Already) || Node <- NodeNames],
     Ports = lists:seq(FirstPort, length(NodeNames) + FirstPort - 1),
-    Nodes = [{N, [{port, P}]} || {N, P} <- lists:zip(NodeNames, Ports)],
+    Nodes = [[{nodename, N}, {port, P}]
+             || {N, P} <- lists:zip(NodeNames, Ports)],
     Base = basedir() ++ "/nodes",
     [start_node(Node, Base) || Node <- Nodes].
 
@@ -50,22 +52,27 @@ check_node_not_running(Node, Already) ->
         false -> ok
     end.
 
-start_node({Node, Cfg}, Base) ->
-    Port = proplists:get_value(port, Cfg),
-    PidFile = rabbit_misc:format("~s/~s.pid", [Base, Node]),
+start_node(Cfg, Base) ->
+    Nodename = pget(nodename, Cfg),
+    Port = pget(port, Cfg),
+    PidFile = rabbit_misc:format("~s/~s.pid", [Base, Nodename]),
     Linked =
         execute_bg(
-          [{"RABBITMQ_MNESIA_BASE", {"~s/rabbitmq-~s-mnesia", [Base, Node]}},
+          [{"RABBITMQ_MNESIA_BASE", {"~s/rabbitmq-~s-mnesia", [Base,Nodename]}},
            {"RABBITMQ_LOG_BASE",    {"~s", [Base]}},
-           {"RABBITMQ_NODENAME",    {"~s", [Node]}},
+           {"RABBITMQ_NODENAME",    {"~s", [Nodename]}},
            {"RABBITMQ_NODE_PORT",   {"~B", [Port]}},
            {"RABBITMQ_PID_FILE",    PidFile},
            {"RABBITMQ_ENABLED_PLUGINS_FILE", "/does-not-exist"}],
           "../rabbitmq-server/scripts/rabbitmq-server"),
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s wait ~s",
-             [Node, PidFile]}),
-    OSPid = rpc:call(rabbit_nodes:make(Node), os, getpid, []),
-    {Node, [{pid_file, PidFile}, {os_pid, OSPid}, {linked_pid, Linked} | Cfg]}.
+             [Nodename, PidFile]}),
+    Node = rabbit_nodes:make(Nodename),
+    OSPid = rpc:call(Node, os, getpid, []),
+    [{node,       Node},
+     {pid_file,   PidFile}, 
+     {os_pid,     OSPid},
+     {linked_pid, Linked} | Cfg].
 
 build_cluster([First | Rest]) ->
     add_to_cluster([First], Rest).
@@ -74,16 +81,19 @@ add_to_cluster([First | _] = Existing, New) ->
     [cluster_with(First, Node) || Node <- New],
     Existing ++ New.
 
-cluster_with({Node, _}, {NewNode, _}) ->
+cluster_with(Cfg, NewCfg) ->
+    Node = pget(node, Cfg),
+    NewNodename = pget(nodename, NewCfg),
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s stop_app",
-             [NewNode]}),
+             [NewNodename]}),
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s join_cluster ~s",
-             [NewNode, rabbit_nodes:make(Node)]}),
+             [NewNodename, Node]}),
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s start_app",
-             [NewNode]}).   
+             [NewNodename]}).   
 
 set_default_policies(Nodes) ->
-    Members = [Node | _] = [rabbit_nodes:make(N) || {N, _} <- Nodes],
+    Node = pget(node, hd(Nodes)),
+    Members = [pget(node, Cfg) || Cfg <- Nodes],
     set_policy(Node, <<"^ha.all.">>, <<"all">>),
     set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
     TwoNodes = [a2b(M) || M <- lists:sublist(Members, 2)],
@@ -93,22 +103,21 @@ set_default_policies(Nodes) ->
 
 start_connections(Nodes) -> [start_connection(Node) || Node <- Nodes].
 
-start_connection({Node, Cfg}) ->
-    Port = proplists:get_value(port, Cfg),
+start_connection(Cfg) ->
+    Port = pget(port, Cfg),
     {ok, Conn} = amqp_connection:start(#amqp_params_network{port = Port}),
     {ok, Ch} =  amqp_connection:open_channel(Conn),
-    {Node, [{connection, Conn}, {channel, Ch} | Cfg]}.
+    [{connection, Conn}, {channel, Ch} | Cfg].
 
 stop_nodes(Nodes) -> [stop_node(Node) || Node <- Nodes].
 
-stop_node({Node, Cfg}) ->
-    PidFile = proplists:get_value(pid_file, Cfg),
+stop_node(Cfg) ->
     catch execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s stop ~s",
-                   [Node, PidFile]}).
+                   [pget(nodename, Cfg), pget(pid_file, Cfg)]}).
 
-kill_node({_Node, Cfg}) ->
-    unlink(proplists:get_value(linked_pid, Cfg)),
-    catch execute({"kill -9 ~s", [proplists:get_value(os_pid, Cfg)]}).
+kill_node(Cfg) ->
+    unlink(pget(linked_pid, Cfg)),
+    catch execute({"kill -9 ~s", [pget(os_pid, Cfg)]}).
 
 %%----------------------------------------------------------------------------
 
