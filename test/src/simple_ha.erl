@@ -21,7 +21,7 @@
 
 -import(rabbit_test_utils, [set_policy/4, a2b/1, get_cfg/2]).
 
-rapid_redeclare_with() -> cluster_abc.
+rapid_redeclare_with() -> cluster_ab.
 rapid_redeclare(Nodes) ->
     Ch = get_cfg("a.channel", Nodes),
     Queue = <<"ha.all.test">>,

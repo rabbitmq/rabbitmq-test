@@ -38,6 +38,38 @@ set_policy0(Node, Pattern, Definition) ->
 clear_policy(Node, Pattern) ->
     ok = rpc_call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
 
+control_action(Command, Node) ->
+    control_action(Command, Node, [], []).
+
+control_action(Command, Node, Args) ->
+    control_action(Command, Node, Args, []).
+
+control_action(Command, Node, Args, Opts) ->
+    rpc_call(Node, rabbit_control_main, action,
+             [Command, Node, Args, Opts,
+              fun (F, A) ->
+                      error_logger:info_msg(F ++ "~n", A)
+              end]).
+
+cluster_status(Node) ->
+    {rpc_call(Node, rabbit_mnesia, cluster_nodes, [all]),
+     rpc_call(Node, rabbit_mnesia, cluster_nodes, [disc]),
+     rpc_call(Node, rabbit_mnesia, cluster_nodes, [running])}.
+
+stop_app(Node) ->
+    control_action(stop_app, Node).
+
+start_app(Node) ->
+    control_action(start_app, Node).
+
+connect({_Node, Cfg}) ->
+    Port = proplists:get_value(port, Cfg),
+    {ok, Conn} = amqp_connection:start(#amqp_params_network{port = Port}),
+    {ok, Ch} =  amqp_connection:open_channel(Conn),
+    {Conn, Ch}.
+
+%%----------------------------------------------------------------------------
+
 kill_after(Time, Node, Nodes, Method) ->
     timer:sleep(Time),
     kill(Node, Nodes, Method).

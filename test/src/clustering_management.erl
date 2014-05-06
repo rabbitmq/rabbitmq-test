@@ -13,38 +13,17 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(clustering_management_SUITE).
+-module(clustering_management).
 
--include_lib("common_test/include/ct.hrl").
+-compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
--include_lib("systest/include/systest.hrl").
-
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-
-         join_and_part_cluster/1, join_cluster_bad_operations/1,
-         join_to_start_interval/1, forget_cluster_node_test/1,
-         forget_cluster_node_removes_things_test/1,
-         change_cluster_node_type_test/1, change_cluster_when_node_offline/1,
-         update_cluster_nodes_test/1, erlang_config_test/1, force_reset_test/1
-        ]).
+-import(rabbit_test_utils, [start_app/1, stop_app/1]).
 
 -define(LOOP_RECURSION_DELAY, 100).
 
-suite() -> [{timetrap, systest:settings("time_traps.cluster_management")}].
-
-all() ->
-    [join_and_part_cluster, join_cluster_bad_operations, join_to_start_interval,
-     forget_cluster_node_test, change_cluster_node_type_test,
-     change_cluster_when_node_offline, update_cluster_nodes_test,
-     erlang_config_test, force_reset_test].
-
-init_per_suite(Config) ->
-    Config.
-end_per_suite(_Config) ->
-    ok.
-
+join_and_part_cluster_with() -> start_abc.
 join_and_part_cluster(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
     assert_not_clustered(Rabbit),
@@ -73,6 +52,7 @@ join_and_part_cluster(Config) ->
     assert_not_clustered(Hare),
     assert_not_clustered(Bunny).
 
+join_cluster_bad_operations_with() -> start_abc.
 join_cluster_bad_operations(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
@@ -114,6 +94,7 @@ join_cluster_bad_operations(Config) ->
 
 %% This tests that the nodes in the cluster are notified immediately of a node
 %% join, and not just after the app is started.
+join_to_start_interval_with() -> start_abc.
 join_to_start_interval(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
@@ -124,7 +105,8 @@ join_to_start_interval(Config) ->
     ok = start_app(Rabbit),
     assert_clustered([Rabbit, Hare]).
 
-forget_cluster_node_test(Config) ->
+forget_cluster_node_with() -> start_abc.
+forget_cluster_node(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Trying to remove a node not in the cluster should fail
@@ -174,34 +156,35 @@ forget_cluster_node_test(Config) ->
     assert_not_clustered(Bunny),
     assert_clustered([Rabbit, Hare]).
 
-forget_cluster_node_removes_things_test(Config) ->
-    {_Cluster, [{{Rabbit, RabbitRef}, _},
-                {{Hare,   HareRef},   _},
-                {{_Bunny, _BunnyRef}, _}
-               ]} = rabbit_ha_test_utils:cluster_members(Config),
-
+forget_cluster_node_removes_things_with() -> start_abc.
+forget_cluster_node_removes_things([{Rabbit0, _} = RabbitCfg,
+                                    {Hare0,   _} = HareCfg,
+                                    {_Bunny,  _}] = Config) ->
+    Rabbit = rabbit_nodes:make(Rabbit0),
+    Hare = rabbit_nodes:make(Hare0),
     stop_join_start(Rabbit, Hare),
-    {_RConn, RCh} = rabbit_ha_test_utils:connect(RabbitRef),
+    {_RConn, RCh} = rabbit_test_utils:connect(RabbitCfg),
     #'queue.declare_ok'{} =
         amqp_channel:call(RCh, #'queue.declare'{queue   = <<"test">>,
                                                 durable = true}),
 
     ok = stop_app(Rabbit),
 
-    {_HConn, HCh} = rabbit_ha_test_utils:connect(HareRef),
+    {_HConn, HCh} = rabbit_test_utils:connect(HareCfg),
     {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
         (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
                                                        durable = true})),
 
     ok = forget_cluster_node(Hare, Rabbit),
 
-    {_HConn2, HCh2} = rabbit_ha_test_utils:connect(HareRef),
+    {_HConn2, HCh2} = rabbit_test_utils:connect(HareCfg),
     #'queue.declare_ok'{} =
         amqp_channel:call(HCh2, #'queue.declare'{queue   = <<"test">>,
                                                  durable = true}),
     ok.
 
-change_cluster_node_type_test(Config) ->
+change_cluster_node_type_with() -> start_abc.
+change_cluster_node_type(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
     %% Trying to change the ram node when not clustered should always fail
@@ -230,6 +213,7 @@ change_cluster_node_type_test(Config) ->
     assert_failure(fun () -> change_cluster_node_type(Hare, ram) end),
     ok = start_app(Hare).
 
+change_cluster_when_node_offline_with() -> start_abc.
 change_cluster_when_node_offline(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
@@ -279,6 +263,7 @@ change_cluster_when_node_offline(Config) ->
                           [Rabbit, Hare]),
     assert_not_clustered(Bunny).
 
+update_cluster_nodes_test_with() -> start_abc.
 update_cluster_nodes_test(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
@@ -301,7 +286,8 @@ update_cluster_nodes_test(Config) ->
     assert_not_clustered(Hare),
     assert_clustered([Rabbit, Bunny]).
 
-erlang_config_test(Config) ->
+erlang_config_with() -> start_abc.
+erlang_config(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
     ok = stop_app(Hare),
@@ -337,6 +323,7 @@ erlang_config_test(Config) ->
     assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                           [Rabbit, Hare]).
 
+force_reset_test_with() -> start_abc.
 force_reset_test(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
@@ -356,17 +343,15 @@ force_reset_test(Config) ->
 %% ----------------------------------------------------------------------------
 %% Internal utils
 
-cluster_members(Config) ->
-    Cluster = systest:active_sut(Config),
-    [Id || {Id, _Ref} <- systest:list_processes(Cluster)].
+cluster_members(Nodes) ->
+    [rabbit_nodes:make(Node) || {Node, _Cfg} <- Nodes].
 
 assert_cluster_status(Status0, Nodes) ->
     Status = {AllNodes, _, _} = sort_cluster_status(Status0),
     wait_for_cluster_status(Status, AllNodes, Nodes).
 
 wait_for_cluster_status(Status, AllNodes, Nodes) ->
-    Max = systest:settings("limits.clustering_mgmt.status_check_max_wait")
-        / ?LOOP_RECURSION_DELAY,
+    Max = 10000 / ?LOOP_RECURSION_DELAY,
     wait_for_cluster_status(0, Max, Status, AllNodes, Nodes).
 
 wait_for_cluster_status(N, Max, Status, _AllNodes, Nodes) when N >= Max ->
@@ -384,7 +369,7 @@ wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) ->
     end.
 
 verify_status_equal(Node, Status, AllNodes) ->
-    NodeStatus = sort_cluster_status(rabbit_ha_test_utils:cluster_status(Node)),
+    NodeStatus = sort_cluster_status(rabbit_test_utils:cluster_status(Node)),
     (AllNodes =/= [Node]) =:= rpc:call(Node, rabbit_mnesia, is_clustered, [])
         andalso NodeStatus =:= Status.
 
@@ -405,27 +390,21 @@ assert_failure(Fun) ->
         Other                          -> exit({expected_failure, Other})
     end.
 
-stop_app(Node) ->
-    rabbit_ha_test_utils:control_action(stop_app, Node).
-
-start_app(Node) ->
-    rabbit_ha_test_utils:control_action(start_app, Node).
-
 join_cluster(Node, To) ->
     join_cluster(Node, To, false).
 
 join_cluster(Node, To, Ram) ->
-    rabbit_ha_test_utils:control_action(
+    rabbit_test_utils:control_action(
       join_cluster, Node, [atom_to_list(To)], [{"--ram", Ram}]).
 
 reset(Node) ->
-    rabbit_ha_test_utils:control_action(reset, Node).
+    rabbit_test_utils:control_action(reset, Node).
 
 force_reset(Node) ->
-    rabbit_ha_test_utils:control_action(force_reset, Node).
+    rabbit_test_utils:control_action(force_reset, Node).
 
 forget_cluster_node(Node, Removee, RemoveWhenOffline) ->
-    rabbit_ha_test_utils:control_action(
+    rabbit_test_utils:control_action(
       forget_cluster_node, Node, [atom_to_list(Removee)],
       [{"--offline", RemoveWhenOffline}]).
 
@@ -433,12 +412,12 @@ forget_cluster_node(Node, Removee) ->
     forget_cluster_node(Node, Removee, false).
 
 change_cluster_node_type(Node, Type) ->
-    rabbit_ha_test_utils:control_action(change_cluster_node_type, Node,
-                                        [atom_to_list(Type)]).
+    rabbit_test_utils:control_action(change_cluster_node_type, Node,
+                                     [atom_to_list(Type)]).
 
 update_cluster_nodes(Node, DiscoveryNode) ->
-    rabbit_ha_test_utils:control_action(update_cluster_nodes, Node,
-                                        [atom_to_list(DiscoveryNode)]).
+    rabbit_test_utils:control_action(update_cluster_nodes, Node,
+                                     [atom_to_list(DiscoveryNode)]).
 
 stop_join_start(Node, ClusterTo, Ram) ->
     ok = stop_app(Node),
