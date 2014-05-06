@@ -134,11 +134,11 @@ execute(Env, Cmd0) ->
 %%execute_bg(Cmd) -> execute_bg([], Cmd).
 
 execute_bg(Env, Cmd) ->
-    Self = self(),
-    spawn_link(fun () ->
-                       execute(Env, Cmd),
-                       unlink(Self)
-               end).
+    spawn(fun () ->
+                  execute(Env, Cmd),
+                  {links, Links} = process_info(self(), links),
+                  [unlink(L) || L <- Links]
+          end).
 
 env_prefix(Env) ->
     lists:append([fmt({"export ~s=~s; ", [K, fmt(V)]}) || {K, V} <- Env]).

@@ -23,6 +23,8 @@
 -define(MODULES, [clustering_management, dynamic_ha, eager_sync,
                   many_node_ha, partitions, simple_ha, sync_detection]).
 
+-import(rabbit_misc, [pget/2]).
+
 -export([run/1]).
 
 run(Filter) ->
@@ -33,39 +35,50 @@ run(Filter) ->
     ok = eunit:test(make_tests(Filter, ?TIMEOUT), []).
 
 make_tests(Filter, Timeout) ->
-    {foreach, fun() -> ok end,
-     [{timeout, Timeout, make_test(Module, FWith, F)} ||
-         Module <- ?MODULES,
-         {FWith, _Arity} <- proplists:get_value(exports, Module:module_info()),
-         string:right(atom_to_list(FWith), 5) =:= "_with",
-         F <- [fwith_to_f(FWith)],
-         should_run(Module, F, tokens(Filter))]}.
+    [make_test(Module, FWith, F, Timeout) ||
+        Module <- ?MODULES,
+        {FWith, _Arity} <- proplists:get_value(exports, Module:module_info()),
+        string:right(atom_to_list(FWith), 5) =:= "_with",
+        F <- [fwith_to_f(FWith)],
+        should_run(Module, F, tokens(Filter))].
 
-make_test(Module, FWith, F) ->
-    fun () ->
-            io:format(user, "~s:~s...", [Module, F]),
-            case error_logger:logfile(filename) of
-                {error, no_log_file} -> ok;
-                _                    -> ok = error_logger:logfile(close)
-            end,
-            FN = rabbit_misc:format("~s/~s:~s.log",
-                                    [rabbit_test_configs:basedir(), Module, F]),
-            ensure_dir(rabbit_test_configs:basedir()),
-            ok = error_logger:logfile({open, FN}),
-            CfgFun = case Module:FWith() of
-                         CfgName when is_atom(CfgName) ->
-                             fun rabbit_test_configs:CfgName/0;
-                         Else ->
-                             Else
-                     end,
-            Nodes = CfgFun(),
-            try
-                Module:F(Nodes)
-            after
-                rabbit_test_configs:stop_nodes(Nodes)
-            end,
-            io:format(user, " passed.~n", [])
-    end.
+make_test(M, FWith, F, Timeout) ->
+    {setup,
+     fun () ->
+             io:format(user, "~s:~s: [setup]", [M, F]),
+             setup_error_logger(M, F),
+             CfgFun = case M:FWith() of
+                          CfgName when is_atom(CfgName) ->
+                              fun rabbit_test_configs:CfgName/0;
+                          Else ->
+                              Else
+                      end,
+             CfgFun()
+     end,
+     fun (Nodes) ->
+             rabbit_test_configs:stop_nodes(Nodes),
+             io:format(user, ".~n", [])
+     end,
+     fun (Nodes) ->
+             [{timeout,
+               Timeout,
+               fun () ->
+                       [link(pget(linked_pid, N)) || N <- Nodes],
+                       io:format(user, " [running]", []),
+                       M:F(Nodes),
+                       io:format(user, " [PASSED]", [])
+               end}]
+     end}.
+
+setup_error_logger(M, F) ->
+    case error_logger:logfile(filename) of
+        {error, no_log_file} -> ok;
+        _                    -> ok = error_logger:logfile(close)
+    end,
+    FN = rabbit_misc:format("~s/~s:~s.log",
+                            [rabbit_test_configs:basedir(), M, F]),
+    ensure_dir(rabbit_test_configs:basedir()),
+    ok = error_logger:logfile({open, FN}).
 
 fwith_to_f(FWith) ->
     FName = atom_to_list(FWith),
