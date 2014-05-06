@@ -41,11 +41,9 @@
 -import(rabbit_misc, [pget/2]).
 
 change_policy_with() -> cluster_abc.
-change_policy([CfgA, CfgB, CfgC]) ->
+change_policy([CfgA, _CfgB, _CfgC] = Cfgs) ->
     ACh = pget(channel, CfgA),
-    A = pget(node, CfgA),
-    B = pget(node, CfgB),
-    C = pget(node, CfgC),
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
 
     %% When we first declare a queue with no policy, it's not HA.
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
@@ -74,11 +72,9 @@ change_policy([CfgA, CfgB, CfgC]) ->
     ok.
 
 change_cluster_with() -> cluster_abc.
-change_cluster([CfgA, CfgB, CfgC] = NodesABC) ->
+change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
     ACh = pget(channel, CfgA),
-    A = pget(node, CfgA),
-    B = pget(node, CfgB),
-    C = pget(node, CfgC),
+    [A, B, C] = [pget(node, Cfg) || Cfg <- CfgsABC],
 
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, {A, ''}),
@@ -88,9 +84,9 @@ change_cluster([CfgA, CfgB, CfgC] = NodesABC) ->
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
-    [CfgD, CfgE] = NodesDE = rabbit_test_configs:start_nodes([d, e], 5675),
+    [CfgD, CfgE] = CfgsDE = rabbit_test_configs:start_nodes([d, e], 5675),
     D = pget(node, CfgD),
-    rabbit_test_configs:add_to_cluster(NodesABC, NodesDE),
+    rabbit_test_configs:add_to_cluster(CfgsABC, CfgsDE),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
 
     %% Remove D, E does not join in

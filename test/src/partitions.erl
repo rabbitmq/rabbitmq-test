@@ -22,10 +22,8 @@
 -import(rabbit_misc, [pget/2]).
 
 ignore_with() -> cluster_abc. 
-ignore([CfgA, CfgB, CfgC]) ->
-    A = pget(node, CfgA),
-    B = pget(node, CfgB),
-    C = pget(node, CfgC),
+ignore(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     disconnect_reconnect([{B, C}]),
     timer:sleep(5000),
     [] = partitions(A),
@@ -34,10 +32,8 @@ ignore([CfgA, CfgB, CfgC]) ->
     ok.
 
 pause_on_down_with() -> cluster_abc. 
-pause_on_down([CfgA, CfgB, CfgC]) ->
-    A = pget(node, CfgA),
-    B = pget(node, CfgB),
-    C = pget(node, CfgC),
+pause_on_down([_CfgA, CfgB, CfgC] = Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     [set_mode(N, pause_minority) || N <- [A, B, C]],
     true = is_running(A),
 
@@ -51,10 +47,8 @@ pause_on_down([CfgA, CfgB, CfgC]) ->
     ok.
 
 pause_on_disconnected_with() -> cluster_abc.
-pause_on_disconnected([CfgA, CfgB, CfgC]) ->
-    A = pget(node, CfgA),
-    B = pget(node, CfgB),
-    C = pget(node, CfgC),
+pause_on_disconnected(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     [set_mode(N, pause_minority) || N <- [A, B, C]],
     [(true = is_running(N)) || N <- [A, B, C]],
     disconnect([{A, B}, {A, C}]),
@@ -69,10 +63,8 @@ pause_on_disconnected([CfgA, CfgB, CfgC]) ->
     ok.
 
 autoheal_with() -> cluster_abc. 
-autoheal([CfgA, CfgB, CfgC]) ->
-    A = pget(node, CfgA),
-    B = pget(node, CfgB),
-    C = pget(node, CfgC),
+autoheal(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     [set_mode(N, autoheal) || N <- [A, B, C]],
     Test = fun (Pairs) ->
                    disconnect_reconnect(Pairs),
