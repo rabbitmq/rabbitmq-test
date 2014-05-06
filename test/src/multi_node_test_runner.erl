@@ -44,8 +44,7 @@ make_tests(Filter, Timeout) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     io:format("Running ~B of ~B tests; FILTER=~s~n~n",
               [length(Filtered), length(All), Filter]),
-    Width = lists:max([length(rabbit_misc:format("~s:~s", [M, F]))
-                       || {M, _, F} <- Filtered]),
+    Width = lists:max([length(name(M, F)) || {M, _, F} <- Filtered]),
     [make_test(M, FWith, F, Timeout, Width) || {M, FWith, F} <- Filtered].
 
 make_test(M, FWith, F, Timeout, Width) ->
@@ -106,5 +105,7 @@ ensure_dir(Path) ->
     end.
 
 name(M, F, Width) ->
-    R = rabbit_misc:format("~s:~s:", [M, F]),
+    R = name(M, F),
     R ++ string:chars($ , Width - length(R)).
+
+name(M, F) -> rabbit_misc:format("~s:~s:", [M, F]).
