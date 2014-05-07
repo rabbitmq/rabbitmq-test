@@ -117,7 +117,6 @@ stop_node(Cfg) ->
                    [pget(nodename, Cfg), pget(pid_file, Cfg)]}).
 
 kill_node(Cfg) ->
-    unlink(pget(linked_pid, Cfg)),
     catch execute({"kill -9 ~s", [pget(os_pid, Cfg)]}).
 
 %%----------------------------------------------------------------------------
