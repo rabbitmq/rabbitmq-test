@@ -58,14 +58,20 @@ make_tests(Filter, Cover, Timeout) ->
                         should_run(M, F, tokens(Filter))],
     io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
               [length(Filtered), length(All), Filter, Cover]),
-    Width = lists:max([length(name(M, F)) || {M, _, F} <- Filtered]),
+    Width = lists:max([atom_length(F) || {M, _, F} <- Filtered]),
     Cfg = [{cover, Cover}],
-    [make_test(M, FWith, F, Timeout, Width, Cfg) || {M, FWith, F} <- Filtered].
+    [make_test(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
+     || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
 
-make_test(M, FWith, F, Timeout, Width, InitialCfg) ->
+make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
     {setup,
      fun () ->
-             io:format(user, "~s [setup]", [name(M, F, Width)]),
+             case ShowHeading of
+                 true  -> io:format(user, "~n~s~n~s~n~n",
+                                    [M, string:chars($-, atom_length(M))]);
+                 false -> ok
+             end,
+             io:format(user, "~s [setup]", [name(F, Width)]),
              setup_error_logger(M, F),
              CfgFun = case M:FWith() of
                           CfgName when is_atom(CfgName) ->
@@ -89,6 +95,14 @@ make_test(M, FWith, F, Timeout, Width, InitialCfg) ->
                        io:format(user, " [PASSED]", [])
                end}]
      end}.
+
+annotate_show_heading(List) ->
+    annotate_show_heading(List, undefined).
+
+annotate_show_heading([], _) ->
+    [];
+annotate_show_heading([{M, FWith, F} | Rest], Current) ->
+    [{M, FWith, F, M =/= Current} | annotate_show_heading(Rest, M)].
 
 setup_error_logger(M, F) ->
     case error_logger:logfile(filename) of
@@ -119,8 +133,8 @@ ensure_dir(Path) ->
         _                                -> file:make_dir(Path)
     end.
 
-name(M, F, Width) ->
-    R = name(M, F),
-    R ++ string:chars($ , Width - length(R)).
+name(F, Width) ->
+    R = atom_to_list(F),
+    R ++ ":" ++ string:chars($ , Width - length(R)).
 
-name(M, F) -> rabbit_misc:format("~s:~s:", [M, F]).
+atom_length(A) -> length(atom_to_list(A)).
