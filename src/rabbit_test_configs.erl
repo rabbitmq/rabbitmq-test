@@ -135,10 +135,13 @@ execute(Env0, Cmd0) ->
 
 port_receive_loop(Port, Stdout) ->
     receive
-        {Port, {exit_status, 0}} -> ok;
-        {Port, {exit_status, X}} -> exit({exit_status, X, Stdout});
-        {Port, {data, Out}}      -> port_receive_loop(Port, Stdout ++ Out)
+        {Port, {exit_status, 0}}   -> ok;
+        {Port, {exit_status, 137}} -> ok; %% [0]
+        {Port, {exit_status, X}}   -> exit({exit_status, X, Stdout});
+        {Port, {data, Out}}        -> port_receive_loop(Port, Stdout ++ Out)
     end.
+
+%% [0] code 137 -> killed with SIGKILL which we do in some tests
 
 execute_bg(Env, Cmd) ->
     spawn_link(fun () ->
