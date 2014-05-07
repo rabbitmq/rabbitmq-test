@@ -58,7 +58,7 @@ make_tests(Filter, Cover, Timeout) ->
                         should_run(M, F, tokens(Filter))],
     io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
               [length(Filtered), length(All), Filter, Cover]),
-    Width = lists:max([atom_length(F) || {M, _, F} <- Filtered]),
+    Width = lists:max([atom_length(F) || {_, _, F} <- Filtered]),
     Cfg = [{cover, Cover}],
     [make_test(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
@@ -67,12 +67,14 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
     {setup,
      fun () ->
              case ShowHeading of
-                 true  -> io:format(user, "~n~s~n~s~n~n",
+                 true  -> io:format(user, "~n~s~n~s~n",
                                     [M, string:chars($-, atom_length(M))]);
                  false -> ok
              end,
              io:format(user, "~s [setup]", [name(F, Width)]),
-             setup_error_logger(M, F),
+             Base = rabbit_test_configs:basedir(),
+             setup_error_logger(M, F, Base),
+             recursive_delete(Base ++ "/nodes"),
              CfgFun = case M:FWith() of
                           CfgName when is_atom(CfgName) ->
                               fun rabbit_test_configs:CfgName/1;
@@ -104,14 +106,14 @@ annotate_show_heading([], _) ->
 annotate_show_heading([{M, FWith, F} | Rest], Current) ->
     [{M, FWith, F, M =/= Current} | annotate_show_heading(Rest, M)].
 
-setup_error_logger(M, F) ->
+setup_error_logger(M, F, Base) ->
     case error_logger:logfile(filename) of
         {error, no_log_file} -> ok;
         _                    -> ok = error_logger:logfile(close)
     end,
     FN = rabbit_misc:format("~s/~s:~s.log",
                             [rabbit_test_configs:basedir(), M, F]),
-    ensure_dir(rabbit_test_configs:basedir()),
+    ensure_dir(Base),
     ok = error_logger:logfile({open, FN}).
 
 fwith_to_f(FWith) ->
@@ -132,6 +134,9 @@ ensure_dir(Path) ->
         {ok, #file_info{type=directory}} -> ok;
         _                                -> file:make_dir(Path)
     end.
+
+recursive_delete(Dir) ->
+    rabbit_test_configs:execute({"rm -rf ~s", [Dir]}).
 
 name(F, Width) ->
     R = atom_to_list(F),

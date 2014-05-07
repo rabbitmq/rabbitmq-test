@@ -61,7 +61,7 @@ consume_survives(Nodes, DeathFun, CancelOnFailover) ->
 
 consume_survives([CfgA, CfgB, CfgC] = Nodes,
                  DeathFun, CancelOnFailover, CCNSupported) ->
-    Msgs = 20000 * rabbit_test_configs:cover_work_factor(CfgA),
+    Msgs = rabbit_test_configs:cover_work_factor(20000, CfgA),
     Channel1 = pget(channel, CfgA),
     Channel2 = pget(channel, CfgB),
     Channel3 = pget(channel, CfgC),
@@ -90,7 +90,7 @@ consume_survives([CfgA, CfgB, CfgC] = Nodes,
     ok.
 
 confirms_survive([CfgA, CfgB, _CfgC] = Nodes, DeathFun) ->
-    Msgs = 20000 * rabbit_test_configs:cover_work_factor(CfgA),
+    Msgs = rabbit_test_configs:cover_work_factor(20000, CfgA),
     Node1Channel = pget(channel, CfgA),
     Node2Channel = pget(channel, CfgB),
 

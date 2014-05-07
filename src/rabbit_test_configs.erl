@@ -19,8 +19,8 @@
 
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_abc/1]).
 -export([start_nodes/3, add_to_cluster/2]).
--export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0]).
--export([cover_work_factor/1]).
+-export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0, execute/1]).
+-export([cover_work_factor/2]).
 
 -import(rabbit_test_utils, [set_policy/3, set_policy/4, set_policy/5, a2b/1]).
 -import(rabbit_misc, [pget/2]).
@@ -34,7 +34,6 @@ cluster(InitialCfg, NodeNames) ->
       set_default_policies(build_cluster(start_nodes(InitialCfg, NodeNames)))).
 
 start_nodes(InitialCfg, NodeNames) ->
-    recursive_delete(basedir() ++ "/nodes"),
     start_nodes(InitialCfg, NodeNames, 5672).
 
 start_nodes(InitialCfg, NodeNames, FirstPort) ->
@@ -78,10 +77,9 @@ start_node(Cfg, Base) ->
     %% same node and will automaticaly re-establish cover as soon as
     %% we see them, so we only want to start cover once per node name
     %% for the entire test run.
-    case {pget(cover, Cfg), get({cover_started, Node})} of
-        {true, undefined} -> cover:start([Node]),
-                             put({cover_started, Node}, true);
-        _                 -> ok
+    case {pget(cover, Cfg), lists:member(Node, cover:which_nodes())} of
+        {true, false} -> cover:start([Node]);
+        _             -> ok
     end,
     [{node,       Node},
      {pid_file,   PidFile}, 
@@ -142,10 +140,10 @@ maybe_flush_cover(Cfg) ->
 
 %% Cover slows things down enough that if we are sending messages in
 %% bulk, we want to send fewer or we'll be here all day...
-cover_work_factor(Cfg) ->
+cover_work_factor(Without, Cfg) ->
     case pget(cover, Cfg) of
-        true  -> 0.1;
-        false -> 1
+        true  -> trunc(Without * 0.1);
+        false -> Without
     end.
 
 %%----------------------------------------------------------------------------
@@ -180,7 +178,5 @@ execute_bg(Env, Cmd) ->
 
 fmt({Fmt, Args}) -> rabbit_misc:format(Fmt, Args);
 fmt(Str)         -> Str.
-
-recursive_delete(Dir) -> execute({"rm -rf ~s", [Dir]}).
 
 basedir() -> "/tmp/rabbitmq-multi-node".

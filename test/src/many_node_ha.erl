@@ -25,7 +25,7 @@
 kill_intermediate_with() ->
     fun (Cfg) -> rabbit_test_configs:cluster(Cfg, [a,b,c,d,e,f]) end.
 kill_intermediate([CfgA, _CfgB, _CfgC, _CfgD, CfgE, CfgF] = Nodes) ->
-    Msgs            = 20000 * rabbit_test_configs:cover_work_factor(CfgA),
+    Msgs            = rabbit_test_configs:cover_work_factor(20000, CfgA),
     MasterChannel   = pget(channel, CfgA),
     ConsumerChannel = pget(channel, CfgE),
     ProducerChannel = pget(channel, CfgF),
