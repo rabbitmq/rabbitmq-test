@@ -17,31 +17,32 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([cluster/1, cluster_ab/0, cluster_abc/0, start_abc/0]).
--export([start_nodes/2, add_to_cluster/2]).
+-export([cluster/2, cluster_ab/1, cluster_abc/1, start_abc/1]).
+-export([start_nodes/3, add_to_cluster/2]).
 -export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0]).
+-export([cover_work_factor/1]).
 
 -import(rabbit_test_utils, [set_policy/3, set_policy/4, set_policy/5, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
-cluster_ab()  -> cluster([a, b]).
-cluster_abc() -> cluster([a, b, c]).
-start_abc()   -> start_nodes([a, b, c]).
+cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
+cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
+start_abc(InitialCfg)   -> start_nodes(InitialCfg, [a, b, c]).
 
-cluster(NodeNames) ->
+cluster(InitialCfg, NodeNames) ->
     start_connections(
-      set_default_policies(build_cluster(start_nodes(NodeNames)))).
+      set_default_policies(build_cluster(start_nodes(InitialCfg, NodeNames)))).
 
-start_nodes(NodeNames) ->
+start_nodes(InitialCfg, NodeNames) ->
     recursive_delete(basedir() ++ "/nodes"),
-    start_nodes(NodeNames, 5672).
+    start_nodes(InitialCfg, NodeNames, 5672).
 
-start_nodes(NodeNames, FirstPort) ->
+start_nodes(InitialCfg, NodeNames, FirstPort) ->
     {ok, Already0} = net_adm:names(),
     Already = [list_to_atom(N) || {N, _P} <- Already0],
     [check_node_not_running(Node, Already) || Node <- NodeNames],
     Ports = lists:seq(FirstPort, length(NodeNames) + FirstPort - 1),
-    Nodes = [[{nodename, N}, {port, P}]
+    Nodes = [[{nodename, N}, {port, P} | InitialCfg]
              || {N, P} <- lists:zip(NodeNames, Ports)],
     Base = basedir() ++ "/nodes",
     [start_node(Node, Base) || Node <- Nodes].
@@ -70,6 +71,15 @@ start_node(Cfg, Base) ->
              [Nodename, PidFile]}),
     Node = rabbit_nodes:make(Nodename),
     OSPid = rpc:call(Node, os, getpid, []),
+    %% The cover system thinks all nodes with the same name are the
+    %% same node and will automaticaly re-establish cover as soon as
+    %% we see them, so we only want to start cover once per node name
+    %% for the entire test run.
+    case {pget(cover, Cfg), get({cover_started, Node})} of
+        {true, undefined} -> cover:start([Node]),
+                             put({cover_started, Node}, true);
+        _                 -> ok
+    end,
     [{node,       Node},
      {pid_file,   PidFile}, 
      {os_pid,     OSPid},
@@ -113,11 +123,27 @@ start_connection(Cfg) ->
 stop_nodes(Nodes) -> [stop_node(Node) || Node <- Nodes].
 
 stop_node(Cfg) ->
+    maybe_flush_cover(Cfg),
     catch execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s stop ~s",
                    [pget(nodename, Cfg), pget(pid_file, Cfg)]}).
 
 kill_node(Cfg) ->
+    maybe_flush_cover(Cfg),
     catch execute({"kill -9 ~s", [pget(os_pid, Cfg)]}).
+
+maybe_flush_cover(Cfg) ->
+    case pget(cover, Cfg) of
+        true  -> cover:flush(pget(node, Cfg));
+        false -> ok
+    end.
+
+%% Cover slows things down enough that if we are sending messages in
+%% bulk, we want to send fewer or we'll be here all day...
+cover_work_factor(Cfg) ->
+    case pget(cover, Cfg) of
+        true  -> 0.1;
+        false -> 1
+    end.
 
 %%----------------------------------------------------------------------------
 

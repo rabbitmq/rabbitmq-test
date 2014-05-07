@@ -25,15 +25,30 @@
 
 -import(rabbit_misc, [pget/2]).
 
--export([run/1]).
+-export([run/2]).
 
-run(Filter) ->
+run(Filter, Cover) ->
+    io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([multi_node_test_runner, shortnames]),
     error_logger:tty(false),
-    ok = eunit:test(make_tests(Filter, ?TIMEOUT), []).
+    case Cover of
+        true  -> io:format("Cover compiling..."),
+                 cover:start(),
+                 ok = rabbit_misc:enable_cover(["../rabbitmq-server/"]),
+                 io:format(" done.~n~n");
+        false -> ok
+    end,
+    ok = eunit:test(make_tests(Filter, Cover, ?TIMEOUT), []),
+    case Cover of
+        true  -> io:format("~nCover reporting..."),
+                 ok = rabbit_misc:report_cover(),
+                 io:format(" done.~n~n");
+        false -> ok
+    end,
+    ok.
 
-make_tests(Filter, Timeout) ->
+make_tests(Filter, Cover, Timeout) ->
     All = [{M, FWith, F} ||
               M <- ?MODULES,
               {FWith, _Arity} <- proplists:get_value(exports, M:module_info()),
@@ -41,24 +56,24 @@ make_tests(Filter, Timeout) ->
               F <- [fwith_to_f(FWith)]],
     Filtered = [Test || {M, _FWith, F} = Test <- All,
                         should_run(M, F, tokens(Filter))],
-    io:format("~nMulti-node tests~n================~n~n", []),
-    io:format("Running ~B of ~B tests; FILTER=~s~n~n",
-              [length(Filtered), length(All), Filter]),
+    io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
+              [length(Filtered), length(All), Filter, Cover]),
     Width = lists:max([length(name(M, F)) || {M, _, F} <- Filtered]),
-    [make_test(M, FWith, F, Timeout, Width) || {M, FWith, F} <- Filtered].
+    Cfg = [{cover, Cover}],
+    [make_test(M, FWith, F, Timeout, Width, Cfg) || {M, FWith, F} <- Filtered].
 
-make_test(M, FWith, F, Timeout, Width) ->
+make_test(M, FWith, F, Timeout, Width, InitialCfg) ->
     {setup,
      fun () ->
              io:format(user, "~s [setup]", [name(M, F, Width)]),
              setup_error_logger(M, F),
              CfgFun = case M:FWith() of
                           CfgName when is_atom(CfgName) ->
-                              fun rabbit_test_configs:CfgName/0;
+                              fun rabbit_test_configs:CfgName/1;
                           Else ->
                               Else
                       end,
-             CfgFun()
+             CfgFun(InitialCfg)
      end,
      fun (Nodes) ->
              rabbit_test_configs:stop_nodes(Nodes),

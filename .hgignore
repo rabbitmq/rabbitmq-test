@@ -1,7 +1,8 @@
 syntax: regexp
 ^qpid_testsuite/
-^certs/
 ^build/
+^certs/
+^cover/
 ^dist/
 ^ebin/
 ^test/ebin/
