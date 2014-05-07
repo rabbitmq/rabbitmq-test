@@ -42,7 +42,7 @@ start_nodes(InitialCfg, NodeNames, FirstPort) ->
     Already = [list_to_atom(N) || {N, _P} <- Already0],
     [check_node_not_running(Node, Already) || Node <- NodeNames],
     Ports = lists:seq(FirstPort, length(NodeNames) + FirstPort - 1),
-    Nodes = [[{nodename, N}, {port, P} | InitialCfg]
+    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(InitialCfg)]
              || {N, P} <- lists:zip(NodeNames, Ports)],
     Base = basedir() ++ "/nodes",
     [start_node(Node, Base) || Node <- Nodes].
@@ -52,6 +52,9 @@ check_node_not_running(Node, Already) ->
         true  -> exit({node_already_running, Node});
         false -> ok
     end.
+
+strip_non_initial(Cfg) ->
+    [{K, V} || {K, V} <- Cfg, K =:= cover].
 
 start_node(Cfg, Base) ->
     Nodename = pget(nodename, Cfg),

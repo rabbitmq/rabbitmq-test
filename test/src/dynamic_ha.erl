@@ -84,7 +84,7 @@ change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
-    [CfgD, CfgE] = CfgsDE = rabbit_test_configs:start_nodes([d, e], 5675),
+    [CfgD, CfgE] = CfgsDE = rabbit_test_configs:start_nodes(CfgA, [d, e], 5675),
     D = pget(node, CfgD),
     rabbit_test_configs:add_to_cluster(CfgsABC, CfgsDE),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
