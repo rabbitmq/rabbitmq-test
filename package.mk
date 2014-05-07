@@ -1,4 +1,3 @@
-RELEASABLE:=false
 DEPS:=rabbitmq-erlang-client
 FILTER:=all
 COVER:=false
