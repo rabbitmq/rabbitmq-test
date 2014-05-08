@@ -19,15 +19,12 @@
 -include_lib("kernel/include/file.hrl").
 
 -define(TIMEOUT, 600).
-%% TODO generate this
--define(MODULES, [clustering_management, dynamic_ha, eager_sync,
-                  many_node_ha, partitions, simple_ha, sync_detection]).
 
 -import(rabbit_misc, [pget/2]).
 
--export([run/2]).
+-export([run/3]).
 
-run(Filter, Cover) ->
+run(Dir, Filter, Cover) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([multi_node_test_runner, shortnames]),
@@ -39,7 +36,7 @@ run(Filter, Cover) ->
                  io:format(" done.~n~n");
         false -> ok
     end,
-    ok = eunit:test(make_tests(Filter, Cover, ?TIMEOUT), []),
+    ok = eunit:test(make_tests(modules(Dir), Filter, Cover, ?TIMEOUT), []),
     case Cover of
         true  -> io:format("~nCover reporting..."),
                  ok = rabbit_misc:report_cover(),
@@ -48,9 +45,9 @@ run(Filter, Cover) ->
     end,
     ok.
 
-make_tests(Filter, Cover, Timeout) ->
+make_tests(Modules, Filter, Cover, Timeout) ->
     All = [{M, FWith, F} ||
-              M <- ?MODULES,
+              M <- Modules,
               {FWith, _Arity} <- proplists:get_value(exports, M:module_info()),
               string:right(atom_to_list(FWith), 5) =:= "_with",
               F <- [fwith_to_f(FWith)]],
@@ -58,7 +55,10 @@ make_tests(Filter, Cover, Timeout) ->
                         should_run(M, F, tokens(Filter))],
     io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
               [length(Filtered), length(All), Filter, Cover]),
-    Width = lists:max([atom_length(F) || {_, _, F} <- Filtered]),
+    Width = case Filtered of
+                [] -> 0;
+                _  -> lists:max([atom_length(F) || {_, _, F} <- Filtered])
+            end,
     Cfg = [{cover, Cover}],
     [make_test(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
@@ -134,6 +134,14 @@ ensure_dir(Path) ->
         {ok, #file_info{type=directory}} -> ok;
         _                                -> file:make_dir(Path)
     end.
+
+modules(RelDir) ->
+    {ok, Files} = file:list_dir(RelDir),
+    [M || F <- Files,
+          M <- case string:tokens(F, ".") of
+                   [MStr, "beam"] -> [list_to_atom(MStr)];
+                   _              -> []
+               end].
 
 recursive_delete(Dir) ->
     rabbit_test_configs:execute({"rm -rf ~s", [Dir]}).
