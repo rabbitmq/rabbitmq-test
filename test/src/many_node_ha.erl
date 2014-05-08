@@ -19,12 +19,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_util, [set_policy/4, a2b/1]).
+-import(rabbit_test_util, [a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 kill_intermediate_with() ->
     fun (Cfg) -> rabbit_test_configs:cluster(Cfg, [a,b,c,d,e,f]) end.
-kill_intermediate([CfgA, _CfgB, _CfgC, _CfgD, CfgE, CfgF] = Nodes) ->
+kill_intermediate([CfgA, CfgB, CfgC, CfgD, CfgE, CfgF] = Nodes) ->
     Msgs            = rabbit_test_configs:cover_work_factor(20000, CfgA),
     MasterChannel   = pget(channel, CfgA),
     ConsumerChannel = pget(channel, CfgE),
@@ -49,11 +49,11 @@ kill_intermediate([CfgA, _CfgB, _CfgC, _CfgD, CfgE, CfgF] = Nodes) ->
                                                  Queue, self(), false, Msgs),
 
     %% create a killer for the master and the first 3 slaves
-    [rabbit_test_util:kill_after(Time, Node, Nodes, sigkill) ||
-        {Node, Time} <- [{a, 50},
-                         {b, 50},
-                         {c, 100},
-                         {d, 100}]],
+    [rabbit_test_util:kill_after(Time, Cfg, sigkill) ||
+        {Cfg, Time} <- [{CfgA, 50},
+                        {CfgB, 50},
+                        {CfgC, 100},
+                        {CfgD, 100}]],
 
     %% verify that the consumer got all msgs, or die, or time out
     rabbit_ha_test_producer:await_response(ProducerPid),

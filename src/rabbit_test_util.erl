@@ -20,48 +20,48 @@
 
 -compile(export_all).
 
-set_policy(Node, Pattern, HAMode) ->
-    set_policy0(Node, Pattern, [{<<"ha-mode">>,   HAMode}]).
+set_ha_policy(Cfg, Pattern, HAMode) ->
+    set_policy(Cfg, Pattern, Pattern, [{<<"ha-mode">>,   HAMode}]).
 
-set_policy(Node, Pattern, HAMode, HAParams) ->
-    set_policy0(Node, Pattern, [{<<"ha-mode">>,   HAMode},
-                                {<<"ha-params">>, HAParams}]).
+set_ha_policy(Cfg, Pattern, HAMode, HAParams) ->
+    set_policy(Cfg, Pattern, Pattern, [{<<"ha-mode">>,   HAMode},
+                                       {<<"ha-params">>, HAParams}]).
 
-set_policy(Node, Pattern, HAMode, HAParams, HASyncMode) ->
-    set_policy0(Node, Pattern, [{<<"ha-mode">>,      HAMode},
-                                {<<"ha-params">>,    HAParams},
-                                {<<"ha-sync-mode">>, HASyncMode}]).
+set_ha_policy(Cfg, Pattern, HAMode, HAParams, HASyncMode) ->
+    set_policy(Cfg, Pattern, Pattern, [{<<"ha-mode">>,      HAMode},
+                                       {<<"ha-params">>,    HAParams},
+                                       {<<"ha-sync-mode">>, HASyncMode}]).
 
-set_policy0(Node, Pattern, Definition) ->
-    ok = rpc:call(Node, rabbit_policy, set,
-                  [<<"/">>, Pattern, Pattern, Definition, 0, <<"queues">>]).
+set_policy(Cfg, Name, Pattern, Definition) ->
+    ok = rpc:call(pget(node, Cfg), rabbit_policy, set,
+                  [<<"/">>, Name, Pattern, Definition, 0, <<"queues">>]).
 
-clear_policy(Node, Pattern) ->
-    ok = rpc:call(Node, rabbit_policy, delete, [<<"/">>, Pattern]).
+clear_policy(Cfg, Name) ->
+    ok = rpc:call(pget(node, Cfg), rabbit_policy, delete, [<<"/">>, Name]).
 
-control_action(Command, Node) ->
-    control_action(Command, Node, [], []).
+control_action(Command, Cfg) ->
+    control_action(Command, Cfg, [], []).
 
-control_action(Command, Node, Args) ->
-    control_action(Command, Node, Args, []).
+control_action(Command, Cfg, Args) ->
+    control_action(Command, Cfg, Args, []).
 
-control_action(Command, Node, Args, Opts) ->
+control_action(Command, Cfg, Args, Opts) ->
+    Node = pget(node, Cfg),
     rpc:call(Node, rabbit_control_main, action,
              [Command, Node, Args, Opts,
               fun (F, A) ->
                       error_logger:info_msg(F ++ "~n", A)
               end]).
 
-cluster_status(Node) ->
-    {rpc:call(Node, rabbit_mnesia, cluster_nodes, [all]),
-     rpc:call(Node, rabbit_mnesia, cluster_nodes, [disc]),
-     rpc:call(Node, rabbit_mnesia, cluster_nodes, [running])}.
+restart_app(Cfg) ->
+    stop_app(Cfg),
+    start_app(Cfg).
 
-stop_app(Node) ->
-    control_action(stop_app, Node).
+stop_app(Cfg) ->
+    control_action(stop_app, Cfg).
 
-start_app(Node) ->
-    control_action(start_app, Node).
+start_app(Cfg) ->
+    control_action(start_app, Cfg).
 
 connect(Cfg) ->
     Port = pget(port, Cfg),
@@ -71,20 +71,16 @@ connect(Cfg) ->
 
 %%----------------------------------------------------------------------------
 
-kill_after(Time, Nodename, Cfgs, Method) ->
+kill_after(Time, Cfg, Method) ->
     timer:sleep(Time),
-    kill(Nodename, Cfgs, Method).
+    kill(Cfg, Method).
 
-kill(Nodename, Cfgs, Method) ->
-    NodeCfg = find(Nodename, Cfgs),
-    kill(NodeCfg, Method).
+kill(Cfg, Method) ->
+    kill0(Cfg, Method),
+    wait_down(pget(node, Cfg)).
 
-kill(NodeCfg, Method) ->
-    kill0(NodeCfg, Method),
-    wait_down(pget(node, NodeCfg)).
-
-kill0(NodeCfg, stop)    -> rabbit_test_configs:stop_node(NodeCfg);
-kill0(NodeCfg, sigkill) -> rabbit_test_configs:kill_node(NodeCfg).
+kill0(Cfg, stop)    -> rabbit_test_configs:stop_node(Cfg);
+kill0(Cfg, sigkill) -> rabbit_test_configs:kill_node(Cfg).
 
 wait_down(Node) ->
     case net_adm:ping(Node) of
@@ -94,11 +90,3 @@ wait_down(Node) ->
     end.
 
 a2b(A) -> list_to_binary(atom_to_list(A)).
-
-
-find(Name, Cfgs) ->
-    [Cfg] = [Cfg || Cfg <- Cfgs, pget(nodename, Cfg) =:= Name],
-    Cfg.
-
-find(Nodename, Thing, Cfgs) ->
-    pget(Thing, find(Nodename, Cfgs)).

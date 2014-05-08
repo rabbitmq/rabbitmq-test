@@ -133,8 +133,8 @@ eager_sync_auto_on_policy_change([A, B, C]) ->
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
     Params = [a2b(pget(node, Cfg)) || Cfg <- [A, B]],
-    rabbit_test_util:set_policy(
-      pget(node, A), <<"^ha.two.">>, <<"nodes">>, Params, <<"automatic">>),
+    rabbit_test_util:set_ha_policy(
+      A, <<"^ha.two.">>, <<"nodes">>, Params, <<"automatic">>),
     wait_for_sync(C, ?QNAME),
 
     ok.
@@ -194,9 +194,7 @@ fetch(Ch, QName, Count) ->
         _ <- lists:seq(1, Count)],
     ok.
 
-restart(Cfg) ->
-    rabbit_test_util:stop_app(pget(node, Cfg)),
-    rabbit_test_util:start_app(pget(node, Cfg)).
+restart(Cfg) -> rabbit_test_util:restart_app(Cfg).
 
 sync(Cfg, QName) ->
     case sync_nowait(Cfg, QName) of
@@ -213,7 +211,7 @@ wait_for_sync(Cfg, QName) ->
 
 action(Cfg, Action, QName) ->
     rabbit_test_util:control_action(
-      Action, pget(node, Cfg), [binary_to_list(QName)], [{"-p", "/"}]).
+      Action, Cfg, [binary_to_list(QName)], [{"-p", "/"}]).
 
 queue(Cfg, QName) ->
     QNameRes = rabbit_misc:r(<<"/">>, queue, QName),

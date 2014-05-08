@@ -37,7 +37,8 @@
 -define(POLICY, <<"^ha.test$">>). %% " emacs
 -define(VHOST, <<"/">>).
 
--import(rabbit_test_util, [set_policy/3, set_policy/4, clear_policy/2, a2b/1]).
+-import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4,
+                           clear_policy/2, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 change_policy_with() -> cluster_abc.
@@ -50,23 +51,23 @@ change_policy([CfgA, _CfgB, _CfgC] = Cfgs) ->
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy "all", it becomes HA and gets all mirrors
-    set_policy(A, ?POLICY, <<"all">>),
+    set_ha_policy(CfgA, ?POLICY, <<"all">>),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Give it policy "nodes", it gets specific mirrors
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(B)]),
+    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(A), a2b(B)]),
     assert_slaves(A, ?QNAME, {A, [B]}),
 
     %% Now explicitly change the mirrors
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
+    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
     assert_slaves(A, ?QNAME, {A, [C]}, [{A, [B, C]}]),
 
     %% Clear the policy, and we go back to non-mirrored
-    clear_policy(A, ?POLICY),
+    clear_policy(CfgA, ?POLICY),
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Test switching "away" from an unmirrored node
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
+    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
     assert_slaves(A, ?QNAME, {A, [B, C]}, [{A, [B]}, {A, [C]}]),
 
     ok.
@@ -80,7 +81,7 @@ change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy exactly 4, it should mirror to all 3 nodes
-    set_policy(A, ?POLICY, <<"exactly">>, 4),
+    set_ha_policy(CfgA, ?POLICY, <<"exactly">>, 4),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
@@ -107,7 +108,7 @@ rapid_change([CfgA, _CfgB, _CfgC]) ->
               [rapid_amqp_ops(ACh, I) || I <- lists:seq(1, 100)],
               Self ! done
       end),
-    rapid_loop(A),
+    rapid_loop(CfgA),
     ok.
 
 rapid_amqp_ops(Ch, I) ->
@@ -125,13 +126,13 @@ rapid_amqp_ops(Ch, I) ->
     end,
     amqp_channel:call(Ch, #'queue.delete'{queue = ?QNAME}).
 
-rapid_loop(Node) ->
+rapid_loop(Cfg) ->
     receive done ->
             ok
     after 0 ->
-            set_policy(Node, ?POLICY, <<"all">>),
-            clear_policy(Node, ?POLICY),
-            rapid_loop(Node)
+            set_ha_policy(Cfg, ?POLICY, <<"all">>),
+            clear_policy(Cfg, ?POLICY),
+            rapid_loop(Cfg)
     end.
 
 %%----------------------------------------------------------------------------

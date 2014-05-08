@@ -19,6 +19,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
+-import(rabbit_test_util, [stop_app/1, start_app/1]).
 -import(rabbit_misc, [pget/2]).
 
 -define(LOOP_RECURSION_DELAY, 100).
@@ -186,6 +187,3 @@ wait_for_messages(Queue, Channel, N) ->
                  end
       end, lists:seq(1, N)),
     amqp_channel:call(Channel, #'basic.cancel'{consumer_tag = CTag}).
-
-start_app(Cfg) -> rabbit_test_util:start_app(pget(node, Cfg)).
-stop_app(Cfg)  -> rabbit_test_util:stop_app(pget(node, Cfg)).

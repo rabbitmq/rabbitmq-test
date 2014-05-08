@@ -19,7 +19,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_util, [set_policy/4, a2b/1]).
+-import(rabbit_test_util, [set_ha_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 rapid_redeclare_with() -> cluster_ab.
@@ -82,7 +82,7 @@ consume_survives([CfgA, CfgB, CfgC] = Nodes,
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Channel3, Queue,
                                                  self(), false, Msgs),
-    DeathFun(a, Nodes),
+    DeathFun(CfgA, Nodes),
     %% verify that the consumer got all msgs, or die - the await_response
     %% calls throw an exception if anything goes wrong....
     rabbit_ha_test_consumer:await_response(ConsumerPid),
@@ -103,15 +103,14 @@ confirms_survive([CfgA, CfgB, _CfgC] = Nodes, DeathFun) ->
     %% send a bunch of messages from the producer
     ProducerPid = rabbit_ha_test_producer:create(Node2Channel, Queue,
                                                  self(), true, Msgs),
-    DeathFun(a, Nodes),
+    DeathFun(CfgA, Nodes),
     rabbit_ha_test_producer:await_response(ProducerPid),
     ok.
 
-stop(Name, Nodes)    -> rabbit_test_util:kill_after(50, Name, Nodes, stop).
-sigkill(Name, Nodes) -> rabbit_test_util:kill_after(50, Name, Nodes, sigkill).
-policy(Name, [H|T])  -> Nodes = [a2b(pget(node, Cfg)) || Cfg <- T],
-                        Node = rabbit_test_util:find(Name, node, [H|T]),
-                        set_policy(Node, <<"^ha.all.">>, <<"nodes">>, Nodes).
+stop(Cfg, _Cfgs)    -> rabbit_test_util:kill_after(50, Cfg, stop).
+sigkill(Cfg, _Cfgs) -> rabbit_test_util:kill_after(50, Cfg, sigkill).
+policy(Cfg, [_|T])  -> Nodes = [a2b(pget(node, C)) || C <- T],
+                       set_ha_policy(Cfg, <<"^ha.all.">>, <<"nodes">>, Nodes).
 
 open_incapable_channel(NodePort) ->
     Props = [{<<"capabilities">>, table, []}],

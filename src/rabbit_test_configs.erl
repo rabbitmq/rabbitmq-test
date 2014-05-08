@@ -22,7 +22,8 @@
 -export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0, execute/1]).
 -export([cover_work_factor/2]).
 
--import(rabbit_test_utils, [set_policy/3, set_policy/4, set_policy/5, a2b/1]).
+-import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, set_ha_policy/5,
+                           a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
@@ -103,15 +104,14 @@ cluster_with(Cfg, NewCfg) ->
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s start_app",
              [NewNodename]}).   
 
-set_default_policies(Nodes) ->
-    Node = pget(node, hd(Nodes)),
-    Members = [pget(node, Cfg) || Cfg <- Nodes],
-    set_policy(Node, <<"^ha.all.">>, <<"all">>),
-    set_policy(Node, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
+set_default_policies([Cfg | _] = Cfgs) ->
+    Members = [pget(node, C) || C <- Cfgs],
+    set_ha_policy(Cfg, <<"^ha.all.">>, <<"all">>),
+    set_ha_policy(Cfg, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
     TwoNodes = [a2b(M) || M <- lists:sublist(Members, 2)],
-    set_policy(Node, <<"^ha.two.">>, <<"nodes">>, TwoNodes),
-    set_policy(Node, <<"^ha.auto.">>, <<"nodes">>, TwoNodes, <<"automatic">>),
-    Nodes.
+    set_ha_policy(Cfg, <<"^ha.two.">>, <<"nodes">>, TwoNodes),
+    set_ha_policy(Cfg, <<"^ha.auto.">>, <<"nodes">>, TwoNodes, <<"automatic">>),
+    Cfgs.
 
 start_connections(Nodes) -> [start_connection(Node) || Node <- Nodes].
 
