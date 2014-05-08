@@ -17,9 +17,10 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([cluster/2, cluster_ab/1, cluster_abc/1, start_abc/1]).
+-export([enable_plugins/1]).
+-export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
 -export([start_nodes/3, add_to_cluster/2]).
--export([stop_nodes/1, stop_node/1, kill_node/1, basedir/0, execute/1]).
+-export([stop_nodes/1, stop_node/1, kill_node/1, restart_node/1, execute/1]).
 -export([cover_work_factor/2]).
 
 -import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, set_ha_policy/5,
@@ -28,6 +29,7 @@
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
 cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
+start_ab(InitialCfg)    -> start_nodes(InitialCfg, [a, b]).
 start_abc(InitialCfg)   -> start_nodes(InitialCfg, [a, b, c]).
 
 cluster(InitialCfg, NodeNames) ->
@@ -44,8 +46,7 @@ start_nodes(InitialCfg, NodeNames, FirstPort) ->
     Ports = lists:seq(FirstPort, length(NodeNames) + FirstPort - 1),
     Nodes = [[{nodename, N}, {port, P} | strip_non_initial(InitialCfg)]
              || {N, P} <- lists:zip(NodeNames, Ports)],
-    Base = basedir() ++ "/nodes",
-    [start_node(Node, Base) || Node <- Nodes].
+    [start_node(Node) || Node <- Nodes].
 
 check_node_not_running(Node, Already) ->
     case lists:member(Node, Already) of
@@ -54,11 +55,34 @@ check_node_not_running(Node, Already) ->
     end.
 
 strip_non_initial(Cfg) ->
-    [{K, V} || {K, V} <- Cfg, K =:= cover].
+    [{K, V} || {K, V} <- Cfg, lists:member(K, [cover, base, plugins])].
 
-start_node(Cfg, Base) ->
+strip_non_running(Cfg) ->
+    [{K, V} || {K, V} <- Cfg, lists:member(K, [cover, base, plugins,
+                                               nodename, port])].
+enable_plugins(none) -> ok;
+enable_plugins(Dir) ->
+    R = execute(
+          plugins_env(Dir),
+          "../rabbitmq-server/scripts/rabbitmq-plugins list -m"),
+    Plugins = string:tokens(R, "\n"),
+    [execute(
+       plugins_env(Dir),
+       {"../rabbitmq-server/scripts/rabbitmq-plugins enable ~s", [Plugin]})
+     || Plugin <- Plugins],
+    ok.
+
+plugins_env(none) ->
+    [{"RABBITMQ_ENABLED_PLUGINS_FILE", "/does-not-exist"}];
+plugins_env(Dir) ->
+    [{"RABBITMQ_PLUGINS_DIR",          {"~s/plugins", [Dir]}},
+     {"RABBITMQ_PLUGINS_EXPAND_DIR",   {"~s/expand", [Dir]}},
+     {"RABBITMQ_ENABLED_PLUGINS_FILE", {"~s/enabled_plugins", [Dir]}}].
+
+start_node(Cfg) ->
     Nodename = pget(nodename, Cfg),
     Port = pget(port, Cfg),
+    Base = pget(base, Cfg),
     PidFile = rabbit_misc:format("~s/~s.pid", [Base, Nodename]),
     Linked =
         execute_bg(
@@ -67,8 +91,8 @@ start_node(Cfg, Base) ->
            {"RABBITMQ_NODENAME",    {"~s", [Nodename]}},
            {"RABBITMQ_NODE_PORT",   {"~B", [Port]}},
            {"RABBITMQ_PID_FILE",    PidFile},
-           {"RABBITMQ_ALLOW_INPUT", "1"}, %% Needed to make it close on our exit
-           {"RABBITMQ_ENABLED_PLUGINS_FILE", "/does-not-exist"}],
+           {"RABBITMQ_ALLOW_INPUT", "1"} %% Needed to make it close on our exit
+           | plugins_env(pget(plugins, Cfg))],
           "../rabbitmq-server/scripts/rabbitmq-server"),
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s wait ~s",
              [Nodename, PidFile]}),
@@ -126,11 +150,16 @@ stop_nodes(Nodes) -> [stop_node(Node) || Node <- Nodes].
 stop_node(Cfg) ->
     maybe_flush_cover(Cfg),
     catch execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s stop ~s",
-                   [pget(nodename, Cfg), pget(pid_file, Cfg)]}).
+                   [pget(nodename, Cfg), pget(pid_file, Cfg)]}),
+    strip_non_running(Cfg).
 
 kill_node(Cfg) ->
     maybe_flush_cover(Cfg),
-    catch execute({"kill -9 ~s", [pget(os_pid, Cfg)]}).
+    catch execute({"kill -9 ~s", [pget(os_pid, Cfg)]}),
+    strip_non_running(Cfg).
+
+restart_node(Cfg) ->
+    start_node(stop_node(Cfg)).
 
 maybe_flush_cover(Cfg) ->
     case pget(cover, Cfg) of
@@ -161,8 +190,8 @@ execute(Env0, Cmd0) ->
 
 port_receive_loop(Port, Stdout) ->
     receive
-        {Port, {exit_status, 0}}   -> ok;
-        {Port, {exit_status, 137}} -> ok; %% [0]
+        {Port, {exit_status, 0}}   -> Stdout;
+        {Port, {exit_status, 137}} -> Stdout; %% [0]
         {Port, {exit_status, X}}   -> exit({exit_status, X, Stdout});
         {Port, {data, Out}}        -> port_receive_loop(Port, Stdout ++ Out)
     end.
@@ -178,5 +207,3 @@ execute_bg(Env, Cmd) ->
 
 fmt({Fmt, Args}) -> rabbit_misc:format(Fmt, Args);
 fmt(Str)         -> Str.
-
-basedir() -> "/tmp/rabbitmq-multi-node".

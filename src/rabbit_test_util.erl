@@ -21,23 +21,34 @@
 -compile(export_all).
 
 set_ha_policy(Cfg, Pattern, HAMode) ->
-    set_policy(Cfg, Pattern, Pattern, [{<<"ha-mode">>,   HAMode}]).
+    set_policy(Cfg, Pattern, Pattern, <<"queues">>,
+               [{<<"ha-mode">>,   HAMode}]).
 
 set_ha_policy(Cfg, Pattern, HAMode, HAParams) ->
-    set_policy(Cfg, Pattern, Pattern, [{<<"ha-mode">>,   HAMode},
-                                       {<<"ha-params">>, HAParams}]).
+    set_policy(Cfg, Pattern, Pattern, <<"queues">>,
+               [{<<"ha-mode">>,   HAMode},
+                {<<"ha-params">>, HAParams}]).
 
 set_ha_policy(Cfg, Pattern, HAMode, HAParams, HASyncMode) ->
-    set_policy(Cfg, Pattern, Pattern, [{<<"ha-mode">>,      HAMode},
-                                       {<<"ha-params">>,    HAParams},
-                                       {<<"ha-sync-mode">>, HASyncMode}]).
+    set_policy(Cfg, Pattern, Pattern, <<"queues">>,
+               [{<<"ha-mode">>,      HAMode},
+                {<<"ha-params">>,    HAParams},
+                {<<"ha-sync-mode">>, HASyncMode}]).
 
-set_policy(Cfg, Name, Pattern, Definition) ->
+set_policy(Cfg, Name, Pattern, ApplyTo, Definition) ->
     ok = rpc:call(pget(node, Cfg), rabbit_policy, set,
-                  [<<"/">>, Name, Pattern, Definition, 0, <<"queues">>]).
+                  [<<"/">>, Name, Pattern, Definition, 0, ApplyTo]).
 
 clear_policy(Cfg, Name) ->
     ok = rpc:call(pget(node, Cfg), rabbit_policy, delete, [<<"/">>, Name]).
+
+set_param(Cfg, Component, Name, Value) ->
+    ok = rpc:call(pget(node, Cfg), rabbit_runtime_parameters, set,
+                  [<<"/">>, Component, Name, Value, none]).
+
+clear_param(Cfg, Component, Name) ->
+    ok = rpc:call(pget(node, Cfg), rabbit_runtime_parameters, clear,
+                 [<<"/">>, Component, Name]).
 
 control_action(Command, Cfg) ->
     control_action(Command, Cfg, [], []).

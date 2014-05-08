@@ -22,9 +22,9 @@
 
 -import(rabbit_misc, [pget/2]).
 
--export([run_multi/3]).
+-export([run_multi/4]).
 
-run_multi(Dir, Filter, Cover) ->
+run_multi(Dir, Filter, Cover, PluginsDir) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([?MODULE, shortnames]),
@@ -36,7 +36,7 @@ run_multi(Dir, Filter, Cover) ->
                  io:format(" done.~n~n");
         false -> ok
     end,
-    ok = eunit:test(make_tests(modules(Dir), Filter, Cover, ?TIMEOUT), []),
+    ok = eunit:test(make_tests(Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
     case Cover of
         true  -> io:format("~nCover reporting..."),
                  ok = rabbit_misc:report_cover(),
@@ -45,9 +45,9 @@ run_multi(Dir, Filter, Cover) ->
     end,
     ok.
 
-make_tests(Modules, Filter, Cover, Timeout) ->
+make_tests(Dir, Filter, Cover, PluginsDir, Timeout) ->
     All = [{M, FWith, F} ||
-              M <- Modules,
+              M <- modules(Dir),
               {FWith, _Arity} <- proplists:get_value(exports, M:module_info()),
               string:right(atom_to_list(FWith), 5) =:= "_with",
               F <- [fwith_to_f(FWith)]],
@@ -59,7 +59,10 @@ make_tests(Modules, Filter, Cover, Timeout) ->
                 [] -> 0;
                 _  -> lists:max([atom_length(F) || {_, _, F} <- Filtered])
             end,
-    Cfg = [{cover, Cover}],
+    Cfg = [{cover,   Cover},
+           {base,    basedir() ++ "/nodes"},
+           {plugins, PluginsDir}],
+    rabbit_test_configs:enable_plugins(PluginsDir),
     [make_test(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
 
@@ -72,9 +75,8 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
                  false -> ok
              end,
              io:format(user, "~s [setup]", [name(F, Width)]),
-             Base = rabbit_test_configs:basedir(),
-             setup_error_logger(M, F, Base),
-             recursive_delete(Base ++ "/nodes"),
+             setup_error_logger(M, F, basedir()),
+             recursive_delete(pget(base, InitialCfg)),
              CfgFun = case M:FWith() of
                           CfgName when is_atom(CfgName) ->
                               fun rabbit_test_configs:CfgName/1;
@@ -111,8 +113,7 @@ setup_error_logger(M, F, Base) ->
         {error, no_log_file} -> ok;
         _                    -> ok = error_logger:logfile(close)
     end,
-    FN = rabbit_misc:format("~s/~s:~s.log",
-                            [rabbit_test_configs:basedir(), M, F]),
+    FN = rabbit_misc:format("~s/~s:~s.log", [basedir(), M, F]),
     ensure_dir(Base),
     ok = error_logger:logfile({open, FN}).
 
@@ -151,3 +152,5 @@ name(F, Width) ->
     R ++ ":" ++ string:chars($ , Width - length(R)).
 
 atom_length(A) -> length(atom_to_list(A)).
+
+basedir() -> "/tmp/rabbitmq-multi-node".
