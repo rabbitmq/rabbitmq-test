@@ -187,5 +187,5 @@ wait_for_messages(Queue, Channel, N) ->
       end, lists:seq(1, N)),
     amqp_channel:call(Channel, #'basic.cancel'{consumer_tag = CTag}).
 
-start_app(Cfg) -> rabbit_test_utils:start_app(pget(node, Cfg)).
-stop_app(Cfg)  -> rabbit_test_utils:stop_app(pget(node, Cfg)).
+start_app(Cfg) -> rabbit_test_util:start_app(pget(node, Cfg)).
+stop_app(Cfg)  -> rabbit_test_util:stop_app(pget(node, Cfg)).

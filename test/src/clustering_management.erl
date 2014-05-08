@@ -19,7 +19,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_utils, [start_app/1, stop_app/1]).
+-import(rabbit_test_util, [start_app/1, stop_app/1]).
 -import(rabbit_misc, [pget/2]).
 
 -define(LOOP_RECURSION_DELAY, 100).
@@ -161,21 +161,21 @@ forget_cluster_node_removes_things_with() -> start_abc.
 forget_cluster_node_removes_things([RabbitCfg, HareCfg, _BunnyCfg] = Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
     stop_join_start(Rabbit, Hare),
-    {_RConn, RCh} = rabbit_test_utils:connect(RabbitCfg),
+    {_RConn, RCh} = rabbit_test_util:connect(RabbitCfg),
     #'queue.declare_ok'{} =
         amqp_channel:call(RCh, #'queue.declare'{queue   = <<"test">>,
                                                 durable = true}),
 
     ok = stop_app(Rabbit),
 
-    {_HConn, HCh} = rabbit_test_utils:connect(HareCfg),
+    {_HConn, HCh} = rabbit_test_util:connect(HareCfg),
     {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
         (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
                                                        durable = true})),
 
     ok = forget_cluster_node(Hare, Rabbit),
 
-    {_HConn2, HCh2} = rabbit_test_utils:connect(HareCfg),
+    {_HConn2, HCh2} = rabbit_test_util:connect(HareCfg),
     #'queue.declare_ok'{} =
         amqp_channel:call(HCh2, #'queue.declare'{queue   = <<"test">>,
                                                  durable = true}),
@@ -366,7 +366,7 @@ wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) ->
     end.
 
 verify_status_equal(Node, Status, AllNodes) ->
-    NodeStatus = sort_cluster_status(rabbit_test_utils:cluster_status(Node)),
+    NodeStatus = sort_cluster_status(rabbit_test_util:cluster_status(Node)),
     (AllNodes =/= [Node]) =:= rpc:call(Node, rabbit_mnesia, is_clustered, [])
         andalso NodeStatus =:= Status.
 
@@ -391,17 +391,17 @@ join_cluster(Node, To) ->
     join_cluster(Node, To, false).
 
 join_cluster(Node, To, Ram) ->
-    rabbit_test_utils:control_action(
+    rabbit_test_util:control_action(
       join_cluster, Node, [atom_to_list(To)], [{"--ram", Ram}]).
 
 reset(Node) ->
-    rabbit_test_utils:control_action(reset, Node).
+    rabbit_test_util:control_action(reset, Node).
 
 force_reset(Node) ->
-    rabbit_test_utils:control_action(force_reset, Node).
+    rabbit_test_util:control_action(force_reset, Node).
 
 forget_cluster_node(Node, Removee, RemoveWhenOffline) ->
-    rabbit_test_utils:control_action(
+    rabbit_test_util:control_action(
       forget_cluster_node, Node, [atom_to_list(Removee)],
       [{"--offline", RemoveWhenOffline}]).
 
@@ -409,11 +409,11 @@ forget_cluster_node(Node, Removee) ->
     forget_cluster_node(Node, Removee, false).
 
 change_cluster_node_type(Node, Type) ->
-    rabbit_test_utils:control_action(change_cluster_node_type, Node,
+    rabbit_test_util:control_action(change_cluster_node_type, Node,
                                      [atom_to_list(Type)]).
 
 update_cluster_nodes(Node, DiscoveryNode) ->
-    rabbit_test_utils:control_action(update_cluster_nodes, Node,
+    rabbit_test_util:control_action(update_cluster_nodes, Node,
                                      [atom_to_list(DiscoveryNode)]).
 
 stop_join_start(Node, ClusterTo, Ram) ->

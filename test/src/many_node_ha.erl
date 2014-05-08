@@ -19,7 +19,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_utils, [set_policy/4, a2b/1]).
+-import(rabbit_test_util, [set_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 kill_intermediate_with() ->
@@ -49,7 +49,7 @@ kill_intermediate([CfgA, _CfgB, _CfgC, _CfgD, CfgE, CfgF] = Nodes) ->
                                                  Queue, self(), false, Msgs),
 
     %% create a killer for the master and the first 3 slaves
-    [rabbit_test_utils:kill_after(Time, Node, Nodes, sigkill) ||
+    [rabbit_test_util:kill_after(Time, Node, Nodes, sigkill) ||
         {Node, Time} <- [{a, 50},
                          {b, 50},
                          {c, 100},

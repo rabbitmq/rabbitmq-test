@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(rabbit_test_utils).
+-module(rabbit_test_util).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 -import(rabbit_misc, [pget/2]).

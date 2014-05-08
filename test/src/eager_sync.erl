@@ -23,7 +23,7 @@
 -define(QNAME_AUTO, <<"ha.auto.test">>).
 -define(MESSAGE_COUNT, 2000).
 
--import(rabbit_test_utils, [a2b/1]).
+-import(rabbit_test_util, [a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 eager_sync_with() -> cluster_abc.
@@ -133,7 +133,7 @@ eager_sync_auto_on_policy_change([A, B, C]) ->
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
     Params = [a2b(pget(node, Cfg)) || Cfg <- [A, B]],
-    rabbit_test_utils:set_policy(
+    rabbit_test_util:set_policy(
       pget(node, A), <<"^ha.two.">>, <<"nodes">>, Params, <<"automatic">>),
     wait_for_sync(C, ?QNAME),
 
@@ -195,8 +195,8 @@ fetch(Ch, QName, Count) ->
     ok.
 
 restart(Cfg) ->
-    rabbit_test_utils:stop_app(pget(node, Cfg)),
-    rabbit_test_utils:start_app(pget(node, Cfg)).
+    rabbit_test_util:stop_app(pget(node, Cfg)),
+    rabbit_test_util:start_app(pget(node, Cfg)).
 
 sync(Cfg, QName) ->
     case sync_nowait(Cfg, QName) of
@@ -212,7 +212,7 @@ wait_for_sync(Cfg, QName) ->
     sync_detection:wait_for_sync_status(true, Cfg, QName).
 
 action(Cfg, Action, QName) ->
-    rabbit_test_utils:control_action(
+    rabbit_test_util:control_action(
       Action, pget(node, Cfg), [binary_to_list(QName)], [{"-p", "/"}]).
 
 queue(Cfg, QName) ->

@@ -37,11 +37,11 @@ pause_on_down([_CfgA, CfgB, CfgC] = Cfgs) ->
     [set_mode(N, pause_minority) || N <- [A, B, C]],
     true = is_running(A),
 
-    rabbit_test_utils:kill(CfgB, sigkill),
+    rabbit_test_util:kill(CfgB, sigkill),
     timer:sleep(5000),
     true = is_running(A),
 
-    rabbit_test_utils:kill(CfgC, sigkill),
+    rabbit_test_util:kill(CfgC, sigkill),
     timer:sleep(5000),
     false = is_running(A),
     ok.

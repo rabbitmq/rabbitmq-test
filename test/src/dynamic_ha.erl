@@ -37,7 +37,7 @@
 -define(POLICY, <<"^ha.test$">>). %% " emacs
 -define(VHOST, <<"/">>).
 
--import(rabbit_test_utils, [set_policy/3, set_policy/4, clear_policy/2, a2b/1]).
+-import(rabbit_test_util, [set_policy/3, set_policy/4, clear_policy/2, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 change_policy_with() -> cluster_abc.
