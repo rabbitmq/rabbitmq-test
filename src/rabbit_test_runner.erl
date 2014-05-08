@@ -14,7 +14,7 @@
 %%   Copyright (c) 2010-2014 GoPivotal, Inc.  All rights reserved.
 %%
 
--module(multi_node_test_runner).
+-module(rabbit_test_runner).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -22,12 +22,12 @@
 
 -import(rabbit_misc, [pget/2]).
 
--export([run/3]).
+-export([run_multi/3]).
 
-run(Dir, Filter, Cover) ->
+run_multi(Dir, Filter, Cover) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
-    net_kernel:start([multi_node_test_runner, shortnames]),
+    net_kernel:start([?MODULE, shortnames]),
     error_logger:tty(false),
     case Cover of
         true  -> io:format("Cover compiling..."),
