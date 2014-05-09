@@ -101,7 +101,6 @@ change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
 rapid_change_with() -> cluster_abc.
 rapid_change([CfgA, _CfgB, _CfgC]) ->
     ACh = pget(channel, CfgA),
-    A = pget(node, CfgA),
     Self = self(),
     spawn_link(
       fun() ->
