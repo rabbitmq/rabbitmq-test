@@ -1,9 +1,9 @@
 syntax: regexp
 ^qpid_testsuite/
+^build/
 ^certs/
-^multi-node/lib/
-^multi-node/test-lib/
-^multi-node/bin/
-^multi-node/ebin/
-^multi-node/test-ebin/
-^multi-node/logs/
+^cover/
+^dist/
+^ebin/
+^test/ebin/
+.*~

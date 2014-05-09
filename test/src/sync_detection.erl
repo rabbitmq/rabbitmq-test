@@ -13,34 +13,20 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(slave_synchronization_SUITE).
+-module(sync_detection).
 
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         slave_synchronization/1, slave_synchronization_ttl/1,
-         wait_for_sync_status/3]).
+-import(rabbit_test_util, [stop_app/1, start_app/1]).
+-import(rabbit_misc, [pget/2]).
 
 -define(LOOP_RECURSION_DELAY, 100).
 
-suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
-
-all() ->
-    [slave_synchronization, slave_synchronization_ttl].
-
-init_per_suite(Config) ->
-    timer:start(),
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-slave_synchronization(Config) ->
-    {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
-                {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
-                _Unused]} =
-        rabbit_ha_test_utils:cluster_members(Config),
-
+slave_synchronization_with() -> cluster_ab.
+slave_synchronization([Master, Slave]) ->
+    Channel = pget(channel, Master),
     Queue = <<"ha.two.test">>,
     #'queue.declare_ok'{} =
         amqp_channel:call(Channel, #'queue.declare'{queue       = Queue,
@@ -48,7 +34,7 @@ slave_synchronization(Config) ->
 
     %% The comments on the right are the queue length and the pending acks on
     %% the master.
-    rabbit_ha_test_utils:stop_app(Slave),
+    stop_app(Slave),
 
     %% We get and ack one message when the slave is down, and check that when we
     %% start the slave it's not marked as synced until ack the message.  We also
@@ -57,7 +43,7 @@ slave_synchronization(Config) ->
     {#'basic.get_ok'{delivery_tag = Tag1}, _} =
         amqp_channel:call(Channel, #'basic.get'{queue = Queue}),        % 0 - 1
 
-    rabbit_ha_test_utils:start_app(Slave),
+    start_app(Slave),
 
     slave_unsynced(Master, Queue),
     send_dummy_message(Channel, Queue),                                 % 1 - 1
@@ -69,8 +55,8 @@ slave_synchronization(Config) ->
 
     %% We restart the slave and we send a message, so that the slave will only
     %% have one of the messages.
-    rabbit_ha_test_utils:stop_app(Slave),
-    rabbit_ha_test_utils:start_app(Slave),
+    stop_app(Slave),
+    start_app(Slave),
 
     send_dummy_message(Channel, Queue),                                 % 2 - 0
 
@@ -93,11 +79,10 @@ slave_synchronization(Config) ->
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag4}),      % 0 - 0
     slave_synced(Master, Queue).
 
-slave_synchronization_ttl(Config) ->
-    {_Cluster, [{{Master, _MRef}, {_Connection,      Channel}},
-                {{Slave,  _SRef}, {_SlaveConnection, _SlaveChannel}},
-                {{_DLX,   _DRef}, {_DLXConnection,   DLXChannel}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+slave_synchronization_ttl_with() -> cluster_abc.
+slave_synchronization_ttl([Master, Slave, DLX]) ->
+    Channel = pget(channel, Master),
+    DLXChannel = pget(channel, DLX),
 
     %% We declare a DLX queue to wait for messages to be TTL'ed
     DLXQueue = <<"dlx-queue">>,
@@ -105,7 +90,7 @@ slave_synchronization_ttl(Config) ->
         amqp_channel:call(Channel, #'queue.declare'{queue       = DLXQueue,
                                                     auto_delete = false}),
 
-    TestMsgTTL = systest:settings("limits.slave_sync.test_msg_ttl"),
+    TestMsgTTL = 5000,
     Queue = <<"ha.two.test">>,
     %% Sadly we need fairly high numbers for the TTL because starting/stopping
     %% nodes takes a fair amount of time.
@@ -120,18 +105,18 @@ slave_synchronization_ttl(Config) ->
     slave_synced(Master, Queue),
 
     %% All unknown
-    rabbit_ha_test_utils:stop_app(Slave),
+    stop_app(Slave),
     send_dummy_message(Channel, Queue),
     send_dummy_message(Channel, Queue),
-    rabbit_ha_test_utils:start_app(Slave),
+    start_app(Slave),
     slave_unsynced(Master, Queue),
     wait_for_messages(DLXQueue, DLXChannel, 2),
     slave_synced(Master, Queue),
 
     %% 1 unknown, 1 known
-    rabbit_ha_test_utils:stop_app(Slave),
+    stop_app(Slave),
     send_dummy_message(Channel, Queue),
-    rabbit_ha_test_utils:start_app(Slave),
+    start_app(Slave),
     slave_unsynced(Master, Queue),
     send_dummy_message(Channel, Queue),
     slave_unsynced(Master, Queue),
@@ -164,10 +149,9 @@ slave_pids(Node, Queue) ->
 
 %% The mnesia syncronization takes a while, but we don't want to wait for the
 %% test to fail, since the timetrap is quite high.
-wait_for_sync_status(Status, Node, Queue) ->
-    Max = systest:settings("limits.slave_sync.sync_check_max_recursion_depth")
-        / ?LOOP_RECURSION_DELAY,
-    wait_for_sync_status(0, Max, Status, Node, Queue).
+wait_for_sync_status(Status, Cfg, Queue) ->
+    Max = 10000 / ?LOOP_RECURSION_DELAY,
+    wait_for_sync_status(0, Max, Status, pget(node, Cfg), Queue).
 
 wait_for_sync_status(N, Max, Status, Node, Queue) when N >= Max ->
     error({sync_status_max_tries_failed,
@@ -183,11 +167,11 @@ wait_for_sync_status(N, Max, Status, Node, Queue) ->
                  wait_for_sync_status(N + 1, Max, Status, Node, Queue)
     end.
 
-slave_synced(Node, Queue) ->
-    wait_for_sync_status(true, Node, Queue).
+slave_synced(Cfg, Queue) ->
+    wait_for_sync_status(true, Cfg, Queue).
 
-slave_unsynced(Node, Queue) ->
-    wait_for_sync_status(false, Node, Queue).
+slave_unsynced(Cfg, Queue) ->
+    wait_for_sync_status(false, Cfg, Queue).
 
 wait_for_messages(Queue, Channel, N) ->
     Sub = #'basic.consume'{queue = Queue},

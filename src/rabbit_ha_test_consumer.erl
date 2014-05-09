@@ -17,14 +17,10 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([await_response/1, await_response/2, create/5, start/6]).
+-export([await_response/1, create/5, start/6]).
 
 await_response(ConsumerPid) ->
-    await_response(ConsumerPid, infinity).
-
-await_response(ConsumerPid, Timeout) ->
-    case rabbit_ha_test_utils:await_response(ConsumerPid, Timeout) of
-        {error, timeout} -> throw(lost_contact_with_consumer);
+    case receive {ConsumerPid, Response} -> Response end of
         {error, Reason}  -> error(Reason);
         ok               -> ok
     end.
@@ -38,9 +34,10 @@ create(Channel, Queue, TestPid, CancelOnFailover, ExpectingMsgs) ->
     ConsumerPid.
 
 start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
-    systest:log("consumer ~p on ~p awaiting ~w messages "
-                "(lowest seen = ~w, cancel-on-failover = ~w)~n",
-                [self(), Channel, MsgsToConsume, LowestSeen, CancelOnFailover]),
+    error_logger:info_msg("consumer ~p on ~p awaiting ~w messages "
+                          "(lowest seen = ~w, cancel-on-failover = ~w)~n",
+                          [self(), Channel, MsgsToConsume, LowestSeen,
+                           CancelOnFailover]),
     run(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
 
 run(TestPid, _Channel, _Queue, _CancelOnFailover, _LowestSeen, 0) ->
@@ -66,9 +63,9 @@ run(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
                     run(TestPid, Channel, Queue,
                         CancelOnFailover, MsgNum, MsgsToConsume - 1);
                 MsgNum >= LowestSeen ->
-                    systest:log("consumer ~p on ~p ignoring redeliverd msg "
-                                "~p~n",
-                                [self(), Channel, MsgNum]),
+                    error_logger:info_msg(
+                      "consumer ~p on ~p ignoring redeliverd msg ~p~n",
+                      [self(), Channel, MsgNum]),
                     true = Redelivered, %% ASSERTION
                     run(TestPid, Channel, Queue,
                         CancelOnFailover, LowestSeen, MsgsToConsume);
@@ -80,9 +77,9 @@ run(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume) ->
                                    {error, {unexpected_message, MsgNum}})
             end;
         #'basic.cancel'{} when CancelOnFailover ->
-            systest:log("consumer ~p on ~p received basic.cancel: "
-                        "resubscribing to ~p on ~p~n",
-                        [self(), Channel, Queue, Channel]),
+            error_logger:info_msg("consumer ~p on ~p received basic.cancel: "
+                                  "resubscribing to ~p on ~p~n",
+                                  [self(), Channel, Queue, Channel]),
             resubscribe(TestPid, Channel, Queue, CancelOnFailover,
                         LowestSeen, MsgsToConsume);
         #'basic.cancel'{} ->
@@ -99,9 +96,9 @@ resubscribe(TestPid, Channel, Queue, CancelOnFailover, LowestSeen,
       Channel, consume_method(Queue, CancelOnFailover), self()),
     ok = receive #'basic.consume_ok'{} -> ok
          end,
-    systest:log("re-subscripting consumer ~p on ~p complete "
-                "(received basic.consume_ok)",
-                [self(), Channel]),
+    error_logger:info_msg("re-subscripting consumer ~p on ~p complete "
+                          "(received basic.consume_ok)",
+                          [self(), Channel]),
     start(TestPid, Channel, Queue, CancelOnFailover, LowestSeen, MsgsToConsume).
 
 consume_method(Queue, CancelOnFailover) ->

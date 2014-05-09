@@ -2,7 +2,9 @@
 	prepare restart-app stop-app start-app \
 	start-secondary-app stop-secondary-app \
 	restart-secondary-node cleanup force-snapshot \
-	multi-node-tests enable-ha disable-ha
+	enable-ha disable-ha
+
+include ../umbrella.mk
 
 BROKER_DIR=../rabbitmq-server
 TEST_DIR=../rabbitmq-java-client
@@ -42,7 +44,7 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
-all: full multi-node-tests
+all: full test
 
 full:
 	OK=true && \
@@ -81,12 +83,8 @@ run-qpid-testsuite: qpid_testsuite
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
 	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
-multi-node-tests:
-	$(MAKE) -C multi-node all
-
 clean:
 	rm -rf qpid_testsuite
-	$(MAKE) -C multi-node clean
 
 prepare: create_ssl_certs
 	$(MAKE) -C $(BROKER_DIR) \

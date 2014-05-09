@@ -13,43 +13,24 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(eager_synchronization_SUITE).
+-module(eager_sync).
 
--include_lib("common_test/include/ct.hrl").
--include_lib("systest/include/systest.hrl").
-
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.two.test">>).
 -define(QNAME_AUTO, <<"ha.auto.test">>).
 -define(MESSAGE_COUNT, 2000).
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         eager_sync_test/1, eager_sync_cancel_test/1, eager_sync_auto_test/1,
-         eager_sync_auto_on_policy_change_test/1, eager_sync_requeue_test/1]).
+-import(rabbit_test_util, [a2b/1]).
+-import(rabbit_misc, [pget/2]).
 
--import(rabbit_ha_test_utils, [set_policy/5, a2b/1]).
-
-%% NB: it can take almost a minute to start and cluster 3 nodes,
-%% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, systest:settings("time_traps.eager_sync")}].
-
-all() ->
-    systest_suite:export_all(?MODULE).
-
-init_per_suite(Config) ->
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-eager_sync_test(Config) ->
+eager_sync_with() -> cluster_abc.
+eager_sync([A, B, C]) ->
     %% Queue is on AB but not C.
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
-
+    ACh = pget(channel, A),
+    Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
@@ -83,12 +64,11 @@ eager_sync_test(Config) ->
 
     ok.
 
-eager_sync_cancel_test(Config) ->
+eager_sync_cancel_with() -> cluster_abc.
+eager_sync_cancel([A, B, C]) ->
     %% Queue is on AB but not C.
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_Conn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
+    ACh = pget(channel, A),
+    Ch = pget(channel, C),
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
@@ -123,13 +103,10 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
             eager_sync_cancel_test2(A, B, C, Ch)
     end.
 
-eager_sync_auto_test(Config) ->
-    %% Queue is on AB but not C.
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
-
+eager_sync_auto_with() -> cluster_abc.
+eager_sync_auto([A, B, C]) ->
+    ACh = pget(channel, A),
+    Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME_AUTO,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
@@ -144,13 +121,10 @@ eager_sync_auto_test(Config) ->
 
     ok.
 
-eager_sync_auto_on_policy_change_test(Config) ->
-    %% Queue is on AB but not C.
-    {_Cluster, [{{A, _ARef}, {_AConn, ACh}},
-                {{B, _BRef}, {_BConn, _BCh}},
-                {{C, _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
-
+eager_sync_auto_on_policy_change_with() -> cluster_abc.
+eager_sync_auto_on_policy_change([A, B, C]) ->
+    ACh = pget(channel, A),
+    Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
@@ -158,19 +132,18 @@ eager_sync_auto_on_policy_change_test(Config) ->
     %% Sync automatically once the policy is changed to tell us to.
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
-    set_policy(A, <<"^ha.two.">>, <<"nodes">>, [a2b(A), a2b(B)],
-               <<"automatic">>),
+    Params = [a2b(pget(node, Cfg)) || Cfg <- [A, B]],
+    rabbit_test_util:set_ha_policy(
+      A, <<"^ha.two.">>, <<"nodes">>, Params, <<"automatic">>),
     wait_for_sync(C, ?QNAME),
 
     ok.
 
-eager_sync_requeue_test(Config) ->
+eager_sync_requeue_with() -> cluster_abc.
+eager_sync_requeue([A, B, C]) ->
     %% Queue is on AB but not C.
-    {_Cluster, [{{_A, _ARef}, {_AConn, ACh}},
-                {{B,  _BRef}, {_BConn, _BCh}},
-                {{C,  _CRef}, {_CConn, Ch}}]} =
-        rabbit_ha_test_utils:cluster_members(Config),
-
+    ACh = pget(channel, A),
+    Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
@@ -221,49 +194,47 @@ fetch(Ch, QName, Count) ->
         _ <- lists:seq(1, Count)],
     ok.
 
-restart(Node) ->
-    rabbit_ha_test_utils:stop_app(Node),
-    rabbit_ha_test_utils:start_app(Node).
+restart(Cfg) -> rabbit_test_util:restart_app(Cfg).
 
-sync(Node, QName) ->
-    case sync_nowait(Node, QName) of
-        ok -> wait_for_sync(Node, QName),
+sync(Cfg, QName) ->
+    case sync_nowait(Cfg, QName) of
+        ok -> wait_for_sync(Cfg, QName),
               ok;
         R  -> R
     end.
 
-sync_nowait(Node, QName) -> action(Node, sync_queue, QName).
-sync_cancel(Node, QName) -> action(Node, cancel_sync_queue, QName).
+sync_nowait(Cfg, QName) -> action(Cfg, sync_queue, QName).
+sync_cancel(Cfg, QName) -> action(Cfg, cancel_sync_queue, QName).
 
-wait_for_sync(Node, QName) ->
-    slave_synchronization_SUITE:wait_for_sync_status(true, Node, QName).
+wait_for_sync(Cfg, QName) ->
+    sync_detection:wait_for_sync_status(true, Cfg, QName).
 
-action(Node, Action, QName) ->
-    rabbit_ha_test_utils:control_action(
-      Action, Node, [binary_to_list(QName)], [{"-p", "/"}]).
+action(Cfg, Action, QName) ->
+    rabbit_test_util:control_action(
+      Action, Cfg, [binary_to_list(QName)], [{"-p", "/"}]).
 
-queue(Node, QName) ->
+queue(Cfg, QName) ->
     QNameRes = rabbit_misc:r(<<"/">>, queue, QName),
-    {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup, [QNameRes]),
+    {ok, Q} = rpc:call(pget(node, Cfg), rabbit_amqqueue, lookup, [QNameRes]),
     Q.
 
-wait_for_syncing(Node, QName, Target) ->
-    case state(Node, QName) of
+wait_for_syncing(Cfg, QName, Target) ->
+    case state(Cfg, QName) of
         {{syncing, _}, _} -> ok;
         {running, Target} -> synced_already;
         _                 -> timer:sleep(100),
-                             wait_for_syncing(Node, QName, Target)
+                             wait_for_syncing(Cfg, QName, Target)
     end.
 
-wait_for_running(Node, QName) ->
-    case state(Node, QName) of
+wait_for_running(Cfg, QName) ->
+    case state(Cfg, QName) of
         {running, _} -> ok;
         _            -> timer:sleep(100),
-                        wait_for_running(Node, QName)
+                        wait_for_running(Cfg, QName)
     end.
 
-state(Node, QName) ->
+state(Cfg, QName) ->
     [{state, State}, {synchronised_slave_pids, Pids}] =
-        rpc:call(Node, rabbit_amqqueue, info,
-                 [queue(Node, QName), [state, synchronised_slave_pids]]),
+        rpc:call(pget(node, Cfg), rabbit_amqqueue, info,
+                 [queue(Cfg, QName), [state, synchronised_slave_pids]]),
     {State, length(Pids)}.

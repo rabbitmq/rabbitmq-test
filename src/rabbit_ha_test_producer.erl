@@ -15,29 +15,23 @@
 %%
 -module(rabbit_ha_test_producer).
 
--export([await_response/1, await_response/2, start/5, create/5]).
+-export([await_response/1, start/5, create/5]).
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 await_response(ProducerPid) ->
-    await_response(ProducerPid, infinity).
-
-await_response(ProducerPid, Timeout) ->
-    systest:log("waiting for producer pid ~p (timeout = ~p)~n",
-                [ProducerPid, Timeout]),
-    case rabbit_ha_test_utils:await_response(ProducerPid, Timeout) of
+    error_logger:info_msg("waiting for producer pid ~p~n", [ProducerPid]),
+    case receive {ProducerPid, Response} -> Response end of
         ok                -> ok;
-        {error, _} = Else -> ct:fail(Else);
-        Else              -> ct:fail({weird_response, Else})
+        {error, _} = Else -> exit(Else);
+        Else              -> exit({weird_response, Else})
     end.
 
 create(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
     ProducerPid = spawn_link(?MODULE, start, [Channel, Queue, TestPid,
                                               Confirm, MsgsToSend]),
-    StartTimeout = 10000,
-    case rabbit_ha_test_utils:await_response(ProducerPid, StartTimeout) of
-        started -> ProducerPid;
-        Other   -> throw({producer_not_started, Other})
+    receive
+        {ProducerPid, started} -> ProducerPid
     end.
 
 start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
@@ -50,7 +44,7 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
             false -> none
         end,
     TestPid ! {self(), started},
-    systest:log("publishing ~w msgs on ~p~n", [MsgsToSend, Channel]),
+    error_logger:info_msg("publishing ~w msgs on ~p~n", [MsgsToSend, Channel]),
     producer(Channel, Queue, TestPid, ConfirmState, MsgsToSend).
 
 %%
@@ -60,7 +54,7 @@ start(Channel, Queue, TestPid, Confirm, MsgsToSend) ->
 producer(_Channel, _Queue, TestPid, none, 0) ->
     TestPid ! {self(), ok};
 producer(Channel, _Queue, TestPid, ConfirmState, 0) ->
-    systest:log("awaiting confirms on channel ~p~n", [Channel]),
+    error_logger:info_msg("awaiting confirms on channel ~p~n", [Channel]),
     Msg = case drain_confirms(no_nacks, ConfirmState) of
               no_nacks    -> ok;
               nacks       -> {error, received_nacks};

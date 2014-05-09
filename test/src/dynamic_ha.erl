@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(dynamic_ha_cluster_SUITE).
+-module(dynamic_ha).
 
 %% rabbit_tests:test_dynamic_mirroring() is a unit test which should
 %% test the logic of what all the policies decide to do, so we don't
@@ -27,115 +27,91 @@
 %%   logic wants it (since this gives us a good way to lose messages
 %%   on cluster shutdown, by repeated failover to new nodes)
 %%
-%% The first two are change_policy_test, the last two are change_cluster_test
+%% The first two are change_policy, the last two are change_cluster
 
--include_lib("common_test/include/ct.hrl").
--include_lib("systest/include/systest.hrl").
-
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -define(QNAME, <<"ha.test">>).
 -define(POLICY, <<"^ha.test$">>). %% " emacs
 -define(VHOST, <<"/">>).
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         change_policy_test/1, change_cluster_test/1, rapid_change_test/1]).
+-import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4,
+                           clear_policy/2, a2b/1]).
+-import(rabbit_misc, [pget/2]).
 
--import(rabbit_ha_test_utils, [set_policy/3, set_policy/4, clear_policy/2,
-                               a2b/1]).
-
-%% NB: it can take almost a minute to start and cluster 3 nodes,
-%% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
-
-all() ->
-    systest_suite:export_all(?MODULE).
-
-init_per_suite(Config) ->
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-change_policy_test(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, ARef},
-     {B, _BRef},
-     {C, _CRef}] = systest:list_processes(SUT),
-    ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
+change_policy_with() -> cluster_abc.
+change_policy([CfgA, _CfgB, _CfgC] = Cfgs) ->
+    ACh = pget(channel, CfgA),
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
 
     %% When we first declare a queue with no policy, it's not HA.
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy "all", it becomes HA and gets all mirrors
-    set_policy(A, ?POLICY, <<"all">>),
+    set_ha_policy(CfgA, ?POLICY, <<"all">>),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Give it policy "nodes", it gets specific mirrors
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(B)]),
+    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(A), a2b(B)]),
     assert_slaves(A, ?QNAME, {A, [B]}),
 
     %% Now explicitly change the mirrors
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
+    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
     assert_slaves(A, ?QNAME, {A, [C]}, [{A, [B, C]}]),
 
     %% Clear the policy, and we go back to non-mirrored
-    clear_policy(A, ?POLICY),
+    clear_policy(CfgA, ?POLICY),
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Test switching "away" from an unmirrored node
-    set_policy(A, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
+    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
     assert_slaves(A, ?QNAME, {A, [B, C]}, [{A, [B]}, {A, [C]}]),
 
     ok.
 
-change_cluster_test(Config) ->
-    %% ABC are clustered at start; DE are not started
-    SUT = systest:active_sut(Config),
-    [{A, ARef},
-     {B, _BRef},
-     {C, _CRef},
-     {D, DRef},
-     {E, ERef}] = systest:list_processes(SUT),
-    ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
+change_cluster_with() -> cluster_abc.
+change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
+    ACh = pget(channel, CfgA),
+    [A, B, C] = [pget(node, Cfg) || Cfg <- CfgsABC],
 
     amqp_channel:call(ACh, #'queue.declare'{queue = ?QNAME}),
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy exactly 4, it should mirror to all 3 nodes
-    set_policy(A, ?POLICY, <<"exactly">>, 4),
+    set_ha_policy(CfgA, ?POLICY, <<"exactly">>, 4),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
-    ok = systest:activate_process(DRef),
-    ok = systest:activate_process(ERef),
-    rabbit_ha_test_utils:cluster(D, A),
-    rabbit_ha_test_utils:cluster(E, A),
+    [CfgD, CfgE] = CfgsDE = rabbit_test_configs:start_nodes(CfgA, [d, e], 5675),
+    D = pget(node, CfgD),
+    rabbit_test_configs:add_to_cluster(CfgsABC, CfgsDE),
     assert_slaves(A, ?QNAME, {A, [B, C, D]}),
 
     %% Remove D, E does not join in
-    systest:stop_and_wait(DRef),
+    rabbit_test_configs:stop_node(CfgD),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
+    %% Clean up since we started this by hand
+    rabbit_test_configs:stop_node(CfgE),
     ok.
 
-rapid_change_test(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, ARef},
-     {_B, _BRef},
-     {_C, _CRef}] = systest:list_processes(SUT),
-    ACh = ?REQUIRE(amqp_channel, systest:read_process_user_data(ARef)),
+rapid_change_with() -> cluster_abc.
+rapid_change([CfgA, _CfgB, _CfgC]) ->
+    ACh = pget(channel, CfgA),
+    A = pget(node, CfgA),
     Self = self(),
     spawn_link(
       fun() ->
-              [rct_amqp_ops(ACh, I) || I <- lists:seq(1, 100)],
+              [rapid_amqp_ops(ACh, I) || I <- lists:seq(1, 100)],
               Self ! done
       end),
-    rct_loop(A),
+    rapid_loop(CfgA),
     ok.
 
-rct_amqp_ops(Ch, I) ->
+rapid_amqp_ops(Ch, I) ->
     Payload = list_to_binary(integer_to_list(I)),
     amqp_channel:call(Ch, #'queue.declare'{queue = ?QNAME}),
     amqp_channel:cast(Ch, #'basic.publish'{exchange = <<"">>,
@@ -150,13 +126,13 @@ rct_amqp_ops(Ch, I) ->
     end,
     amqp_channel:call(Ch, #'queue.delete'{queue = ?QNAME}).
 
-rct_loop(Node) ->
+rapid_loop(Cfg) ->
     receive done ->
             ok
     after 0 ->
-            set_policy(Node, ?POLICY, <<"all">>),
-            clear_policy(Node, ?POLICY),
-            rct_loop(Node)
+            set_ha_policy(Cfg, ?POLICY, <<"all">>),
+            clear_policy(Cfg, ?POLICY),
+            rapid_loop(Cfg)
     end.
 
 %%----------------------------------------------------------------------------

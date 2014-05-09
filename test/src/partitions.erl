@@ -13,35 +13,17 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(partition_SUITE).
+-module(partitions).
 
--include_lib("common_test/include/ct.hrl").
--include_lib("systest/include/systest.hrl").
-
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--export([suite/0, all/0, init_per_suite/1, end_per_suite/1,
-         ignore/1, pause_on_down/1, pause_on_disconnected/1, autoheal/1]).
+-import(rabbit_misc, [pget/2]).
 
-%% NB: it can take almost a minute to start and cluster 3 nodes,
-%% and then we need time left over to run the actual tests...
-suite() -> [{timetrap, systest:settings("time_traps.ha_cluster_SUITE")}].
-
-all() ->
-    systest_suite:export_all(?MODULE).
-
-init_per_suite(Config) ->
-    timer:start(),
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-ignore(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, _ARef},
-     {B, _BRef},
-     {C, _CRef}] = systest:list_processes(SUT),
+ignore_with() -> cluster_abc. 
+ignore(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     disconnect_reconnect([{B, C}]),
     timer:sleep(5000),
     [] = partitions(A),
@@ -49,46 +31,40 @@ ignore(Config) ->
     [B] = partitions(C),
     ok.
 
-pause_on_down(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, _ARef},
-     {B, BRef},
-     {C, CRef}] = systest:list_processes(SUT),
+pause_on_down_with() -> cluster_abc. 
+pause_on_down([_CfgA, CfgB, CfgC] = Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     [set_mode(N, pause_minority) || N <- [A, B, C]],
-    true = rabbit:is_running(A),
+    true = is_running(A),
 
-    systest:kill_and_wait(BRef),
+    rabbit_test_util:kill(CfgB, sigkill),
     timer:sleep(5000),
-    true = rabbit:is_running(A),
+    true = is_running(A),
 
-    systest:kill_and_wait(CRef),
+    rabbit_test_util:kill(CfgC, sigkill),
     timer:sleep(5000),
-    false = rabbit:is_running(A),
+    false = is_running(A),
     ok.
 
-pause_on_disconnected(Config) ->
-    SUT = systest:get_system_under_test(Config),
-    [{A, _ARef},
-     {B, _BRef},
-     {C, _CRef}] = systest:list_processes(SUT),
+pause_on_disconnected_with() -> cluster_abc.
+pause_on_disconnected(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     [set_mode(N, pause_minority) || N <- [A, B, C]],
-    [(true = rabbit:is_running(N)) || N <- [A, B, C]],
+    [(true = is_running(N)) || N <- [A, B, C]],
     disconnect([{A, B}, {A, C}]),
     timer:sleep(5000),
-    [(true = rabbit:is_running(N)) || N <- [B, C]],
-    false = rabbit:is_running(A),
+    [(true = is_running(N)) || N <- [B, C]],
+    false = is_running(A),
     reconnect([{A, B}, {A, C}]),
     timer:sleep(5000),
-    [(true = rabbit:is_running(N)) || N <- [A, B, C]],
+    [(true = is_running(N)) || N <- [A, B, C]],
     Status = rpc:call(A, rabbit_mnesia, status, []),
-    [] = proplists:get_value(partitions, Status),
+    [] = pget(partitions, Status),
     ok.
 
-autoheal(Config) ->
-    SUT = systest:active_sut(Config),
-    [{A, _ARef},
-     {B, _BRef},
-     {C, _CRef}] = systest:list_processes(SUT),
+autoheal_with() -> cluster_abc. 
+autoheal(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     [set_mode(N, autoheal) || N <- [A, B, C]],
     Test = fun (Pairs) ->
                    disconnect_reconnect(Pairs),
@@ -140,3 +116,4 @@ await_startup([Node | Rest]) ->
                 await_startup([Node | Rest])
     end.
 
+is_running(Node) -> rpc:call(Node, rabbit, is_running, []).
