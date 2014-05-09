@@ -79,7 +79,7 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
              recursive_delete(pget(base, InitialCfg)),
              CfgFun = case M:FWith() of
                           CfgName when is_atom(CfgName) ->
-                              fun rabbit_test_configs:CfgName/1;
+                              fun (Cfg) -> rabbit_test_configs:CfgName(Cfg) end;
                           Else ->
                               Else
                       end,
