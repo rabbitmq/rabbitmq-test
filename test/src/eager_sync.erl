@@ -26,7 +26,9 @@
 -import(rabbit_test_util, [a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
-eager_sync_with() -> cluster_abc.
+-define(CONFIG, [cluster_abc, ha_policy_two]).
+
+eager_sync_with() -> ?CONFIG.
 eager_sync([A, B, C]) ->
     %% Queue is on AB but not C.
     ACh = pget(channel, A),
@@ -64,7 +66,7 @@ eager_sync([A, B, C]) ->
 
     ok.
 
-eager_sync_cancel_with() -> cluster_abc.
+eager_sync_cancel_with() -> ?CONFIG.
 eager_sync_cancel([A, B, C]) ->
     %% Queue is on AB but not C.
     ACh = pget(channel, A),
@@ -103,7 +105,7 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
             eager_sync_cancel_test2(A, B, C, Ch)
     end.
 
-eager_sync_auto_with() -> cluster_abc.
+eager_sync_auto_with() -> ?CONFIG.
 eager_sync_auto([A, B, C]) ->
     ACh = pget(channel, A),
     Ch = pget(channel, C),
@@ -121,7 +123,7 @@ eager_sync_auto([A, B, C]) ->
 
     ok.
 
-eager_sync_auto_on_policy_change_with() -> cluster_abc.
+eager_sync_auto_on_policy_change_with() -> ?CONFIG.
 eager_sync_auto_on_policy_change([A, B, C]) ->
     ACh = pget(channel, A),
     Ch = pget(channel, C),
@@ -139,7 +141,7 @@ eager_sync_auto_on_policy_change([A, B, C]) ->
 
     ok.
 
-eager_sync_requeue_with() -> cluster_abc.
+eager_sync_requeue_with() -> ?CONFIG.
 eager_sync_requeue([A, B, C]) ->
     %% Queue is on AB but not C.
     ACh = pget(channel, A),

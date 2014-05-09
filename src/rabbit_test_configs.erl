@@ -19,6 +19,7 @@
 
 -export([enable_plugins/1]).
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
+-export([ha_policy_all/1, ha_policy_two/1]).
 -export([start_nodes/3, add_to_cluster/2]).
 -export([stop_nodes/1, start_node/1, stop_node/1, kill_node/1, restart_node/1,
          execute/1]).
@@ -34,8 +35,7 @@ start_ab(InitialCfg)    -> start_nodes(InitialCfg, [a, b]).
 start_abc(InitialCfg)   -> start_nodes(InitialCfg, [a, b, c]).
 
 cluster(InitialCfg, NodeNames) ->
-    start_connections(
-      set_default_policies(build_cluster(start_nodes(InitialCfg, NodeNames)))).
+    start_connections(build_cluster(start_nodes(InitialCfg, NodeNames))).
 
 start_nodes(InitialCfg, NodeNames) ->
     start_nodes(InitialCfg, NodeNames, 5672).
@@ -129,11 +129,13 @@ cluster_with(Cfg, NewCfg) ->
     execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s start_app",
              [NewNodename]}).   
 
-set_default_policies([Cfg | _] = Cfgs) ->
-    Members = [pget(node, C) || C <- Cfgs],
-    set_ha_policy(Cfg, <<"^ha.all.">>, <<"all">>),
-    set_ha_policy(Cfg, <<"^ha.nodes.">>, <<"nodes">>, [a2b(M) || M <- Members]),
-    TwoNodes = [a2b(M) || M <- lists:sublist(Members, 2)],
+ha_policy_all([Cfg | _] = Cfgs) ->
+    set_ha_policy(Cfg, <<".*">>, <<"all">>),
+    Cfgs.
+
+ha_policy_two([Cfg | _] = Cfgs) ->
+    Members = [a2b(pget(node, C)) || C <- Cfgs],
+    TwoNodes = [M || M <- lists:sublist(Members, 2)],
     set_ha_policy(Cfg, <<"^ha.two.">>, <<"nodes">>, TwoNodes),
     set_ha_policy(Cfg, <<"^ha.auto.">>, <<"nodes">>, TwoNodes, <<"automatic">>),
     Cfgs.
