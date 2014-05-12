@@ -77,13 +77,7 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
              io:format(user, "~s [setup]", [name(F, Width)]),
              setup_error_logger(M, F, basedir()),
              recursive_delete(pget(base, InitialCfg)),
-             CfgFun = case M:FWith() of
-                          CfgName when is_atom(CfgName) ->
-                              fun (Cfg) -> rabbit_test_configs:CfgName(Cfg) end;
-                          Else ->
-                              Else
-                      end,
-             CfgFun(InitialCfg)
+             apply_config(M:FWith(), InitialCfg)
      end,
      fun (Nodes) ->
              rabbit_test_configs:stop_nodes(Nodes),
@@ -99,6 +93,13 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
                        io:format(user, " [PASSED]", [])
                end}]
      end}.
+
+apply_config(Things, Cfg) when is_list(Things) ->
+    lists:foldl(fun apply_config/2, Cfg, Things);
+apply_config(F, Cfg) when is_atom(F) ->
+    rabbit_test_configs:F(Cfg);
+apply_config(F, Cfg) when is_function(F) ->
+    F(Cfg).
 
 annotate_show_heading(List) ->
     annotate_show_heading(List, undefined).

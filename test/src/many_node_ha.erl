@@ -23,13 +23,15 @@
 -import(rabbit_misc, [pget/2]).
 
 kill_intermediate_with() ->
-    fun (Cfg) -> rabbit_test_configs:cluster(Cfg, [a,b,c,d,e,f]) end.
+    fun (Cfg) -> rabbit_test_configs:ha_policy_all(
+                   rabbit_test_configs:cluster(Cfg, [a,b,c,d,e,f]))
+    end.
 kill_intermediate([CfgA, CfgB, CfgC, CfgD, CfgE, CfgF]) ->
     Msgs            = rabbit_test_configs:cover_work_factor(20000, CfgA),
     MasterChannel   = pget(channel, CfgA),
     ConsumerChannel = pget(channel, CfgE),
     ProducerChannel = pget(channel, CfgF),
-    Queue = <<"ha.all.test">>,
+    Queue = <<"test">>,
     amqp_channel:call(MasterChannel, #'queue.declare'{queue       = Queue,
                                                       auto_delete = false}),
 
