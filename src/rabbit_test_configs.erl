@@ -25,8 +25,7 @@
          execute/1]).
 -export([cover_work_factor/2]).
 
--import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, set_ha_policy/5,
-                           a2b/1]).
+-import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
@@ -136,9 +135,9 @@ ha_policy_all([Cfg | _] = Cfgs) ->
 ha_policy_two_pos([Cfg | _] = Cfgs) ->
     Members = [a2b(pget(node, C)) || C <- Cfgs],
     TwoNodes = [M || M <- lists:sublist(Members, 2)],
-    set_ha_policy(Cfg, <<"^ha.two.">>, <<"nodes">>, TwoNodes,
+    set_ha_policy(Cfg, <<"^ha.two.">>, {<<"nodes">>, TwoNodes},
                   [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
-    set_ha_policy(Cfg, <<"^ha.auto.">>, <<"nodes">>, TwoNodes,
+    set_ha_policy(Cfg, <<"^ha.auto.">>, {<<"nodes">>, TwoNodes},
                   [{<<"ha-sync-mode">>,           <<"automatic">>},
                    {<<"ha-promote-on-shutdown">>, <<"always">>}]),
     Cfgs.

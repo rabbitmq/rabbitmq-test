@@ -38,7 +38,7 @@
 -define(VHOST, <<"/">>).
 
 -import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4,
-                           clear_policy/2, a2b/1]).
+                           clear_policy/2, a2b/1, publish/3, consume/3]).
 -import(rabbit_misc, [pget/2]).
 
 change_policy_with() -> cluster_abc.
@@ -55,11 +55,11 @@ change_policy([CfgA, _CfgB, _CfgC] = Cfgs) ->
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Give it policy "nodes", it gets specific mirrors
-    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(A), a2b(B)]),
+    set_ha_policy(CfgA, ?POLICY, {<<"nodes">>, [a2b(A), a2b(B)]}),
     assert_slaves(A, ?QNAME, {A, [B]}),
 
     %% Now explicitly change the mirrors
-    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(A), a2b(C)]),
+    set_ha_policy(CfgA, ?POLICY, {<<"nodes">>, [a2b(A), a2b(C)]}),
     assert_slaves(A, ?QNAME, {A, [C]}, [{A, [B, C]}]),
 
     %% Clear the policy, and we go back to non-mirrored
@@ -67,7 +67,7 @@ change_policy([CfgA, _CfgB, _CfgC] = Cfgs) ->
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Test switching "away" from an unmirrored node
-    set_ha_policy(CfgA, ?POLICY, <<"nodes">>, [a2b(B), a2b(C)]),
+    set_ha_policy(CfgA, ?POLICY, {<<"nodes">>, [a2b(B), a2b(C)]}),
     assert_slaves(A, ?QNAME, {A, [B, C]}, [{A, [B]}, {A, [C]}]),
 
     ok.
@@ -81,7 +81,7 @@ change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
     assert_slaves(A, ?QNAME, {A, ''}),
 
     %% Give it policy exactly 4, it should mirror to all 3 nodes
-    set_ha_policy(CfgA, ?POLICY, <<"exactly">>, 4),
+    set_ha_policy(CfgA, ?POLICY, {<<"exactly">>, 4}),
     assert_slaves(A, ?QNAME, {A, [B, C]}),
 
     %% Add D and E, D joins in
@@ -133,6 +133,38 @@ rapid_loop(Cfg) ->
             clear_policy(Cfg, ?POLICY),
             rapid_loop(Cfg)
     end.
+
+promote_on_shutdown_with() -> cluster_ab.
+promote_on_shutdown([CfgA, CfgB]) ->
+    set_ha_policy(CfgA, <<"^ha.promote">>, <<"all">>,
+                  [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
+    set_ha_policy(CfgA, <<"^ha.nopromote">>, <<"all">>),
+
+    ACh = pget(channel, CfgA),
+    [begin
+         amqp_channel:call(ACh, #'queue.declare'{queue   = Q,
+                                                 durable = true}),
+         publish(ACh, Q, 10)
+     end || Q <- [<<"ha.promote.test">>, <<"ha.nopromote.test">>]],
+    rabbit_test_configs:restart_node(CfgB),
+    CfgA1 = rabbit_test_configs:stop_node(CfgA),
+    {_, BCh} =  rabbit_test_util:connect(CfgB),
+    #'queue.declare_ok'{message_count = 0} = 
+        amqp_channel:call(
+          BCh, #'queue.declare'{queue   = <<"ha.promote.test">>,
+                                durable = true}),
+    ?assertExit(
+       {{shutdown, {server_initiated_close, 404, _}}, _},
+       amqp_channel:call(
+         BCh, #'queue.declare'{queue   = <<"ha.nopromote.test">>,
+                               durable = true})),
+    CfgA2 = rabbit_test_configs:start_node(CfgA1),
+    {_, ACh2} =  rabbit_test_util:connect(CfgA2),
+    #'queue.declare_ok'{message_count = 10} = 
+        amqp_channel:call(
+          ACh2, #'queue.declare'{queue   = <<"ha.nopromote.test">>,
+                                 durable = true}),
+    ok.
 
 %%----------------------------------------------------------------------------
 

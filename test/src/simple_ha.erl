@@ -19,7 +19,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_util, [set_ha_policy/4, a2b/1]).
+-import(rabbit_test_util, [set_ha_policy/3, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
 -define(CONFIG, [cluster_abc, ha_policy_all]).
@@ -112,7 +112,7 @@ confirms_survive([CfgA, CfgB, _CfgC] = Nodes, DeathFun) ->
 stop(Cfg, _Cfgs)    -> rabbit_test_util:kill_after(50, Cfg, stop).
 sigkill(Cfg, _Cfgs) -> rabbit_test_util:kill_after(50, Cfg, sigkill).
 policy(Cfg, [_|T])  -> Nodes = [a2b(pget(node, C)) || C <- T],
-                       set_ha_policy(Cfg, <<".*">>, <<"nodes">>, Nodes).
+                       set_ha_policy(Cfg, <<".*">>, {<<"nodes">>, Nodes}).
 
 open_incapable_channel(NodePort) ->
     Props = [{<<"capabilities">>, table, []}],
