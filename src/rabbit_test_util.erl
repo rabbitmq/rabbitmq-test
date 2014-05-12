@@ -29,11 +29,10 @@ set_ha_policy(Cfg, Pattern, HAMode, HAParams) ->
                [{<<"ha-mode">>,   HAMode},
                 {<<"ha-params">>, HAParams}]).
 
-set_ha_policy(Cfg, Pattern, HAMode, HAParams, HASyncMode) ->
+set_ha_policy(Cfg, Pattern, HAMode, HAParams, Extra) ->
     set_policy(Cfg, Pattern, Pattern, <<"queues">>,
-               [{<<"ha-mode">>,      HAMode},
-                {<<"ha-params">>,    HAParams},
-                {<<"ha-sync-mode">>, HASyncMode}]).
+               [{<<"ha-mode">>,   HAMode},
+                {<<"ha-params">>, HAParams} | Extra]).
 
 set_policy(Cfg, Name, Pattern, ApplyTo, Definition) ->
     ok = rpc:call(pget(node, Cfg), rabbit_policy, set,

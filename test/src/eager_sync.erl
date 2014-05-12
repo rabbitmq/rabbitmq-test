@@ -26,7 +26,7 @@
 -import(rabbit_test_util, [a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
--define(CONFIG, [cluster_abc, ha_policy_two]).
+-define(CONFIG, [cluster_abc, ha_policy_two_pos]).
 
 eager_sync_with() -> ?CONFIG.
 eager_sync([A, B, C]) ->
@@ -136,7 +136,8 @@ eager_sync_auto_on_policy_change([A, B, C]) ->
     restart(A),
     Params = [a2b(pget(node, Cfg)) || Cfg <- [A, B]],
     rabbit_test_util:set_ha_policy(
-      A, <<"^ha.two.">>, <<"nodes">>, Params, <<"automatic">>),
+      A, <<"^ha.two.">>, <<"nodes">>, Params,
+      [{<<"ha-sync-mode">>, <<"automatic">>}]),
     wait_for_sync(C, ?QNAME),
 
     ok.
