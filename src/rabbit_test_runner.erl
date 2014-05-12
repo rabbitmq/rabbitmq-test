@@ -77,7 +77,13 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
              io:format(user, "~s [setup]", [name(F, Width)]),
              setup_error_logger(M, F, basedir()),
              recursive_delete(pget(base, InitialCfg)),
-             apply_config(M:FWith(), InitialCfg)
+             try
+                 apply_config(M:FWith(), InitialCfg)
+             catch
+                 error:{Type, Error, Nodes, Stack} ->
+                     rabbit_test_configs:stop_nodes(Nodes),
+                     exit({Type, Error, Stack})
+             end
      end,
      fun (Nodes) ->
              rabbit_test_configs:stop_nodes(Nodes),
@@ -97,9 +103,13 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
 apply_config(Things, Cfg) when is_list(Things) ->
     lists:foldl(fun apply_config/2, Cfg, Things);
 apply_config(F, Cfg) when is_atom(F) ->
-    rabbit_test_configs:F(Cfg);
+    apply_config(fun (C) -> rabbit_test_configs:F(C) end, Cfg);
 apply_config(F, Cfg) when is_function(F) ->
-    F(Cfg).
+    try
+        F(Cfg)
+    catch
+        Type:Error -> error({Type, Error, Cfg, erlang:get_stacktrace()})
+    end.
 
 annotate_show_heading(List) ->
     annotate_show_heading(List, undefined).
