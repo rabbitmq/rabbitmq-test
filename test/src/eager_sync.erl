@@ -23,17 +23,18 @@
 -define(QNAME_AUTO, <<"ha.auto.test">>).
 -define(MESSAGE_COUNT, 2000).
 
--import(rabbit_test_util, [a2b/1]).
+-import(rabbit_test_util, [a2b/1, publish/3, consume/3, fetch/3]).
 -import(rabbit_misc, [pget/2]).
 
-eager_sync_with() -> cluster_abc.
+-define(CONFIG, [cluster_abc, ha_policy_two_pos]).
+
+eager_sync_with() -> ?CONFIG.
 eager_sync([A, B, C]) ->
     %% Queue is on AB but not C.
     ACh = pget(channel, A),
     Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
-    amqp_channel:call(Ch, #'confirm.select'{}),
 
     %% Don't sync, lose messages
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
@@ -64,7 +65,7 @@ eager_sync([A, B, C]) ->
 
     ok.
 
-eager_sync_cancel_with() -> cluster_abc.
+eager_sync_cancel_with() -> ?CONFIG.
 eager_sync_cancel([A, B, C]) ->
     %% Queue is on AB but not C.
     ACh = pget(channel, A),
@@ -72,7 +73,6 @@ eager_sync_cancel([A, B, C]) ->
 
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
-    amqp_channel:call(Ch, #'confirm.select'{}),
     {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
     eager_sync_cancel_test2(A, B, C, Ch).
 
@@ -103,13 +103,12 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
             eager_sync_cancel_test2(A, B, C, Ch)
     end.
 
-eager_sync_auto_with() -> cluster_abc.
+eager_sync_auto_with() -> ?CONFIG.
 eager_sync_auto([A, B, C]) ->
     ACh = pget(channel, A),
     Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME_AUTO,
                                             durable = true}),
-    amqp_channel:call(Ch, #'confirm.select'{}),
 
     %% Sync automatically, don't lose messages
     publish(Ch, ?QNAME_AUTO, ?MESSAGE_COUNT),
@@ -121,32 +120,31 @@ eager_sync_auto([A, B, C]) ->
 
     ok.
 
-eager_sync_auto_on_policy_change_with() -> cluster_abc.
+eager_sync_auto_on_policy_change_with() -> ?CONFIG.
 eager_sync_auto_on_policy_change([A, B, C]) ->
     ACh = pget(channel, A),
     Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
-    amqp_channel:call(Ch, #'confirm.select'{}),
 
     %% Sync automatically once the policy is changed to tell us to.
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
     Params = [a2b(pget(node, Cfg)) || Cfg <- [A, B]],
     rabbit_test_util:set_ha_policy(
-      A, <<"^ha.two.">>, <<"nodes">>, Params, <<"automatic">>),
+      A, <<"^ha.two.">>, {<<"nodes">>, Params},
+      [{<<"ha-sync-mode">>, <<"automatic">>}]),
     wait_for_sync(C, ?QNAME),
 
     ok.
 
-eager_sync_requeue_with() -> cluster_abc.
+eager_sync_requeue_with() -> ?CONFIG.
 eager_sync_requeue([A, B, C]) ->
     %% Queue is on AB but not C.
     ACh = pget(channel, A),
     Ch = pget(channel, C),
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
-    amqp_channel:call(Ch, #'confirm.select'{}),
 
     publish(Ch, ?QNAME, 2),
     {#'basic.get_ok'{delivery_tag = TagA}, _} =
@@ -159,39 +157,6 @@ eager_sync_requeue([A, B, C]) ->
     amqp_channel:cast(Ch, #'basic.reject'{delivery_tag = TagB, requeue = true}),
     consume(Ch, ?QNAME, 2),
 
-    ok.
-
-publish(Ch, QName, Count) ->
-    [amqp_channel:call(Ch,
-                       #'basic.publish'{routing_key = QName},
-                       #amqp_msg{props   = #'P_basic'{delivery_mode = 2},
-                                 payload = list_to_binary(integer_to_list(I))})
-     || I <- lists:seq(1, Count)],
-    amqp_channel:wait_for_confirms(Ch).
-
-consume(Ch, QName, Count) ->
-    amqp_channel:subscribe(Ch, #'basic.consume'{queue = QName, no_ack = true},
-                           self()),
-    CTag = receive #'basic.consume_ok'{consumer_tag = C} -> C end,
-    [begin
-         Exp = list_to_binary(integer_to_list(I)),
-         receive {#'basic.deliver'{consumer_tag = CTag},
-                  #amqp_msg{payload = Exp}} ->
-                 ok
-         after 500 ->
-                 exit(timeout)
-         end
-     end|| I <- lists:seq(1, Count)],
-    #'queue.declare_ok'{message_count = 0}
-        = amqp_channel:call(Ch, #'queue.declare'{queue   = QName,
-                                                 durable = true}),
-    amqp_channel:call(Ch, #'basic.cancel'{consumer_tag = CTag}),
-    ok.
-
-fetch(Ch, QName, Count) ->
-    [{#'basic.get_ok'{}, _} =
-         amqp_channel:call(Ch, #'basic.get'{queue = QName}) ||
-        _ <- lists:seq(1, Count)],
     ok.
 
 restart(Cfg) -> rabbit_test_util:restart_app(Cfg).

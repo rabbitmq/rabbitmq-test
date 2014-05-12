@@ -19,13 +19,15 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
--import(rabbit_test_util, [set_ha_policy/4, a2b/1]).
+-import(rabbit_test_util, [set_ha_policy/3, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
-rapid_redeclare_with() -> cluster_ab.
+-define(CONFIG, [cluster_abc, ha_policy_all]).
+
+rapid_redeclare_with() -> [cluster_ab, ha_policy_all].
 rapid_redeclare([CfgA | _]) ->
     Ch = pget(channel, CfgA),
-    Queue = <<"ha.all.test">>,
+    Queue = <<"test">>,
     [begin
          amqp_channel:call(Ch, #'queue.declare'{queue   = Queue,
                                                 durable = true}),
@@ -33,11 +35,11 @@ rapid_redeclare([CfgA | _]) ->
      end || _I <- lists:seq(1, 20)],
     ok.
 
-consume_survives_stop_with()     -> cluster_abc.
-consume_survives_sigkill_with()  -> cluster_abc.
-consume_survives_policy_with()   -> cluster_abc.
-auto_resume_with()               -> cluster_abc.
-auto_resume_no_ccn_client_with() -> cluster_abc.
+consume_survives_stop_with()     -> ?CONFIG.
+consume_survives_sigkill_with()  -> ?CONFIG.
+consume_survives_policy_with()   -> ?CONFIG.
+auto_resume_with()               -> ?CONFIG.
+auto_resume_no_ccn_client_with() -> ?CONFIG.
 
 consume_survives_stop(Cf)     -> consume_survives(Cf, fun stop/2,    true).
 consume_survives_sigkill(Cf)  -> consume_survives(Cf, fun sigkill/2, true).
@@ -46,15 +48,15 @@ auto_resume(Cf)               -> consume_survives(Cf, fun sigkill/2, false).
 auto_resume_no_ccn_client(Cf) -> consume_survives(Cf, fun sigkill/2, false,
                                                   false).
 
-confirms_survive_stop_with()    -> cluster_abc.
-confirms_survive_sigkill_with() -> cluster_abc.
-confirms_survive_policy_with()  -> cluster_abc.
+confirms_survive_stop_with()    -> ?CONFIG.
+confirms_survive_sigkill_with() -> ?CONFIG.
+confirms_survive_policy_with()  -> ?CONFIG.
 
 confirms_survive_stop(Cf)    -> confirms_survive(Cf, fun stop/2).
 confirms_survive_sigkill(Cf) -> confirms_survive(Cf, fun sigkill/2).
 confirms_survive_policy(Cf)  -> confirms_survive(Cf, fun policy/2).
 
-%% %%----------------------------------------------------------------------------
+%%----------------------------------------------------------------------------
 
 consume_survives(Nodes, DeathFun, CancelOnFailover) ->
     consume_survives(Nodes, DeathFun, CancelOnFailover, true).
@@ -67,7 +69,7 @@ consume_survives([CfgA, CfgB, CfgC] = Nodes,
     Channel3 = pget(channel, CfgC),
 
     %% declare the queue on the master, mirrored to the two slaves
-    Queue = <<"ha.all.test">>,
+    Queue = <<"test">>,
     amqp_channel:call(Channel1, #'queue.declare'{queue       = Queue,
                                                  auto_delete = false}),
 
@@ -95,7 +97,7 @@ confirms_survive([CfgA, CfgB, _CfgC] = Nodes, DeathFun) ->
     Node2Channel = pget(channel, CfgB),
 
     %% declare the queue on the master, mirrored to the two slaves
-    Queue = <<"ha.all.test">>,
+    Queue = <<"test">>,
     amqp_channel:call(Node1Channel,#'queue.declare'{queue       = Queue,
                                                     auto_delete = false,
                                                     durable     = true}),
@@ -110,7 +112,7 @@ confirms_survive([CfgA, CfgB, _CfgC] = Nodes, DeathFun) ->
 stop(Cfg, _Cfgs)    -> rabbit_test_util:kill_after(50, Cfg, stop).
 sigkill(Cfg, _Cfgs) -> rabbit_test_util:kill_after(50, Cfg, sigkill).
 policy(Cfg, [_|T])  -> Nodes = [a2b(pget(node, C)) || C <- T],
-                       set_ha_policy(Cfg, <<"^ha.all.">>, <<"nodes">>, Nodes).
+                       set_ha_policy(Cfg, <<".*">>, {<<"nodes">>, Nodes}).
 
 open_incapable_channel(NodePort) ->
     Props = [{<<"capabilities">>, table, []}],

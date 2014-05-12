@@ -20,20 +20,15 @@
 
 -compile(export_all).
 
-set_ha_policy(Cfg, Pattern, HAMode) ->
-    set_policy(Cfg, Pattern, Pattern, <<"queues">>,
-               [{<<"ha-mode">>,   HAMode}]).
+set_ha_policy(Cfg, Pattern, Policy) ->
+    set_ha_policy(Cfg, Pattern, Policy, []).
 
-set_ha_policy(Cfg, Pattern, HAMode, HAParams) ->
-    set_policy(Cfg, Pattern, Pattern, <<"queues">>,
-               [{<<"ha-mode">>,   HAMode},
-                {<<"ha-params">>, HAParams}]).
+set_ha_policy(Cfg, Pattern, Policy, Extra) ->
+    set_policy(Cfg, Pattern, Pattern, <<"queues">>, ha_policy(Policy) ++ Extra).
 
-set_ha_policy(Cfg, Pattern, HAMode, HAParams, HASyncMode) ->
-    set_policy(Cfg, Pattern, Pattern, <<"queues">>,
-               [{<<"ha-mode">>,      HAMode},
-                {<<"ha-params">>,    HAParams},
-                {<<"ha-sync-mode">>, HASyncMode}]).
+ha_policy(<<"all">>)      -> [{<<"ha-mode">>,   <<"all">>}];
+ha_policy({Mode, Params}) -> [{<<"ha-mode">>,   Mode},
+                              {<<"ha-params">>, Params}].
 
 set_policy(Cfg, Name, Pattern, ApplyTo, Definition) ->
     ok = rpc:call(pget(node, Cfg), rabbit_policy, set,
@@ -101,3 +96,39 @@ wait_down(Node) ->
     end.
 
 a2b(A) -> list_to_binary(atom_to_list(A)).
+
+%%----------------------------------------------------------------------------
+
+publish(Ch, QName, Count) ->
+    amqp_channel:call(Ch, #'confirm.select'{}),
+    [amqp_channel:call(Ch,
+                       #'basic.publish'{routing_key = QName},
+                       #amqp_msg{props   = #'P_basic'{delivery_mode = 2},
+                                 payload = list_to_binary(integer_to_list(I))})
+     || I <- lists:seq(1, Count)],
+    amqp_channel:wait_for_confirms(Ch).
+
+consume(Ch, QName, Count) ->
+    amqp_channel:subscribe(Ch, #'basic.consume'{queue = QName, no_ack = true},
+                           self()),
+    CTag = receive #'basic.consume_ok'{consumer_tag = C} -> C end,
+    [begin
+         Exp = list_to_binary(integer_to_list(I)),
+         receive {#'basic.deliver'{consumer_tag = CTag},
+                  #amqp_msg{payload = Exp}} ->
+                 ok
+         after 500 ->
+                 exit(timeout)
+         end
+     end|| I <- lists:seq(1, Count)],
+    #'queue.declare_ok'{message_count = 0}
+        = amqp_channel:call(Ch, #'queue.declare'{queue   = QName,
+                                                 durable = true}),
+    amqp_channel:call(Ch, #'basic.cancel'{consumer_tag = CTag}),
+    ok.
+
+fetch(Ch, QName, Count) ->
+    [{#'basic.get_ok'{}, _} =
+         amqp_channel:call(Ch, #'basic.get'{queue = QName}) ||
+        _ <- lists:seq(1, Count)],
+    ok.
