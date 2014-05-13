@@ -36,14 +36,14 @@ run_multi(Dir, Filter, Cover, PluginsDir) ->
                  io:format(" done.~n~n");
         false -> ok
     end,
-    ok = eunit:test(make_tests(Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
+    R = eunit:test(make_tests(Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
     case Cover of
         true  -> io:format("~nCover reporting..."),
                  ok = rabbit_misc:report_cover(),
                  io:format(" done.~n~n");
         false -> ok
     end,
-    ok.
+    R.
 
 make_tests(Dir, Filter, Cover, PluginsDir, Timeout) ->
     All = [{M, FWith, F} ||

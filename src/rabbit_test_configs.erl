@@ -20,7 +20,7 @@
 -export([enable_plugins/1]).
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
 -export([ha_policy_all/1, ha_policy_two_pos/1]).
--export([start_nodes/3, add_to_cluster/2]).
+-export([start_nodes/2, start_nodes/3, add_to_cluster/2]).
 -export([stop_nodes/1, start_node/1, stop_node/1, kill_node/1, restart_node/1,
          execute/1]).
 -export([cover_work_factor/2]).
