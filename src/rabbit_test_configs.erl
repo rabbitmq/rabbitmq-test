@@ -39,13 +39,17 @@ cluster(InitialCfg, NodeNames) ->
 start_nodes(InitialCfg, NodeNames) ->
     start_nodes(InitialCfg, NodeNames, 5672).
 
-start_nodes(InitialCfg, NodeNames, FirstPort) ->
+start_nodes(InitialCfg0, NodeNames, FirstPort) ->
     {ok, Already0} = net_adm:names(),
     Already = [list_to_atom(N) || {N, _P} <- Already0],
     [check_node_not_running(Node, Already) || Node <- NodeNames],
     Ports = lists:seq(FirstPort, length(NodeNames) + FirstPort - 1),
-    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(InitialCfg)]
-             || {N, P} <- lists:zip(NodeNames, Ports)],
+    InitialCfgs = case InitialCfg0 of
+                      [{_, _}|_] -> [InitialCfg0 || _ <- NodeNames];
+                      _          -> InitialCfg0
+                  end,
+    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(Cfg)]
+             || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
     [start_node(Node) || Node <- Nodes].
 
 check_node_not_running(Node, Already) ->
