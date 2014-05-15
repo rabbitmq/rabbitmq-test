@@ -160,9 +160,6 @@ truncate_function_name(FWith, Length) ->
     FName = atom_to_list(FWith),
     list_to_atom(string:substr(FName, 1, length(FName) - Length)).
 
-tokens(Filter) ->
-    [list_to_atom(T) || T <- string:tokens(Filter, ":")].
-
 should_run(_M, _F, "all") -> true;
 should_run(M, F, Filter)  -> MF = rabbit_misc:format("~s:~s", [M, F]),
                              case re:run(MF, Filter) of
