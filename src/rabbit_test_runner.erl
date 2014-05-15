@@ -136,7 +136,7 @@ apply_config(F, Cfg) when is_function(F) ->
     try
         F(Cfg)
     catch
-        Type:Error -> error({Type, Error, Cfg, erlang:get_stacktrace()})
+        Type:Error -> erlang:error({Type, Error, Cfg, erlang:get_stacktrace()})
     end.
 
 annotate_show_heading(List) ->

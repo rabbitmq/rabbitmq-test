@@ -21,7 +21,7 @@
 
 await_response(ConsumerPid) ->
     case receive {ConsumerPid, Response} -> Response end of
-        {error, Reason}  -> error(Reason);
+        {error, Reason}  -> erlang:error(Reason);
         ok               -> ok
     end.
 
