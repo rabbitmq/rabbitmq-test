@@ -22,13 +22,13 @@
 
 -import(rabbit_misc, [pget/2]).
 
--export([run_in_broker/2, run_multi/4]).
+-export([run_in_broker/2, run_multi/5]).
 
 run_in_broker(Dir, Filter) ->
     io:format("~nIn-broker tests~n================~n~n", []),
     eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).
 
-run_multi(Dir, Filter, Cover, PluginsDir) ->
+run_multi(ServerDir, Dir, Filter, Cover, PluginsDir) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([?MODULE, shortnames]),
@@ -40,8 +40,8 @@ run_multi(Dir, Filter, Cover, PluginsDir) ->
                  io:format(" done.~n~n");
         false -> ok
     end,
-    R = eunit:test(
-          make_tests_multi(Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
+    R = eunit:test(make_tests_multi(
+                     ServerDir, Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
     case Cover of
         true  -> io:format("~nCover reporting..."),
                  ok = rabbit_misc:report_cover(),
@@ -57,14 +57,15 @@ make_tests_single(Dir, Filter, Timeout) ->
     [make_test_single(M, FWith, F, ShowHeading, Timeout, Width)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
 
-make_tests_multi(Dir, Filter, Cover, PluginsDir, Timeout) ->
+make_tests_multi(ServerDir, Dir, Filter, Cover, PluginsDir, Timeout) ->
     {Filtered, AllCount, Width} = find_tests(Dir, Filter, "_with"),
     io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
               [length(Filtered), AllCount, Filter, Cover]),
     Cfg = [{cover,   Cover},
            {base,    basedir() ++ "/nodes"},
+           {server,  ServerDir},
            {plugins, PluginsDir}],
-    rabbit_test_configs:enable_plugins(PluginsDir),
+    rabbit_test_configs:enable_plugins(Cfg),
     [make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
 
