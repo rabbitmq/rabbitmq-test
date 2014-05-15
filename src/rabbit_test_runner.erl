@@ -76,7 +76,7 @@ find_tests(Dir, Filter, Suffix) ->
               string:right(atom_to_list(FWith), length(Suffix)) =:= Suffix,
               F <- [truncate_function_name(FWith, length(Suffix))]],
     Filtered = [Test || {M, _FWith, F} = Test <- All,
-                        should_run(M, F, tokens(Filter))],
+                        should_run(M, F, Filter)],
     Width = case Filtered of
                 [] -> 0;
                 _  -> lists:max([atom_length(F) || {_, _, F} <- Filtered])
@@ -163,10 +163,12 @@ truncate_function_name(FWith, Length) ->
 tokens(Filter) ->
     [list_to_atom(T) || T <- string:tokens(Filter, ":")].
 
-should_run(_Module, _F, [all])       -> true;
-should_run( Module, _F, [Module])    -> true;
-should_run( Module,  F, [Module, F]) -> true;
-should_run(_Module, _F, _)           -> false.
+should_run(_M, _F, "all") -> true;
+should_run(M, F, Filter)  -> MF = rabbit_misc:format("~s:~s", [M, F]),
+                             case re:run(MF, Filter) of
+                                 {match, _} -> true;
+                                 nomatch    -> false
+                             end.
 
 ensure_dir(Path) ->
     case file:read_file_info(Path) of
