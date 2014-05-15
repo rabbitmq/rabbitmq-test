@@ -28,6 +28,9 @@
 -import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2]).
 
+-define(INITIAL_KEYS, [cover, base, server, plugins]).
+-define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port]).
+
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
 cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
 start_ab(InitialCfg)    -> start_nodes(InitialCfg, [a, b]).
@@ -39,13 +42,17 @@ cluster(InitialCfg, NodeNames) ->
 start_nodes(InitialCfg, NodeNames) ->
     start_nodes(InitialCfg, NodeNames, 5672).
 
-start_nodes(InitialCfg, NodeNames, FirstPort) ->
+start_nodes(InitialCfg0, NodeNames, FirstPort) ->
     {ok, Already0} = net_adm:names(),
     Already = [list_to_atom(N) || {N, _P} <- Already0],
     [check_node_not_running(Node, Already) || Node <- NodeNames],
     Ports = lists:seq(FirstPort, length(NodeNames) + FirstPort - 1),
-    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(InitialCfg)]
-             || {N, P} <- lists:zip(NodeNames, Ports)],
+    InitialCfgs = case InitialCfg0 of
+                      [{_, _}|_] -> [InitialCfg0 || _ <- NodeNames];
+                      _          -> InitialCfg0
+                  end,
+    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(Cfg)]
+             || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
     [start_node(Node) || Node <- Nodes].
 
 check_node_not_running(Node, Already) ->
@@ -55,20 +62,19 @@ check_node_not_running(Node, Already) ->
     end.
 
 strip_non_initial(Cfg) ->
-    [{K, V} || {K, V} <- Cfg, lists:member(K, [cover, base, plugins])].
+    [{K, V} || {K, V} <- Cfg, lists:member(K, ?INITIAL_KEYS)].
 
-strip_non_running(Cfg) ->
-    [{K, V} || {K, V} <- Cfg, lists:member(K, [cover, base, plugins,
-                                               nodename, port])].
-enable_plugins(none) -> ok;
-enable_plugins(Dir) ->
-    R = execute(
-          plugins_env(Dir),
-          "../rabbitmq-server/scripts/rabbitmq-plugins list -m"),
+strip_running(Cfg) ->
+    [{K, V} || {K, V} <- Cfg, lists:member(K, ?NON_RUNNING_KEYS)].
+
+enable_plugins(Cfg) -> enable_plugins(pget(plugins, Cfg), pget(server, Cfg)).
+
+enable_plugins(none, _Server) -> ok;
+enable_plugins(Dir, Server) ->
+    Env = plugins_env(Dir),
+    R = execute(Env, Server ++ "/scripts/rabbitmq-plugins list -m"),
     Plugins = string:tokens(R, "\n"),
-    [execute(
-       plugins_env(Dir),
-       {"../rabbitmq-server/scripts/rabbitmq-plugins enable ~s", [Plugin]})
+    [execute(Env, {Server ++ "/scripts/rabbitmq-plugins enable ~s", [Plugin]})
      || Plugin <- Plugins],
     ok.
 
@@ -83,6 +89,7 @@ start_node(Cfg) ->
     Nodename = pget(nodename, Cfg),
     Port = pget(port, Cfg),
     Base = pget(base, Cfg),
+    Server = pget(server, Cfg),
     PidFile = rabbit_misc:format("~s/~s.pid", [Base, Nodename]),
     Linked =
         execute_bg(
@@ -93,8 +100,8 @@ start_node(Cfg) ->
            {"RABBITMQ_PID_FILE",    PidFile},
            {"RABBITMQ_ALLOW_INPUT", "1"} %% Needed to make it close on our exit
            | plugins_env(pget(plugins, Cfg))],
-          "../rabbitmq-server/scripts/rabbitmq-server"),
-    execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s wait ~s",
+          Server ++ "/scripts/rabbitmq-server"),
+    execute({Server ++ "/scripts/rabbitmqctl -n ~s wait ~s",
              [Nodename, PidFile]}),
     Node = rabbit_nodes:make(Nodename),
     OSPid = rpc:call(Node, os, getpid, []),
@@ -121,11 +128,12 @@ add_to_cluster([First | _] = Existing, New) ->
 cluster_with(Cfg, NewCfg) ->
     Node = pget(node, Cfg),
     NewNodename = pget(nodename, NewCfg),
-    execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s stop_app",
+    Server = pget(server, Cfg),
+    execute({Server ++ "/scripts/rabbitmqctl -n ~s stop_app",
              [NewNodename]}),
-    execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s join_cluster ~s",
+    execute({Server ++ "/scripts/rabbitmqctl -n ~s join_cluster ~s",
              [NewNodename, Node]}),
-    execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s start_app",
+    execute({Server ++ "/scripts/rabbitmqctl -n ~s start_app",
              [NewNodename]}).   
 
 ha_policy_all([Cfg | _] = Cfgs) ->
@@ -151,15 +159,16 @@ start_connection(Cfg) ->
 stop_nodes(Nodes) -> [stop_node(Node) || Node <- Nodes].
 
 stop_node(Cfg) ->
+    Server = pget(server, Cfg),
     maybe_flush_cover(Cfg),
-    catch execute({"../rabbitmq-server/scripts/rabbitmqctl -n ~s stop ~s",
+    catch execute({Server ++ "/scripts/rabbitmqctl -n ~s stop ~s",
                    [pget(nodename, Cfg), pget(pid_file, Cfg)]}),
-    strip_non_running(Cfg).
+    strip_running(Cfg).
 
 kill_node(Cfg) ->
     maybe_flush_cover(Cfg),
     catch execute({"kill -9 ~s", [pget(os_pid, Cfg)]}),
-    strip_non_running(Cfg).
+    strip_running(Cfg).
 
 restart_node(Cfg) ->
     start_node(stop_node(Cfg)).

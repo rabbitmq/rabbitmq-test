@@ -22,9 +22,13 @@
 
 -import(rabbit_misc, [pget/2]).
 
--export([run_multi/4]).
+-export([run_in_broker/2, run_multi/5]).
 
-run_multi(Dir, Filter, Cover, PluginsDir) ->
+run_in_broker(Dir, Filter) ->
+    io:format("~nIn-broker tests~n================~n~n", []),
+    eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).
+
+run_multi(ServerDir, Dir, Filter, Cover, PluginsDir) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([?MODULE, shortnames]),
@@ -36,7 +40,8 @@ run_multi(Dir, Filter, Cover, PluginsDir) ->
                  io:format(" done.~n~n");
         false -> ok
     end,
-    R = eunit:test(make_tests(Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
+    R = eunit:test(make_tests_multi(
+                     ServerDir, Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
     case Cover of
         true  -> io:format("~nCover reporting..."),
                  ok = rabbit_misc:report_cover(),
@@ -45,35 +50,53 @@ run_multi(Dir, Filter, Cover, PluginsDir) ->
     end,
     R.
 
-make_tests(Dir, Filter, Cover, PluginsDir, Timeout) ->
+make_tests_single(Dir, Filter, Timeout) ->
+    {Filtered, AllCount, Width} = find_tests(Dir, Filter, "_test"),
+    io:format("Running ~B of ~B tests; FILTER=~s~n~n",
+              [length(Filtered), AllCount, Filter]),
+    [make_test_single(M, FWith, F, ShowHeading, Timeout, Width)
+     || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
+
+make_tests_multi(ServerDir, Dir, Filter, Cover, PluginsDir, Timeout) ->
+    {Filtered, AllCount, Width} = find_tests(Dir, Filter, "_with"),
+    io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
+              [length(Filtered), AllCount, Filter, Cover]),
+    Cfg = [{cover,   Cover},
+           {base,    basedir() ++ "/nodes"},
+           {server,  ServerDir},
+           {plugins, PluginsDir}],
+    rabbit_test_configs:enable_plugins(Cfg),
+    [make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
+     || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
+
+find_tests(Dir, Filter, Suffix) ->
     All = [{M, FWith, F} ||
               M <- modules(Dir),
               {FWith, _Arity} <- proplists:get_value(exports, M:module_info()),
-              string:right(atom_to_list(FWith), 5) =:= "_with",
-              F <- [fwith_to_f(FWith)]],
+              string:right(atom_to_list(FWith), length(Suffix)) =:= Suffix,
+              F <- [truncate_function_name(FWith, length(Suffix))]],
     Filtered = [Test || {M, _FWith, F} = Test <- All,
                         should_run(M, F, tokens(Filter))],
-    io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
-              [length(Filtered), length(All), Filter, Cover]),
     Width = case Filtered of
                 [] -> 0;
                 _  -> lists:max([atom_length(F) || {_, _, F} <- Filtered])
             end,
-    Cfg = [{cover,   Cover},
-           {base,    basedir() ++ "/nodes"},
-           {plugins, PluginsDir}],
-    rabbit_test_configs:enable_plugins(PluginsDir),
-    [make_test(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
-     || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
+    {Filtered, length(All), Width}.
 
-make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
+make_test_single(M, FWith, F, ShowHeading, Timeout, Width) ->
+    {timeout,
+     Timeout,
+     fun () ->
+             maybe_print_heading(M, ShowHeading),
+             io:format(user, "~s [running]", [name(F, Width)]),
+             M:FWith(),
+             io:format(user, " [PASSED].~n", [])
+     end}.
+
+make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
     {setup,
      fun () ->
-             case ShowHeading of
-                 true  -> io:format(user, "~n~s~n~s~n",
-                                    [M, string:chars($-, atom_length(M))]);
-                 false -> ok
-             end,
+             maybe_print_heading(M, ShowHeading),
              io:format(user, "~s [setup]", [name(F, Width)]),
              setup_error_logger(M, F, basedir()),
              recursive_delete(pget(base, InitialCfg)),
@@ -99,6 +122,11 @@ make_test(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
                        io:format(user, " [PASSED]", [])
                end}]
      end}.
+
+maybe_print_heading(M, true) ->
+    io:format(user, "~n~s~n~s~n", [M, string:chars($-, atom_length(M))]);
+maybe_print_heading(_M, false) ->
+    ok.
 
 apply_config(Things, Cfg) when is_list(Things) ->
     lists:foldl(fun apply_config/2, Cfg, Things);
@@ -128,9 +156,9 @@ setup_error_logger(M, F, Base) ->
     ensure_dir(Base),
     ok = error_logger:logfile({open, FN}).
 
-fwith_to_f(FWith) ->
+truncate_function_name(FWith, Length) ->
     FName = atom_to_list(FWith),
-    list_to_atom(string:substr(FName, 1, length(FName) - 5)).
+    list_to_atom(string:substr(FName, 1, length(FName) - Length)).
 
 tokens(Filter) ->
     [list_to_atom(T) || T <- string:tokens(Filter, ":")].
