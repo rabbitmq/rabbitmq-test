@@ -134,6 +134,16 @@ rapid_loop(Cfg) ->
             rapid_loop(Cfg)
     end.
 
+%% Vhost deletion needs to successfully tear down policies and queues
+%% with policies. At least smoke-test that it doesn't blow up.
+vhost_deletion_with() -> [cluster_ab, ha_policy_all].
+vhost_deletion([CfgA, _CfgB]) ->
+    ACh = pget(channel, CfgA),
+    Node = pget(node, CfgA),
+    amqp_channel:call(ACh, #'queue.declare'{queue = <<"test">>}),
+    ok = rpc:call(Node, rabbit_vhost, delete, [<<"/">>]),
+    ok.
+
 promote_on_shutdown_with() -> cluster_ab.
 promote_on_shutdown([CfgA, CfgB]) ->
     set_ha_policy(CfgA, <<"^ha.promote">>, <<"all">>,
