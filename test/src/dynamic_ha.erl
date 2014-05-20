@@ -170,7 +170,7 @@ promote_on_shutdown([CfgA, CfgB]) ->
                                durable = true})),
     CfgA2 = rabbit_test_configs:start_node(CfgA1),
     {_, ACh2} =  rabbit_test_util:connect(CfgA2),
-    #'queue.declare_ok'{message_count = 10} = 
+    #'queue.declare_ok'{message_count = 10} =
         amqp_channel:call(
           ACh2, #'queue.declare'{queue   = <<"ha.nopromote.test">>,
                                  durable = true}),
