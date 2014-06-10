@@ -74,8 +74,8 @@ enable_plugins(Dir, Server) ->
     Env = plugins_env(Dir),
     R = execute(Env, Server ++ "/scripts/rabbitmq-plugins list -m"),
     Plugins = string:tokens(R, "\n"),
-    [execute(Env, {Server ++ "/scripts/rabbitmq-plugins enable ~s", [Plugin]})
-     || Plugin <- Plugins],
+    [execute(Env, {Server ++ "/scripts/rabbitmq-plugins enable --offline ~s",
+                   [Plugin]}) || Plugin <- Plugins],
     ok.
 
 plugins_env(none) ->
