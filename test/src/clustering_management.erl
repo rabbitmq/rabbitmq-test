@@ -156,28 +156,46 @@ forget_cluster_node(Config) ->
     assert_not_clustered(Bunny),
     assert_clustered([Rabbit, Hare]).
 
-forget_cluster_node_removes_things_with() -> start_abc.
-forget_cluster_node_removes_things([RabbitCfg, HareCfg, _BunnyCfg] = Config) ->
-    [Rabbit, Hare, _Bunny] = cluster_members(Config),
-    stop_join_start(Rabbit, Hare),
-    {_RConn, RCh} = rabbit_test_util:connect(RabbitCfg),
-    #'queue.declare_ok'{} =
-        amqp_channel:call(RCh, #'queue.declare'{queue   = <<"test">>,
-                                                durable = true}),
+forget_removes_unmirrored_queue_with() -> cluster_ab.
+forget_removes_unmirrored_queue([RabbitCfg, HareCfg] = Config) ->
+    [Rabbit, Hare] = cluster_members(Config),
+    RabbitCh = pget(channel, RabbitCfg),
+    HareCh = pget(channel, HareCfg),
+    Unmirrored = <<"unmirrored-queue">>,
+    declare(RabbitCh, Unmirrored),
 
     ok = stop_app(Rabbit),
 
-    {_HConn, HCh} = rabbit_test_util:connect(HareCfg),
     {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
-        (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
-                                                       durable = true})),
+        (catch declare(HareCh, Unmirrored)),
 
     ok = forget_cluster_node(Hare, Rabbit),
 
-    {_HConn2, HCh2} = rabbit_test_util:connect(HareCfg),
-    #'queue.declare_ok'{} =
-        amqp_channel:call(HCh2, #'queue.declare'{queue   = <<"test">>,
-                                                 durable = true}),
+    {_HConn2, HareCh2} = rabbit_test_util:connect(HareCfg),
+    declare(HareCh2, Unmirrored),
+    ok.
+
+forget_promotes_slave_with() -> [cluster_ab, ha_policy_all].
+forget_promotes_slave([RabbitCfg, HareCfg] = Config) ->
+    [Rabbit, Hare] = cluster_members(Config),
+    RabbitCh = pget(channel, RabbitCfg),
+    Mirrored = <<"mirrored-queue">>,
+    declare(RabbitCh, Mirrored),
+    amqp_channel:call(RabbitCh, #'confirm.select'{}),
+    amqp_channel:cast(RabbitCh, #'basic.publish'{routing_key = Mirrored},
+                      #amqp_msg{props = #'P_basic'{delivery_mode = 2}}),
+    amqp_channel:wait_for_confirms(RabbitCh),
+
+    %% We should have a down slave on hare and a down master on rabbit.
+    ok = stop_app(Hare),
+    ok = stop_app(Rabbit),
+
+    ok = forget_cluster_node(Hare, Rabbit, true),
+    ok = start_app(Hare),
+
+    {_HConn2, HareCh2} = rabbit_test_util:connect(HareCfg),
+    #'queue.declare_ok'{message_count = 1} = declare(HareCh2, Mirrored),
+
     ok.
 
 change_cluster_node_type_with() -> start_abc.
@@ -445,3 +463,7 @@ control_action(Command, Node, Args, Opts) ->
     rpc:call(Node, rabbit_control_main, action,
              [Command, Node, Args, Opts,
               fun io:format/2]).
+
+declare(Ch, Name) ->
+    amqp_channel:call(Ch, #'queue.declare'{durable = true,
+                                           queue   = Name}).
