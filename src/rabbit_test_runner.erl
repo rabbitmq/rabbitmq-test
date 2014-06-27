@@ -32,6 +32,7 @@ run_multi(ServerDir, Dir, Filter, Cover, PluginsDir) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([?MODULE, shortnames]),
+    inets:start(), %% Used by HTTP tests
     error_logger:tty(false),
     case Cover of
         true  -> io:format("Cover compiling..."),
