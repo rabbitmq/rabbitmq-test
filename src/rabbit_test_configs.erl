@@ -98,6 +98,7 @@ start_node(Cfg) ->
            {"RABBITMQ_NODENAME",    {"~s", [Nodename]}},
            {"RABBITMQ_NODE_PORT",   {"~B", [Port]}},
            {"RABBITMQ_PID_FILE",    PidFile},
+           {"RABBITMQ_CONFIG_FILE", "/some/path/which/does/not/exist"},
            {"RABBITMQ_ALLOW_INPUT", "1"} %% Needed to make it close on our exit
            | plugins_env(pget(plugins, Cfg))],
           Server ++ "/scripts/rabbitmq-server"),
