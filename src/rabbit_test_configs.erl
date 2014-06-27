@@ -74,8 +74,8 @@ enable_plugins(Dir, Server) ->
     Env = plugins_env(Dir),
     R = execute(Env, Server ++ "/scripts/rabbitmq-plugins list -m"),
     Plugins = string:tokens(R, "\n"),
-    [execute(Env, {Server ++ "/scripts/rabbitmq-plugins enable ~s", [Plugin]})
-     || Plugin <- Plugins],
+    [execute(Env, {Server ++ "/scripts/rabbitmq-plugins enable --offline ~s",
+                   [Plugin]}) || Plugin <- Plugins],
     ok.
 
 plugins_env(none) ->
@@ -144,9 +144,11 @@ ha_policy_all([Cfg | _] = Cfgs) ->
 ha_policy_two_pos([Cfg | _] = Cfgs) ->
     Members = [a2b(pget(node, C)) || C <- Cfgs],
     TwoNodes = [M || M <- lists:sublist(Members, 2)],
-    set_ha_policy(Cfg, <<"^ha.two.">>, {<<"nodes">>, TwoNodes}, []),
+    set_ha_policy(Cfg, <<"^ha.two.">>, {<<"nodes">>, TwoNodes},
+                  [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
     set_ha_policy(Cfg, <<"^ha.auto.">>, {<<"nodes">>, TwoNodes},
-                  [{<<"ha-sync-mode">>, <<"automatic">>}]),
+                  [{<<"ha-sync-mode">>,           <<"automatic">>},
+                   {<<"ha-promote-on-shutdown">>, <<"always">>}]),
     Cfgs.
 
 start_connections(Nodes) -> [start_connection(Node) || Node <- Nodes].
