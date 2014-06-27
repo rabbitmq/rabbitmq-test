@@ -99,7 +99,10 @@ start_node(Cfg) ->
            {"RABBITMQ_NODE_PORT",   {"~B", [Port]}},
            {"RABBITMQ_PID_FILE",    PidFile},
            {"RABBITMQ_CONFIG_FILE", "/some/path/which/does/not/exist"},
-           {"RABBITMQ_ALLOW_INPUT", "1"} %% Needed to make it close on our exit
+           {"RABBITMQ_ALLOW_INPUT", "1"}, %% Needed to make it close on our exit
+           %% Bit of a hack - only needed for mgmt tests.
+           {"RABBITMQ_SERVER_START_ARGS",
+            {"-rabbitmq_management listener [{port,1~B}]", [Port]}}
            | plugins_env(pget(plugins, Cfg))],
           Server ++ "/scripts/rabbitmq-server"),
     execute({Server ++ "/scripts/rabbitmqctl -n ~s wait ~s",
