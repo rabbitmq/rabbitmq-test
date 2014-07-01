@@ -104,8 +104,11 @@ make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
              try
                  apply_config(M:FWith(), InitialCfg)
              catch
-                 error:{Type, Error, Nodes, Stack} ->
-                     rabbit_test_configs:stop_nodes(Nodes),
+                 error:{Type, Error, Cfg, Stack} ->
+                     case Cfg of
+                         InitialCfg -> ok; %% [0]
+                         _          -> rabbit_test_configs:stop_nodes(Cfg)
+                     end,
                      exit({Type, Error, Stack})
              end
      end,
@@ -123,6 +126,10 @@ make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
                        io:format(user, " [PASSED]", [])
                end}]
      end}.
+%% [0] If we didn't get as far as starting any nodes then we only have
+%% one proplist for initial config, not several per node. So avoid
+%% trying to "stop" it - it won't work (and there's nothing to do
+%% anyway).
 
 maybe_print_heading(M, true) ->
     io:format(user, "~n~s~n~s~n", [M, string:chars($-, atom_length(M))]);
