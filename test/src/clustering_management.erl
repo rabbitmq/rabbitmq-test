@@ -198,6 +198,14 @@ forget_promotes_slave([RabbitCfg, HareCfg] = Config) ->
 
     ok.
 
+force_boot_with() -> cluster_ab.
+force_boot([Rabbit, Hare]) ->
+    Rabbit2 = rabbit_test_configs:stop_node(Rabbit),
+    _Hare2 = rabbit_test_configs:stop_node(Hare),
+    rabbit_test_configs:rabbitmqctl(Rabbit2, force_boot),
+    _Rabbit3 = rabbit_test_configs:start_node(Rabbit2),
+    ok.
+
 change_cluster_node_type_with() -> start_abc.
 change_cluster_node_type(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
