@@ -106,7 +106,7 @@ join_to_start_interval(Config) ->
     assert_clustered([Rabbit, Hare]).
 
 forget_cluster_node_with() -> start_abc.
-forget_cluster_node(Config) ->
+forget_cluster_node([_, HareCfg, _] = Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Trying to remove a node not in the cluster should fail
@@ -145,9 +145,13 @@ forget_cluster_node(Config) ->
     ok = stop_app(Bunny),
     %% This is fine but we need the flag
     assert_failure(fun () -> forget_cluster_node(Hare, Bunny) end),
-    %% Hare was not the second-to-last to go down
-    ok = forget_cluster_node(Hare, Bunny, true),
-    ok = start_app(Hare),
+    %% Also fails because hare node is still running
+    assert_failure(fun () -> forget_cluster_node(Hare, Bunny, true) end),
+    %% But this works
+    HareCfg2 = rabbit_test_configs:stop_node(HareCfg),
+    rabbit_test_configs:rabbitmqctl(
+      HareCfg2, {"forget_cluster_node --offline ~s", [Bunny]}),
+    _HareCfg3 = rabbit_test_configs:start_node(HareCfg2),
     ok = start_app(Rabbit),
     %% Bunny still thinks its clustered with Rabbit and Hare
     assert_failure(fun () -> start_app(Bunny) end),
@@ -176,9 +180,8 @@ forget_removes_unmirrored_queue([RabbitCfg, HareCfg] = Config) ->
     ok.
 
 forget_promotes_slave_with() -> [cluster_ab, ha_policy_all].
-forget_promotes_slave([RabbitCfg, HareCfg] = Config) ->
-    [Rabbit, Hare] = cluster_members(Config),
-    RabbitCh = pget(channel, RabbitCfg),
+forget_promotes_slave([Rabbit, Hare] = Config) ->
+    RabbitCh = pget(channel, Rabbit),
     Mirrored = <<"mirrored-queue">>,
     declare(RabbitCh, Mirrored),
     amqp_channel:call(RabbitCh, #'confirm.select'{}),
@@ -187,13 +190,15 @@ forget_promotes_slave([RabbitCfg, HareCfg] = Config) ->
     amqp_channel:wait_for_confirms(RabbitCh),
 
     %% We should have a down slave on hare and a down master on rabbit.
-    ok = stop_app(Hare),
-    ok = stop_app(Rabbit),
+    Hare2 = rabbit_test_configs:stop_node(Hare),
+    Rabbit2 = rabbit_test_configs:stop_node(Rabbit),
 
-    ok = forget_cluster_node(Hare, Rabbit, true),
-    ok = start_app(Hare),
+    rabbit_test_configs:rabbitmqctl(
+      Hare2, {"forget_cluster_node --offline ~s", [pget(node, Rabbit)]}),
 
-    {_HConn2, HareCh2} = rabbit_test_util:connect(HareCfg),
+    Hare3 = rabbit_test_configs:start_node(Hare2),
+
+    {_HConn2, HareCh2} = rabbit_test_util:connect(Hare3),
     #'queue.declare_ok'{message_count = 1} = declare(HareCh2, Mirrored),
 
     ok.
