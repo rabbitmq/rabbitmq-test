@@ -120,7 +120,11 @@ cluster_with(Cfg, NewCfg) ->
 rabbitmqctl(Cfg, Str) ->
     Node = pget(node, Cfg),
     Server = pget(server, Cfg),
-    execute(Cfg, {Server ++ "/scripts/rabbitmqctl -n ~s ~s", [Node, fmt(Str)]}).
+    Cmd = case Node of
+              undefined -> {"~s", [fmt(Str)]};
+              _         -> {"-n ~s ~s", [Node, fmt(Str)]}
+          end,
+    execute(Cfg, {Server ++ "/scripts/rabbitmqctl ~s", [fmt(Cmd)]}).
 
 rabbitmqctl_fail(Cfg, Str) ->
     rabbitmqctl([{acceptable_exit_codes, lists:seq(1, 255)} | Cfg], Str).
