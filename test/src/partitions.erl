@@ -64,6 +64,49 @@ pause_on_disconnected(Cfgs) ->
     [] = pget(partitions, Status),
     ok.
 
+%% Make sure we do not confirm any messages after a partition has
+%% happened but before we pause, since any such confirmations would be
+%% lies.
+pause_false_promises_with() -> [cluster_abc, ha_policy_all].
+pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, pause_minority),
+    Ch = pget(channel, CfgA),
+    amqp_channel:call(Ch, #'queue.declare'{queue = <<"test">>}),
+    amqp_channel:call(Ch, #'confirm.select'{}),
+    amqp_channel:register_confirm_handler(Ch, self()),
+
+    %% Cause a partition after 1s
+    Self = self(),
+    spawn_link(fun () ->
+                       timer:sleep(1000),
+                       disconnect([{A, B}, {A, C}], 5000),
+                       unlink(Self)
+               end),
+
+    %% Publish large no of messages, see how many we get confirmed
+    [amqp_channel:cast(Ch, #'basic.publish'{routing_key = <<"test">>},
+                       #amqp_msg{props = #'P_basic'{delivery_mode = 1}}) ||
+        _ <- lists:seq(1, 1000000)],
+    Confirmed = receive_acks(0),
+    await_running(A, false),
+
+    %% But how many made it onto the rest of the cluster?
+    Ch2 = pget(channel, CfgB),
+    #'queue.declare_ok'{message_count = Survived} = 
+        amqp_channel:call(Ch2, #'queue.declare'{queue = <<"test">>}),
+    ?debugVal({Confirmed, Survived}),
+    ?assert(Confirmed =< Survived),
+    ok.
+
+receive_acks(Max) ->
+    receive
+        #'basic.ack'{delivery_tag = DTag} ->
+            receive_acks(DTag)
+    after 5000 ->
+            Max
+    end.
+
 autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
@@ -91,14 +134,12 @@ disconnect_reconnect(Pairs) ->
     timer:sleep(?DELAY),
     reconnect(Pairs).
 
-disconnect(Pairs) -> [block(X, Y) || {X, Y} <- Pairs].
-reconnect(Pairs)  -> [allow(X, Y) || {X, Y} <- Pairs].
+disconnect(Pairs)        -> disconnect(Pairs, 1000).
+disconnect(Pairs, Delay) -> [block(X, Y, Delay) || {X, Y} <- Pairs].
+reconnect(Pairs)         -> [allow(X, Y) || {X, Y} <- Pairs].
 
 partitions(Node) ->
     rpc:call(Node, rabbit_node_monitor, partitions, []).
-
-block(X, Y) ->
-    block(X, Y, 1000).
 
 block(X, Y, Delay) ->
     rpc:call(X, inet_interceptable_dist, block, [Y, Delay]),
@@ -110,11 +151,21 @@ allow(X, Y) ->
     rpc:call(X, inet_interceptable_dist, allow, [Y]),
     rpc:call(Y, inet_interceptable_dist, allow, [X]).
 
-await_running(Node, Bool) ->
-    case is_running(Node) of
+await_running  (Node, Bool) -> await(Node, Bool, fun is_running/1).
+await_listening(Node, Bool) -> await(Node, Bool, fun is_listening/1).
+
+await(Node, Bool, Fun) ->
+    case Fun(Node) of
         Bool -> ok;
         _    -> timer:sleep(100),
-                await_running(Node, Bool)
+                await(Node, Bool, Fun)
     end.
 
 is_running(Node) -> rpc:call(Node, rabbit, is_running, []).
+
+is_listening(Node) ->
+    case rpc:call(Node, rabbit_networking, node_listeners, [Node]) of
+        []    -> false;
+        [_|_] -> true;
+        _     -> false
+    end.
