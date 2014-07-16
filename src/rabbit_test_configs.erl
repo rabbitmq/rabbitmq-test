@@ -102,7 +102,14 @@ start_node(Cfg) ->
            {"RABBITMQ_ALLOW_INPUT", "1"}, %% Needed to make it close on our exit
            %% Bit of a hack - only needed for mgmt tests.
            {"RABBITMQ_SERVER_START_ARGS",
-            {"-rabbitmq_management listener [{port,1~B}]", [Port]}}
+            {"-rabbitmq_management listener [{port,1~B}]", [Port]}},
+           {"RABBITMQ_SERVER_ERL_ARGS",
+            %% Next two lines are defaults
+            {"+K true +A30 +P 1048576 "
+             "-kernel inet_default_connect_options [{nodelay,true}] "
+             %% Some tests need to be able to make distribution unhappy
+             "-pa ~s/../rabbitmq-test/ebin "
+             "-proto_dist inet_interceptable", [Server]}}
            | plugins_env(pget(plugins, Cfg))],
           Server ++ "/scripts/rabbitmq-server"),
     execute({Server ++ "/scripts/rabbitmqctl -n ~s wait ~s",

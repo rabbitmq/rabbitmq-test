@@ -21,54 +21,56 @@
 
 -import(rabbit_misc, [pget/2]).
 
-ignore_with() -> cluster_abc. 
+-define(CONFIG, [cluster_abc]).
+%% We set ticktime to 1s and the pretend failed TCP connection time to 1s so to
+%% make absolutely sure it passes...
+-define(DELAY, 5000).
+
+ignore_with() -> ?CONFIG.
 ignore(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     disconnect_reconnect([{B, C}]),
-    timer:sleep(5000),
+    timer:sleep(?DELAY),
     [] = partitions(A),
     [C] = partitions(B),
     [B] = partitions(C),
     ok.
 
-pause_on_down_with() -> cluster_abc. 
-pause_on_down([_CfgA, CfgB, CfgC] = Cfgs) ->
-    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    [set_mode(N, pause_minority) || N <- [A, B, C]],
+pause_on_down_with() -> ?CONFIG.
+pause_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
+    A = pget(node, CfgA),
+    set_mode(Cfgs, pause_minority),
     true = is_running(A),
 
     rabbit_test_util:kill(CfgB, sigkill),
-    timer:sleep(5000),
+    timer:sleep(?DELAY),
     true = is_running(A),
 
     rabbit_test_util:kill(CfgC, sigkill),
-    timer:sleep(5000),
-    false = is_running(A),
+    await_running(A, false),
     ok.
 
-pause_on_disconnected_with() -> cluster_abc.
+pause_on_disconnected_with() -> ?CONFIG.
 pause_on_disconnected(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    [set_mode(N, pause_minority) || N <- [A, B, C]],
+    set_mode(Cfgs, pause_minority),
     [(true = is_running(N)) || N <- [A, B, C]],
     disconnect([{A, B}, {A, C}]),
-    timer:sleep(5000),
-    [(true = is_running(N)) || N <- [B, C]],
-    false = is_running(A),
+    await_running(A, false),
+    [await_running(N, true) || N <- [B, C]],
     reconnect([{A, B}, {A, C}]),
-    timer:sleep(5000),
-    [(true = is_running(N)) || N <- [A, B, C]],
-    Status = rpc:call(A, rabbit_mnesia, status, []),
+    [await_running(N, true) || N <- [A, B, C]],
+    Status = rpc:call(B, rabbit_mnesia, status, []),
     [] = pget(partitions, Status),
     ok.
 
-autoheal_with() -> cluster_abc. 
+autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    [set_mode(N, autoheal) || N <- [A, B, C]],
+    set_mode(Cfgs, autoheal),
     Test = fun (Pairs) ->
                    disconnect_reconnect(Pairs),
-                   await_startup([A, B, C]),
+                   [await_running(N, true) || N <- [A, B, C]],
                    [] = partitions(A),
                    [] = partitions(B),
                    [] = partitions(C)
@@ -78,42 +80,41 @@ autoheal(Cfgs) ->
     Test([{A, B}, {A, C}, {B, C}]),
     ok.
 
-set_mode(Node, Mode) ->
-    rpc:call(Node, application, set_env,
-             [rabbit, cluster_partition_handling, Mode, infinity]).
+set_mode(Cfgs, Mode) ->
+    [set_env(Cfg, rabbit, cluster_partition_handling, Mode) || Cfg <- Cfgs].
 
-%% We turn off auto_connect and wait a little while to make it more
-%% like a real partition, and since Mnesia has problems with very
-%% short partitions (and rabbit_node_monitor will in various ways attempt to
-%% reconnect immediately).
+set_env(Cfg, App, K, V) ->
+    rpc:call(pget(node, Cfg), application, set_env, [App, K, V]).
+
 disconnect_reconnect(Pairs) ->
     disconnect(Pairs),
-    timer:sleep(1000),
+    timer:sleep(?DELAY),
     reconnect(Pairs).
 
-disconnect(Pairs) ->
-    dist_auto_connect(Pairs, never),
-    [rpc:call(X, erlang, disconnect_node, [Y]) || {X, Y} <- Pairs].
-
-reconnect(Pairs) ->
-    dist_auto_connect(Pairs, always).
-
-dist_auto_connect(Pairs, Val) ->
-    {Xs, Ys} = lists:unzip(Pairs),
-    Nodes = lists:usort(Xs ++ Ys),
-    [rpc:call(Node, application, set_env, [kernel, dist_auto_connect, Val])
-     || Node <- Nodes].
+disconnect(Pairs) -> [block(X, Y) || {X, Y} <- Pairs].
+reconnect(Pairs)  -> [allow(X, Y) || {X, Y} <- Pairs].
 
 partitions(Node) ->
     rpc:call(Node, rabbit_node_monitor, partitions, []).
 
-await_startup([]) ->
-    ok;
-await_startup([Node | Rest]) ->
-    case rpc:call(Node, rabbit, is_running, []) of
-        true -> await_startup(Rest);
+block(X, Y) ->
+    block(X, Y, 1000).
+
+block(X, Y, Delay) ->
+    rpc:call(X, inet_interceptable_dist, block, [Y, Delay]),
+    rpc:call(Y, inet_interceptable_dist, block, [X, Delay]),
+    rpc:call(X, erlang, disconnect_node, [Y]),
+    rpc:call(Y, erlang, disconnect_node, [X]).
+
+allow(X, Y) ->
+    rpc:call(X, inet_interceptable_dist, allow, [Y]),
+    rpc:call(Y, inet_interceptable_dist, allow, [X]).
+
+await_running(Node, Bool) ->
+    case is_running(Node) of
+        Bool -> ok;
         _    -> timer:sleep(100),
-                await_startup([Node | Rest])
+                await_running(Node, Bool)
     end.
 
 is_running(Node) -> rpc:call(Node, rabbit, is_running, []).
