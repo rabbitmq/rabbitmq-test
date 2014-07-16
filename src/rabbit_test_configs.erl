@@ -216,7 +216,8 @@ port_receive_loop(Port, Stdout) ->
         {Port, {exit_status, 0}}   -> Stdout;
         {Port, {exit_status, 137}} -> Stdout; %% [0]
         {Port, {exit_status, X}}   -> exit({exit_status, X, Stdout});
-        {Port, {data, Out}}        -> port_receive_loop(Port, Stdout ++ Out)
+        {Port, {data, Out}}        -> io:format(user, "~s", [Out]),
+                                      port_receive_loop(Port, Stdout ++ Out)
     end.
 
 %% [0] code 137 -> killed with SIGKILL which we do in some tests

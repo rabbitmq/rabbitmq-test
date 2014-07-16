@@ -21,7 +21,7 @@
 
 -import(rabbit_misc, [pget/2]).
 
--define(CONFIG, [cluster_abc]).
+-define(CONFIG, [start_abc, fun enable_dist_proxy/1]).
 %% We set ticktime to 1s and the pretend failed TCP connection time to 1s so to
 %% make absolutely sure it passes...
 -define(DELAY, 5000).
@@ -169,3 +169,9 @@ is_listening(Node) ->
         [_|_] -> true;
         _     -> false
     end.
+
+enable_dist_proxy(Cfgs) ->
+    Nodes = [pget(node, Cfg) || Cfg <- Cfgs],
+    [ok = rpc:call(Node, inet_interceptable_dist, enable, [Nodes])
+     || Node <- Nodes],
+    Cfgs.
