@@ -15,6 +15,9 @@
 %%
 -module(inet_proxy_dist).
 
+%% A distribution plugin that uses the usual inet_tcp_dist but allows
+%% insertion of a proxy at the receiving end.
+
 %% inet_*_dist "behaviour"
 -export([listen/1, accept/1, accept_connection/5,
 	 setup/5, close/1, select/1, is_node_name/1]).

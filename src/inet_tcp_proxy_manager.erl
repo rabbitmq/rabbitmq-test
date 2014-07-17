@@ -15,6 +15,19 @@
 %%
 -module(inet_tcp_proxy_manager).
 
+%% The TCP proxies need to decide whether to block based on the node
+%% they're running on, and the node connecting to them. The trouble
+%% is, they don't have an easy way to determine the latter. Therefore
+%% when A connects to B we register the source port used by A here, so
+%% that B can later look it up and find out who A is without having to
+%% sniff the distribution protocol.
+%%
+%% That does unfortunately mean that we need a central control
+%% thing. We assume here it's running on the node called
+%% 'standalone_test' since that's where tests are orchestrated from.
+%%
+%% Yes, this leaks. For its intended lifecycle, that's fine.
+
 -behaviour(gen_server).
 
 -export([start_link/0, register/5, lookup/1]).

@@ -15,6 +15,9 @@
 %%
 -module(inet_tcp_proxy).
 
+%% A TCP proxy for insertion into the Erlang distribution mechanism,
+%% which allows us to simulate network partitions.
+
 -export([start/0, reconnect/1, is_enabled/0, allow/1, block/1]).
 
 -define(TABLE, ?MODULE).
