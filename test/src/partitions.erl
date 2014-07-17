@@ -21,15 +21,16 @@
 
 -import(rabbit_misc, [pget/2]).
 
--define(CONFIG, [start_abc, fun enable_dist_proxy/1]).
-%% We set ticktime to 1s and the pretend failed TCP connection time to 1s so to
-%% make absolutely sure it passes...
--define(DELAY, 5000).
+-define(CONFIG, [start_abc, fun enable_dist_proxy/1,
+                 build_cluster, short_ticktime(1), start_connections]).
+%% We set ticktime to 1s ans setuptime is 7s so to make sure it
+%% passes...
+-define(DELAY, 8000).
 
 ignore_with() -> ?CONFIG.
 ignore(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    disconnect_reconnect([{B, C}]),
+    block_unblock([{B, C}]),
     timer:sleep(?DELAY),
     [] = partitions(A),
     [C] = partitions(B),
@@ -50,15 +51,15 @@ pause_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
     await_running(A, false),
     ok.
 
-pause_on_disconnected_with() -> ?CONFIG.
-pause_on_disconnected(Cfgs) ->
+pause_on_blocked_with() -> ?CONFIG.
+pause_on_blocked(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, pause_minority),
     [(true = is_running(N)) || N <- [A, B, C]],
-    disconnect([{A, B}, {A, C}]),
+    block([{A, B}, {A, C}]),
     await_running(A, false),
     [await_running(N, true) || N <- [B, C]],
-    reconnect([{A, B}, {A, C}]),
+    unblock([{A, B}, {A, C}]),
     [await_running(N, true) || N <- [A, B, C]],
     Status = rpc:call(B, rabbit_mnesia, status, []),
     [] = pget(partitions, Status),
@@ -67,12 +68,24 @@ pause_on_disconnected(Cfgs) ->
 %% Make sure we do not confirm any messages after a partition has
 %% happened but before we pause, since any such confirmations would be
 %% lies.
-pause_false_promises_with() -> [cluster_abc, ha_policy_all].
+%%
+%% This test has to use an AB cluster (not ABC) since GM ends up
+%% taking longer to detect down slaves when there are more nodes and
+%% we close the window by mistake.
+%%
+%% In general there are quite a few ways to accidentally cause this
+%% test to pass since there are a lot of things in the broker that can
+%% suddenly take several seconds to time out when TCP connections
+%% won't establish.
+pause_false_promises_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(10), start_connections, ha_policy_all].
 pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
-    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    set_mode(Cfgs, pause_minority),
+    [A, B] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode([CfgA], pause_minority),
     Ch = pget(channel, CfgA),
-    amqp_channel:call(Ch, #'queue.declare'{queue = <<"test">>}),
+    amqp_channel:call(Ch, #'queue.declare'{queue   = <<"test">>,
+                                           durable = true}),
     amqp_channel:call(Ch, #'confirm.select'{}),
     amqp_channel:register_confirm_handler(Ch, self()),
 
@@ -80,7 +93,8 @@ pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
     Self = self(),
     spawn_link(fun () ->
                        timer:sleep(1000),
-                       disconnect([{A, B}, {A, C}], 5000),
+                       %%io:format(user, "~p BLOCK~n", [calendar:local_time()]),
+                       block([{A, B}]),
                        unlink(Self)
                end),
 
@@ -88,14 +102,30 @@ pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
     [amqp_channel:cast(Ch, #'basic.publish'{routing_key = <<"test">>},
                        #amqp_msg{props = #'P_basic'{delivery_mode = 1}}) ||
         _ <- lists:seq(1, 1000000)],
+    %%io:format(user, "~p finish publish~n", [calendar:local_time()]),
+
+    %% Time for the partition to be detected. We don't put this sleep
+    %% in receive_acks since otherwise we'd have another similar sleep
+    %% at the end.
+    timer:sleep(30000),
     Confirmed = receive_acks(0),
+    %%io:format(user, "~p got acks~n", [calendar:local_time()]),
     await_running(A, false),
+    %%io:format(user, "~p A stopped~n", [calendar:local_time()]),
+
+    unblock([{A, B}]),
+    await_running(A, true),
 
     %% But how many made it onto the rest of the cluster?
     Ch2 = pget(channel, CfgB),
     #'queue.declare_ok'{message_count = Survived} = 
-        amqp_channel:call(Ch2, #'queue.declare'{queue = <<"test">>}),
-    ?debugVal({Confirmed, Survived}),
+        amqp_channel:call(Ch2, #'queue.declare'{queue   = <<"test">>,
+                                                durable = true}),
+    %%io:format(user, "~p queue declared~n", [calendar:local_time()]),
+    case Confirmed > Survived of
+        true  -> ?debugVal({Confirmed, Survived});
+        false -> ok
+    end,
     ?assert(Confirmed =< Survived),
     ok.
 
@@ -103,7 +133,7 @@ receive_acks(Max) ->
     receive
         #'basic.ack'{delivery_tag = DTag} ->
             receive_acks(DTag)
-    after 5000 ->
+    after ?DELAY ->
             Max
     end.
 
@@ -112,7 +142,7 @@ autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, autoheal),
     Test = fun (Pairs) ->
-                   disconnect_reconnect(Pairs),
+                   block_unblock(Pairs),
                    [await_running(N, true) || N <- [A, B, C]],
                    [] = partitions(A),
                    [] = partitions(B),
@@ -127,29 +157,26 @@ set_mode(Cfgs, Mode) ->
     [set_env(Cfg, rabbit, cluster_partition_handling, Mode) || Cfg <- Cfgs].
 
 set_env(Cfg, App, K, V) ->
-    rpc:call(pget(node, Cfg), application, set_env, [App, K, V]).
+    rpc(Cfg, application, set_env, [App, K, V]).
 
-disconnect_reconnect(Pairs) ->
-    disconnect(Pairs),
+block_unblock(Pairs) ->
+    block(Pairs),
     timer:sleep(?DELAY),
-    reconnect(Pairs).
+    unblock(Pairs).
 
-disconnect(Pairs)        -> disconnect(Pairs, 1000).
-disconnect(Pairs, Delay) -> [block(X, Y, Delay) || {X, Y} <- Pairs].
-reconnect(Pairs)         -> [allow(X, Y) || {X, Y} <- Pairs].
+block(Pairs)   -> [block(X, Y) || {X, Y} <- Pairs].
+unblock(Pairs) -> [allow(X, Y) || {X, Y} <- Pairs].
 
 partitions(Node) ->
     rpc:call(Node, rabbit_node_monitor, partitions, []).
 
-block(X, Y, Delay) ->
-    rpc:call(X, inet_interceptable_dist, block, [Y, Delay]),
-    rpc:call(Y, inet_interceptable_dist, block, [X, Delay]),
-    rpc:call(X, erlang, disconnect_node, [Y]),
-    rpc:call(Y, erlang, disconnect_node, [X]).
+block(X, Y) ->
+    rpc:call(X, inet_tcp_proxy, block, [Y]),
+    rpc:call(Y, inet_tcp_proxy, block, [X]).
 
 allow(X, Y) ->
-    rpc:call(X, inet_interceptable_dist, allow, [Y]),
-    rpc:call(Y, inet_interceptable_dist, allow, [X]).
+    rpc:call(X, inet_tcp_proxy, allow, [Y]),
+    rpc:call(Y, inet_tcp_proxy, allow, [X]).
 
 await_running  (Node, Bool) -> await(Node, Bool, fun is_running/1).
 await_listening(Node, Bool) -> await(Node, Bool, fun is_listening/1).
@@ -171,7 +198,18 @@ is_listening(Node) ->
     end.
 
 enable_dist_proxy(Cfgs) ->
+    inet_tcp_proxy_manager:start_link(),
     Nodes = [pget(node, Cfg) || Cfg <- Cfgs],
-    [ok = rpc:call(Node, inet_interceptable_dist, enable, [Nodes])
-     || Node <- Nodes],
+    [ok = rpc:call(Node, inet_tcp_proxy, start, []) || Node <- Nodes],
+    [ok = rpc:call(Node, inet_tcp_proxy, reconnect, [Nodes]) || Node <- Nodes],
     Cfgs.
+
+short_ticktime(Time) ->
+    fun (Cfgs) ->
+            [rpc(Cfg, net_kernel, set_net_ticktime, [Time, 0]) || Cfg <- Cfgs],
+            net_kernel:set_net_ticktime(Time, 0),
+            Cfgs
+    end.
+
+rpc(Cfg, M, F, A) ->
+    rpc:call(pget(node, Cfg), M, F, A).

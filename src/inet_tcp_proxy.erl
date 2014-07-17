@@ -15,13 +15,29 @@
 %%
 -module(inet_tcp_proxy).
 
--export([start/0]).
+-export([start/0, reconnect/1, is_enabled/0, allow/1, block/1]).
+
+-define(TABLE, ?MODULE).
 
 %% This can't start_link because there's no supervision hierarchy we
 %% can easily fit it into (we need to survive all application
 %% restarts). So we have to do some horrible error handling.
 
-start() -> spawn(error_handler(fun go/0)).
+start() ->
+    spawn(error_handler(fun go/0)),
+    ok.
+
+reconnect(Nodes) ->
+    [erlang:disconnect_node(N) || N <- Nodes, N =/= node()],
+    ok.
+
+is_enabled() ->
+    lists:member(?TABLE, ets:all()).
+
+allow(Node) -> ets:delete(?TABLE, Node).
+block(Node) -> ets:insert(?TABLE, {Node, block}).
+
+%%----------------------------------------------------------------------------
 
 error_handler(Thunk) ->
     fun () ->
@@ -35,33 +51,45 @@ error_handler(Thunk) ->
     end.
 
 go() ->
-    ets:new(inet_interceptable_dist, [public, named_table]),
+    ets:new(?TABLE, [public, named_table]),
     {ok, Port} = application:get_env(kernel, inet_dist_listen_min),
     ProxyPort = Port + 10000,
-    {ok, Sock} = gen_tcp:listen(ProxyPort, [inet]),
+    {ok, Sock} = gen_tcp:listen(ProxyPort, [inet,
+                                            {reuseaddr, true}]),
     accept_loop(Sock, Port).
 
 accept_loop(ListenSock, Port) ->
     {ok, Sock} = gen_tcp:accept(ListenSock),
-    spawn(error_handler(fun() -> run_it(Sock, Port) end)),
+    Proxy = spawn(error_handler(fun() -> run_it(Sock, Port) end)),
+    ok = gen_tcp:controlling_process(Sock, Proxy),
     accept_loop(ListenSock, Port).
 
 run_it(SockIn, Port) ->
-    {ok, {Addr, _OtherPort}} = inet:sockname(SockIn),
-    {ok, SockOut} = gen_tcp:connect(Addr, Port, [inet]),
-    run_loop(SockIn, SockOut).
-
-run_loop(SockIn, SockOut) ->
-    receive
-        {tcp, SockIn,  Data}  -> io:format(user, "in ~p~n", [Data]),
-                                 ok = gen_tcp:send(SockOut, Data),
-                                 run_loop(SockIn, SockOut);
-        {tcp, SockOut, Data}  -> io:format(user, "out ~p~n", [Data]),
-                                 ok = gen_tcp:send(SockIn, Data),
-                                 run_loop(SockIn, SockOut);
-        {tcp_closed, SockIn}  -> io:format(user, "finish in~n", []),
-                                 gen_tcp:close(SockOut);
-        {tcp_closed, SockOut} -> io:format(user, "finish out~n", []),
-                                 gen_tcp:close(SockIn);
-        X                     -> exit({got, X})
+    case {inet:peername(SockIn), inet:sockname(SockIn)} of
+        {{ok, {_Addr, SrcPort}}, {ok, {Addr, _OtherPort}}} ->
+            {ok, RemoteNode, ThisNode} = inet_tcp_proxy_manager:lookup(SrcPort),
+            ThisNode = node(), %% assertion
+            {ok, SockOut} = gen_tcp:connect(Addr, Port, [inet]),
+            run_loop({SockIn, SockOut}, RemoteNode, []);
+        _ ->
+            ok
     end.
+
+run_loop(Sockets, RemoteNode, Buf0) ->
+    Block = [{RemoteNode, block}] =:= ets:lookup(?TABLE, RemoteNode),
+    receive
+        {tcp, Sock, Data} ->
+            Buf = [Data | Buf0],
+            case Block of
+                false -> gen_tcp:send(other(Sock, Sockets), lists:reverse(Buf)),
+                         run_loop(Sockets, RemoteNode, []);
+                true  -> run_loop(Sockets, RemoteNode, Buf)
+            end;
+        {tcp_closed, Sock} ->
+            gen_tcp:close(other(Sock, Sockets));
+        X ->
+            exit({weirdness, X})
+    end.
+
+other(A, {A, B}) -> B;
+other(B, {A, B}) -> A.

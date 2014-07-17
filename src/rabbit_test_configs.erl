@@ -19,6 +19,7 @@
 
 -export([enable_plugins/1]).
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
+-export([start_connections/1, build_cluster/1]).
 -export([ha_policy_all/1, ha_policy_two_pos/1]).
 -export([start_nodes/2, start_nodes/3, add_to_cluster/2]).
 -export([stop_nodes/1, start_node/1, stop_node/1, kill_node/1, restart_node/1,
@@ -109,7 +110,7 @@ start_node(Cfg) ->
              "-kernel inet_default_connect_options [{nodelay,true}] "
              %% Some tests need to be able to make distribution unhappy
              "-pa ~s/../rabbitmq-test/ebin "
-             "-proto_dist inet_interceptable", [Server]}}
+             "-proto_dist inet_proxy", [Server]}}
            | plugins_env(pget(plugins, Cfg))],
           Server ++ "/scripts/rabbitmq-server"),
     execute({Server ++ "/scripts/rabbitmqctl -n ~s wait ~s",
@@ -216,7 +217,7 @@ port_receive_loop(Port, Stdout) ->
         {Port, {exit_status, 0}}   -> Stdout;
         {Port, {exit_status, 137}} -> Stdout; %% [0]
         {Port, {exit_status, X}}   -> exit({exit_status, X, Stdout});
-        {Port, {data, Out}}        -> io:format(user, "~s", [Out]),
+        {Port, {data, Out}}        -> %%io:format(user, "~s", [Out]),
                                       port_receive_loop(Port, Stdout ++ Out)
     end.
 

@@ -13,10 +13,7 @@
 %% The Initial Developer of the Original Code is GoPivotal, Inc.
 %% Copyright (c) 2007-2014 GoPivotal, Inc.  All rights reserved.
 %%
--module(inet_interceptable_dist).
-
-%% API
--export([enable/1, allow/1, block/2]).
+-module(inet_proxy_dist).
 
 %% inet_*_dist "behaviour"
 -export([listen/1, accept/1, accept_connection/5,
@@ -27,17 +24,6 @@
 -import(error_logger,[error_msg/2]).
 
 -define(REAL, inet_tcp_dist).
--define(TABLE, ?MODULE).
-
-%%----------------------------------------------------------------------------
-
-enable(Nodes) ->
-    inet_tcp_proxy:start(),
-    [erlang:disconnect_node(N) || N <- Nodes, N =/= node()],
-    ok.
-
-allow(Node)        -> ets:delete(?TABLE, Node).
-block(Node, Delay) -> ets:insert(?TABLE, {Node, Delay}).
 
 %%----------------------------------------------------------------------------
 
@@ -47,14 +33,11 @@ accept(Listen)     -> ?REAL:accept(Listen).
 close(Socket)      -> ?REAL:close(Socket).
 is_node_name(Node) -> ?REAL:is_node_name(Node).
 
-%% Inbound from another node TODO it would be nice if we could filter
-%% accepts here and thus support asymmetric partitions. But we can't
-%% tell which node a connection is from.
 accept_connection(AcceptPid, Socket, MyNode, Allowed, SetupTime) ->
     ?REAL:accept_connection(AcceptPid, Socket, MyNode, Allowed, SetupTime).
 
 %% This is copied from inet_tcp_dist, in order to change the
-%% output of erl_epmd:port_please/2. Search 'HERE' for the changhed line.
+%% output of erl_epmd:port_please/2.
 
 -include_lib("kernel/include/net_address.hrl").
 -include_lib("kernel/include/dist_util.hrl").
@@ -75,17 +58,20 @@ do_setup(Kernel, Node, Type, MyNode, LongOrShortNames,SetupTime) ->
 		    ?trace("port_please(~p) -> version ~p~n", 
 			   [Node,Version]),
 		    dist_util:reset_timer(Timer),
-                    %% We add 10000 to the port HERE, for the proxy
+                    %% Modification START
                     ProxyPort = case TcpPort >= 25672 andalso TcpPort < 25700
-                                    andalso lists:member(?TABLE, ets:all()) of
+                                    andalso inet_tcp_proxy:is_enabled() of
                                     true  -> TcpPort + 10000;
                                     false -> TcpPort
                                 end,
-                    io:format("~p Connecting to ~p~n", [node(), ProxyPort]),
 		    case inet_tcp:connect(Ip, ProxyPort, 
 					  [{active, false}, 
 					   {packet,2}]) of
 			{ok, Socket} ->
+                            {ok, {_, SrcPort}} = inet:sockname(Socket),
+                            ok = inet_tcp_proxy_manager:register(
+                                   node(), Node, SrcPort, TcpPort, ProxyPort),
+                    %% Modification END
 			    HSData = #hs_data{
 			      kernel_pid = Kernel,
 			      other_node = Node,
