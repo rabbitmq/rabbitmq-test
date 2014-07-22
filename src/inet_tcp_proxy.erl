@@ -46,7 +46,12 @@ error_handler(Thunk) ->
     fun () ->
             try
                 Thunk()
-            catch _:X ->
+            catch _:{{nodedown, _}, _} ->
+                    %% The only other node we ever talk to is the test
+                    %% runner; if that's down then the test is nearly
+                    %% over; die quietly.
+                    ok;
+                  _:X ->
                     io:format(user, "TCP proxy died with ~p~n At ~p~n",
                               [X, erlang:get_stacktrace()]),
                     erlang:halt(1)
