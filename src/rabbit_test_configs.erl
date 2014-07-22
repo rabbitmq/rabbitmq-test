@@ -19,6 +19,7 @@
 
 -export([enable_plugins/1]).
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
+-export([start_connections/1, build_cluster/1]).
 -export([ha_policy_all/1, ha_policy_two_pos/1]).
 -export([start_nodes/2, start_nodes/3, add_to_cluster/2,
          rabbitmqctl/2, rabbitmqctl_fail/2]).
@@ -207,6 +208,7 @@ environment(Cfg) ->
         _         ->
             Port = pget(port, Cfg),
             Base = pget(base, Cfg),
+            Server = pget(server, Cfg),
             [{"MNESIA_BASE", {"~s/rabbitmq-~s-mnesia", [Base, Nodename]}},
              {"LOG_BASE",    {"~s", [Base]}},
              {"NODENAME",    {"~s", [Nodename]}},
@@ -216,7 +218,14 @@ environment(Cfg) ->
              {"ALLOW_INPUT", "1"}, %% Needed to make it close on exit
              %% Bit of a hack - only needed for mgmt tests.
              {"SERVER_START_ARGS",
-              {"-rabbitmq_management listener [{port,1~B}]", [Port]}}
+              {"-rabbitmq_management listener [{port,1~B}]", [Port]}},
+             {"SERVER_ERL_ARGS",
+              %% Next two lines are defaults
+              {"+K true +A30 +P 1048576 "
+               "-kernel inet_default_connect_options [{nodelay,true}] "
+               %% Some tests need to be able to make distribution unhappy
+               "-pa ~s/../rabbitmq-test/ebin "
+               "-proto_dist inet_proxy", [Server]}}
              | plugins_env(Plugins)]
     end.
 
@@ -238,6 +247,7 @@ port_receive_loop(Port, Stdout, AcceptableExitCodes) ->
                 false -> exit({exit_status, X, AcceptableExitCodes, Stdout})
             end;
         {Port, {data, Out}} ->
+            %%io:format(user, "~s", [Out]),
             port_receive_loop(Port, Stdout ++ Out, AcceptableExitCodes)
     end.
 

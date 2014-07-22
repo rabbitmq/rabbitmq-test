@@ -114,6 +114,8 @@ make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
      end,
      fun (Nodes) ->
              rabbit_test_configs:stop_nodes(Nodes),
+             %% Partition tests change this, let's revert
+             net_kernel:set_net_ticktime(60, 1),
              io:format(user, ".~n", [])
      end,
      fun (Nodes) ->
