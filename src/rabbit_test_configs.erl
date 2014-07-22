@@ -75,9 +75,9 @@ enable_plugins(Cfg) ->
 enable_plugins(none, _Server, _Cfg) -> ok;
 enable_plugins(_Dir, Server, Cfg) ->
     R = execute(Cfg, Server ++ "/scripts/rabbitmq-plugins list -m"),
-    Plugins = string:tokens(R, "\n"),
-    [execute(Cfg, {Server ++ "/scripts/rabbitmq-plugins enable --offline ~s",
-                   [Plugin]}) || Plugin <- Plugins],
+    Plugins = string:join(string:tokens(R, "\n"), " "),
+    execute(Cfg, {Server ++ "/scripts/rabbitmq-plugins set --offline ~s",
+                  [Plugins]}),
     ok.
 
 start_node(Cfg0) ->
