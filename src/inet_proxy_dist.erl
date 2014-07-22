@@ -42,6 +42,8 @@ accept_connection(AcceptPid, Socket, MyNode, Allowed, SetupTime) ->
 %% This is copied from inet_tcp_dist, in order to change the
 %% output of erl_epmd:port_please/2.
 
+-ifdef(erlang_r15b_or_later).
+
 -include_lib("kernel/include/net_address.hrl").
 -include_lib("kernel/include/dist_util.hrl").
 
@@ -185,3 +187,10 @@ nodelay() ->
 	_ ->
 	    {nodelay, true}
     end.
+
+-else.
+
+setup(Node, Type, MyNode, LongOrShortNames,SetupTime) ->
+    exit(erlang_r15b_required).
+
+-endif.
