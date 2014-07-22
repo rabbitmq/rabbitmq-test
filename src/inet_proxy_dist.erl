@@ -190,7 +190,10 @@ nodelay() ->
 
 -else.
 
-setup(Node, Type, MyNode, LongOrShortNames,SetupTime) ->
+setup(_Node, _Type, _MyNode, _LongOrShortNames, _SetupTime) ->
+    exit(erlang_r15b_required).
+
+do_setup(_Kernel, _Node, _Type, _MyNode, _LongOrShortNames, _SetupTime) ->
     exit(erlang_r15b_required).
 
 -endif.
