@@ -77,17 +77,29 @@ pause_on_blocked(Cfgs) ->
 %% test to pass since there are a lot of things in the broker that can
 %% suddenly take several seconds to time out when TCP connections
 %% won't establish.
-pause_false_promises_with() ->
+pause_false_promises_mirrored_with() ->
     [start_ab, fun enable_dist_proxy/1,
      build_cluster, short_ticktime(10), start_connections, ha_policy_all].
+
+pause_false_promises_mirrored(Cfgs) ->
+    pause_false_promises(Cfgs).
+
+pause_false_promises_unmirrored_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(10), start_connections].
+
+pause_false_promises_unmirrored(Cfgs) ->
+    pause_false_promises(Cfgs).
+
 pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
     [A, B] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode([CfgA], pause_minority),
-    Ch = pget(channel, CfgA),
-    amqp_channel:call(Ch, #'queue.declare'{queue   = <<"test">>,
-                                           durable = true}),
-    amqp_channel:call(Ch, #'confirm.select'{}),
-    amqp_channel:register_confirm_handler(Ch, self()),
+    ChA = pget(channel, CfgA),
+    ChB = pget(channel, CfgB),
+    amqp_channel:call(ChB, #'queue.declare'{queue   = <<"test">>,
+                                            durable = true}),
+    amqp_channel:call(ChA, #'confirm.select'{}),
+    amqp_channel:register_confirm_handler(ChA, self()),
 
     %% Cause a partition after 1s
     Self = self(),
@@ -99,7 +111,7 @@ pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
                end),
 
     %% Publish large no of messages, see how many we get confirmed
-    [amqp_channel:cast(Ch, #'basic.publish'{routing_key = <<"test">>},
+    [amqp_channel:cast(ChA, #'basic.publish'{routing_key = <<"test">>},
                        #amqp_msg{props = #'P_basic'{delivery_mode = 1}}) ||
         _ <- lists:seq(1, 1000000)],
     %%io:format(user, "~p finish publish~n", [calendar:local_time()]),
@@ -117,9 +129,8 @@ pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
     await_running(A, true),
 
     %% But how many made it onto the rest of the cluster?
-    Ch2 = pget(channel, CfgB),
     #'queue.declare_ok'{message_count = Survived} = 
-        amqp_channel:call(Ch2, #'queue.declare'{queue   = <<"test">>,
+        amqp_channel:call(ChB, #'queue.declare'{queue   = <<"test">>,
                                                 durable = true}),
     %%io:format(user, "~p queue declared~n", [calendar:local_time()]),
     case Confirmed > Survived of
