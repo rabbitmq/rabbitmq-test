@@ -158,7 +158,7 @@ annotate_show_heading([{M, FWith, F} | Rest], Current) ->
     [{M, FWith, F, M =/= Current} | annotate_show_heading(Rest, M)].
 
 setup_error_logger(M, F, Base) ->
-    case error_logger:logfile(filename) of
+    case error_logger_logfile_filename() of
         {error, no_log_file} -> ok;
         _                    -> ok = error_logger:logfile(close)
     end,
@@ -202,3 +202,13 @@ name(F, Width) ->
 atom_length(A) -> length(atom_to_list(A)).
 
 basedir() -> "/tmp/rabbitmq-multi-node".
+
+%% reimplement error_logger:logfile(filename) only using
+%% gen_event:call/4 instead of gen_event:call/3 with our old friend
+%% the 5 second timeout. Grr.
+error_logger_logfile_filename() ->
+    case gen_event:call(
+           error_logger, error_logger_file_h, filename, infinity) of
+	{error,_} -> {error, no_log_file};
+	Val       -> Val
+    end.
