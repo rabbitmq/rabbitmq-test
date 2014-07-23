@@ -113,7 +113,7 @@ pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
     %% Publish large no of messages, see how many we get confirmed
     [amqp_channel:cast(ChA, #'basic.publish'{routing_key = <<"test">>},
                        #amqp_msg{props = #'P_basic'{delivery_mode = 1}}) ||
-        _ <- lists:seq(1, 1000000)],
+        _ <- lists:seq(1, 100000)],
     %%io:format(user, "~p finish publish~n", [calendar:local_time()]),
 
     %% Time for the partition to be detected. We don't put this sleep
