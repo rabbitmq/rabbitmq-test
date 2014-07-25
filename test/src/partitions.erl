@@ -23,7 +23,7 @@
 
 -define(CONFIG, [start_abc, fun enable_dist_proxy/1,
                  build_cluster, short_ticktime(1), start_connections]).
-%% We set ticktime to 1s ans setuptime is 7s so to make sure it
+%% We set ticktime to 1s and setuptime is 7s so to make sure it
 %% passes...
 -define(DELAY, 8000).
 
@@ -148,6 +148,22 @@ receive_acks(Max) ->
             Max
     end.
 
+prompt_disconnect_detection_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(1), start_connections].
+
+prompt_disconnect_detection([CfgA, CfgB]) ->
+    A = pget(node, CfgA),
+    B = pget(node, CfgB),
+    ChB = pget(channel, CfgB),
+    [amqp_channel:call(ChB, #'queue.declare'{}) || _ <- lists:seq(1, 100)],
+    block([{A, B}]),
+    timer:sleep(?DELAY),
+    %% We want to make sure we do not end up waiting for setuptime *
+    %% no of queues. Unfortunately that means we need a timeout...
+    [] = rpc(CfgA, rabbit_amqqueue, info_all, [<<"/">>], ?DELAY),
+    ok.
+
 autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
@@ -224,3 +240,6 @@ short_ticktime(Time) ->
 
 rpc(Cfg, M, F, A) ->
     rpc:call(pget(node, Cfg), M, F, A).
+
+rpc(Cfg, M, F, A, T) ->
+    rpc:call(pget(node, Cfg), M, F, A, T).
