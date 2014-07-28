@@ -75,10 +75,13 @@ accept_loop(ListenSock, Port) ->
 run_it(SockIn, Port) ->
     case {inet:peername(SockIn), inet:sockname(SockIn)} of
         {{ok, {_Addr, SrcPort}}, {ok, {Addr, _OtherPort}}} ->
-            {ok, RemoteNode, ThisNode} = inet_tcp_proxy_manager:lookup(SrcPort),
-            ThisNode = node(), %% assertion
+            {ok, Remote, This} = inet_tcp_proxy_manager:lookup(SrcPort),
+            case node() of
+                This  -> ok;
+                _     -> exit({not_me, node(), This})
+            end,
             {ok, SockOut} = gen_tcp:connect(Addr, Port, [inet]),
-            run_loop({SockIn, SockOut}, RemoteNode, []);
+            run_loop({SockIn, SockOut}, Remote, []);
         _ ->
             ok
     end.
