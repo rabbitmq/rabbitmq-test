@@ -54,6 +54,12 @@ full:
 	{ ( cd $(TEST_DIR) && ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
+unit:
+	OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
+	$(MAKE) cleanup && $$OK
+
 lite:
 	OK=true && \
 	$(MAKE) prepare && \
@@ -170,3 +176,4 @@ cleanup:
 
 create_ssl_certs:
 	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
+

@@ -45,6 +45,12 @@ clear_param(Cfg, Component, Name) ->
     ok = rpc:call(pget(node, Cfg), rabbit_runtime_parameters, clear,
                  [<<"/">>, Component, Name]).
 
+enable_plugin(Cfg, Plugin) ->
+    plugins_action(enable, Cfg, [Plugin], []).
+
+disable_plugin(Cfg, Plugin) ->
+    plugins_action(disable, Cfg, [Plugin], []).
+
 control_action(Command, Cfg) ->
     control_action(Command, Cfg, [], []).
 
@@ -58,6 +64,13 @@ control_action(Command, Cfg, Args, Opts) ->
               fun (F, A) ->
                       error_logger:info_msg(F ++ "~n", A)
               end]).
+
+plugins_action(Command, Cfg, Args, Opts) ->
+    PluginsFile = os:getenv("RABBITMQ_ENABLED_PLUGINS_FILE"),
+    PluginsDir = os:getenv("RABBITMQ_PLUGINS_DIR"),
+    Node = pget(node, Cfg),
+    rpc:call(Node, rabbit_plugins_main, action,
+             [Command, Node, Args, Opts, PluginsFile, PluginsDir]).
 
 restart_app(Cfg) ->
     stop_app(Cfg),

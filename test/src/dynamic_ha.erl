@@ -144,6 +144,38 @@ vhost_deletion([CfgA, _CfgB]) ->
     ok = rpc:call(Node, rabbit_vhost, delete, [<<"/">>]),
     ok.
 
+promote_on_shutdown_with() -> cluster_ab.
+promote_on_shutdown([CfgA, CfgB]) ->
+    set_ha_policy(CfgA, <<"^ha.promote">>, <<"all">>,
+                  [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
+    set_ha_policy(CfgA, <<"^ha.nopromote">>, <<"all">>),
+
+    ACh = pget(channel, CfgA),
+    [begin
+         amqp_channel:call(ACh, #'queue.declare'{queue   = Q,
+                                                 durable = true}),
+         publish(ACh, Q, 10)
+     end || Q <- [<<"ha.promote.test">>, <<"ha.nopromote.test">>]],
+    rabbit_test_configs:restart_node(CfgB),
+    CfgA1 = rabbit_test_configs:stop_node(CfgA),
+    {_, BCh} =  rabbit_test_util:connect(CfgB),
+    #'queue.declare_ok'{message_count = 0} = 
+        amqp_channel:call(
+          BCh, #'queue.declare'{queue   = <<"ha.promote.test">>,
+                                durable = true}),
+    ?assertExit(
+       {{shutdown, {server_initiated_close, 404, _}}, _},
+       amqp_channel:call(
+         BCh, #'queue.declare'{queue   = <<"ha.nopromote.test">>,
+                               durable = true})),
+    CfgA2 = rabbit_test_configs:start_node(CfgA1),
+    {_, ACh2} =  rabbit_test_util:connect(CfgA2),
+    #'queue.declare_ok'{message_count = 10} =
+        amqp_channel:call(
+          ACh2, #'queue.declare'{queue   = <<"ha.nopromote.test">>,
+                                 durable = true}),
+    ok.
+
 %%----------------------------------------------------------------------------
 
 assert_slaves(RPCNode, QName, Exp) ->

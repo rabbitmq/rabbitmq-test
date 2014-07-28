@@ -1,5 +1,6 @@
 Useful targets:
 
+$ make unit # runs the Erlang unit tests
 $ make lite # runs the Erlang unit tests and the Java client / functional tests
 $ make full # runs both the above plus the QPid test suite
 $ make test # runs the Erlang multi-node integration tests
