@@ -156,15 +156,18 @@ forget_cluster_node(Config) ->
     assert_not_clustered(Bunny),
     assert_clustered([Rabbit, Hare]).
 
-forget_cluster_node_removes_things_with() -> start_abc.
-forget_cluster_node_removes_things([RabbitCfg, HareCfg, _BunnyCfg] = Config) ->
-    [Rabbit, Hare, _Bunny] = cluster_members(Config),
-    stop_join_start(Rabbit, Hare),
-    {_RConn, RCh} = rabbit_test_util:connect(RabbitCfg),
-    #'queue.declare_ok'{} =
-        amqp_channel:call(RCh, #'queue.declare'{queue   = <<"test">>,
-                                                durable = true}),
+forget_cluster_node_removes_things_with() -> cluster_ab.
+forget_cluster_node_removes_things(Cfg) ->
+    test_removes_things(Cfg, fun (R, H) -> ok = forget_cluster_node(H, R) end).
 
+reset_removes_things_with() -> cluster_ab.
+reset_removes_things(Cfg) ->
+    test_removes_things(Cfg, fun (R, _H) -> ok = reset(R) end).
+
+test_removes_things([RabbitCfg, HareCfg] = Config, LoseRabbit) ->
+    [Rabbit, Hare] = cluster_members(Config),
+    RCh = pget(channel, RabbitCfg),
+    declare_and_bind(RCh),
     ok = stop_app(Rabbit),
 
     {_HConn, HCh} = rabbit_test_util:connect(HareCfg),
@@ -172,13 +175,16 @@ forget_cluster_node_removes_things([RabbitCfg, HareCfg, _BunnyCfg] = Config) ->
         (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
                                                        durable = true})),
 
-    ok = forget_cluster_node(Hare, Rabbit),
-
+    ok = LoseRabbit(Rabbit, Hare),
     {_HConn2, HCh2} = rabbit_test_util:connect(HareCfg),
-    #'queue.declare_ok'{} =
-        amqp_channel:call(HCh2, #'queue.declare'{queue   = <<"test">>,
-                                                 durable = true}),
+    declare_and_bind(HCh2),
     ok.
+
+declare_and_bind(Ch) ->
+    amqp_channel:call(Ch, #'queue.declare'{queue   = <<"test">>,
+                                           durable = true}),
+    amqp_channel:call(Ch, #'queue.bind'{queue    = <<"test">>,
+                                        exchange = <<"amq.fanout">>}).
 
 change_cluster_node_type_with() -> start_abc.
 change_cluster_node_type(Config) ->
