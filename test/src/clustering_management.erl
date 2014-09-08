@@ -321,9 +321,9 @@ update_cluster_nodes_test(Config) ->
     assert_not_clustered(Hare),
     assert_clustered([Rabbit, Bunny]).
 
-erlang_config_with() -> start_abc.
+erlang_config_with() -> start_ab.
 erlang_config(Config) ->
-    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+    [Rabbit, Hare] = cluster_members(Config),
 
     ok = stop_app(Hare),
     ok = reset(Hare),
