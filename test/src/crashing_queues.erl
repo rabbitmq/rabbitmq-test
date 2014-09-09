@@ -26,32 +26,32 @@ crashing_unmirrored_with() -> [cluster_ab].
 crashing_unmirrored([CfgA, CfgB]) ->
     A = pget(node, CfgA),
     ChA = pget(channel, CfgA),
-    ChB = pget(channel, CfgB),
+    ConnB = pget(connection, CfgB),
     amqp_channel:call(ChA, #'confirm.select'{}),
-    test_queue_failure(A, ChA, ChB, 1, 0, #'queue.declare'{queue   = <<"test">>,
-                                                           durable = true}),
-    test_queue_failure(A, ChA, ChB, 0, 0, #'queue.declare'{queue   = <<"test">>,
-                                                           durable = false}),
+    test_queue_failure(A, ChA, ConnB, 1, 0,
+                       #'queue.declare'{queue = <<"test">>, durable = true}),
+    test_queue_failure(A, ChA, ConnB, 0, 0,
+                       #'queue.declare'{queue = <<"test">>, durable = false}),
     ok.
 
 crashing_mirrored_with() -> [cluster_ab, ha_policy_all].
 crashing_mirrored([CfgA, CfgB]) ->
     A = pget(node, CfgA),
     ChA = pget(channel, CfgA),
-    ChB = pget(channel, CfgB),
+    ConnB = pget(connection, CfgB),
     amqp_channel:call(ChA, #'confirm.select'{}),
-    test_queue_failure(A, ChA, ChB, 2, 1, #'queue.declare'{queue   = <<"test">>,
-                                                           durable = true}),
-    test_queue_failure(A, ChA, ChB, 2, 1, #'queue.declare'{queue   = <<"test">>,
-                                                           durable = false}),
+    test_queue_failure(A, ChA, ConnB, 2, 1,
+                       #'queue.declare'{queue = <<"test">>, durable = true}),
+    test_queue_failure(A, ChA, ConnB, 2, 1,
+                       #'queue.declare'{queue = <<"test">>, durable = false}),
     ok.
 
 
-test_queue_failure(Node, Ch, RaceCh, MsgCount, SlaveCount, Decl) ->
+test_queue_failure(Node, Ch, RaceConn, MsgCount, SlaveCount, Decl) ->
     #'queue.declare_ok'{queue = QName} = amqp_channel:call(Ch, Decl),
     publish(Ch, QName, transient),
     publish(Ch, QName, durable),
-    Racer = spawn_declare_racer(RaceCh, Decl),
+    Racer = spawn_declare_racer(RaceConn, Decl),
     kill_queue(Node, QName),
     assert_message_count(MsgCount, Ch, QName),
     assert_slave_count(SlaveCount, Node, QName),
@@ -67,9 +67,9 @@ publish(Ch, QName, DelMode) ->
 del_mode(transient) -> 1;
 del_mode(durable)   -> 2.
 
-spawn_declare_racer(Ch, Decl) ->
+spawn_declare_racer(Conn, Decl) ->
     Self = self(),
-    spawn_link(fun() -> declare_racer_loop(Self, Ch, Decl) end).
+    spawn_link(fun() -> declare_racer_loop(Self, Conn, Decl) end).
 
 stop_declare_racer(Pid) ->
     Pid ! stop,
@@ -78,12 +78,23 @@ stop_declare_racer(Pid) ->
         {'DOWN', MRef, process, Pid, _} -> ok
     end.
 
-declare_racer_loop(Parent, Ch, Decl) ->
+declare_racer_loop(Parent, Conn, Decl) ->
     receive
         stop -> unlink(Parent)
     after 0 ->
-            amqp_channel:call(Ch, Decl),
-            declare_racer_loop(Parent, Ch, Decl)
+            %% Catch here because we might happen to catch the queue
+            %% while it is in the middle of recovering and thus
+            %% explode with NOT_FOUND because crashed. Doesn't matter,
+            %% we are only in this loop to try to fool the recovery
+            %% code anyway.
+            try
+                {ok, Ch} = amqp_connection:open_channel(Conn),
+                amqp_channel:call(Ch, Decl)
+            catch
+                exit:_ ->
+                    ok
+            end,
+            declare_racer_loop(Parent, Conn, Decl)
     end.
 
 kill_queue(Node, QName) ->
