@@ -46,7 +46,6 @@ crashing_mirrored([CfgA, CfgB]) ->
                        #'queue.declare'{queue = <<"test">>, durable = false}),
     ok.
 
-
 test_queue_failure(Node, Ch, RaceConn, MsgCount, SlaveCount, Decl) ->
     #'queue.declare_ok'{queue = QName} = amqp_channel:call(Ch, Decl),
     publish(Ch, QName, transient),
@@ -57,6 +56,25 @@ test_queue_failure(Node, Ch, RaceConn, MsgCount, SlaveCount, Decl) ->
     assert_slave_count(SlaveCount, Node, QName),
     stop_declare_racer(Racer),
     amqp_channel:call(Ch, #'queue.delete'{queue = QName}).
+
+give_up_after_repeated_crashes_with() -> [cluster_ab].
+give_up_after_repeated_crashes([CfgA, CfgB]) ->
+    A = pget(node, CfgA),
+    ChA = pget(channel, CfgA),
+    ChB = pget(channel, CfgB),
+    QName = <<"test">>,
+    amqp_channel:call(ChA, #'confirm.select'{}),
+    amqp_channel:call(ChA, #'queue.declare'{queue   = QName,
+                                            durable = true}),
+    publish(ChA, QName, durable),
+    kill_queue_hard(A, QName),
+    {'EXIT', _} = (catch amqp_channel:call(
+                           ChA, #'queue.declare'{queue   = QName,
+                                                 durable = true})),
+    amqp_channel:call(ChB, #'queue.delete'{queue = QName}),
+    amqp_channel:call(ChB, #'queue.declare'{queue   = QName,
+                                            durable = true}),
+    ok.
 
 publish(Ch, QName, DelMode) ->
     Publish = #'basic.publish'{exchange = <<>>, routing_key = QName},
@@ -97,10 +115,20 @@ declare_racer_loop(Parent, Conn, Decl) ->
             declare_racer_loop(Parent, Conn, Decl)
     end.
 
+kill_queue_hard(Node, QName) ->
+    %% Needs to match MaxR in rabbit_amqqueue_sup
+    [kill_queue(Node, QName, I =/= 5) || I <- lists:seq(1, 5)].
+
 kill_queue(Node, QName) ->
+    kill_queue(Node, QName, true).
+
+kill_queue(Node, QName, Await) ->
     Pid1 = queue_pid(Node, QName),
     exit(Pid1, boom),
-    await_new_pid(Node, QName, Pid1).
+    case Await of
+        true  -> await_new_pid(Node, QName, Pid1);
+        false -> ok
+    end.
 
 queue_pid(Node, QName) ->
     #amqqueue{pid = QPid} = lookup(Node, QName),
@@ -113,7 +141,7 @@ lookup(Node, QName) ->
 
 await_new_pid(Node, QName, OldPid) ->
     case queue_pid(Node, QName) of
-        OldPid -> timer:sleep(100),
+        OldPid -> timer:sleep(10),
                   await_new_pid(Node, QName, OldPid);
         _      -> ok
     end.
@@ -126,7 +154,16 @@ assert_message_count(Count, Ch, QName) ->
 assert_slave_count(Count, Node, QName) ->
     Q = lookup(Node, QName),
     [{_, Pids}] = rpc:call(Node, rabbit_amqqueue, info, [Q, [slave_pids]]),
-    Count = case Pids of
-                '' -> 0;
-                _  -> length(Pids)
-            end.
+    RealCount = case Pids of
+                    '' -> 0;
+                    _  -> length(Pids)
+                end,
+    case RealCount of
+        Count ->
+            ok;
+        _ when RealCount < Count ->
+            timer:sleep(10),
+            assert_slave_count(Count, Node, QName);
+        _ ->
+            exit({too_many_slaves, Count, RealCount})
+    end.
