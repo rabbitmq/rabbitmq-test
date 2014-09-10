@@ -106,8 +106,10 @@ declare_racer_loop(Parent, Conn, Decl) ->
             %% we are only in this loop to try to fool the recovery
             %% code anyway.
             try
-                {ok, Ch} = amqp_connection:open_channel(Conn),
-                amqp_channel:call(Ch, Decl)
+                case amqp_connection:open_channel(Conn) of
+                    {ok, Ch} -> amqp_channel:call(Ch, Decl);
+                    closing  -> ok
+                end
             catch
                 exit:_ ->
                     ok
