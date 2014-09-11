@@ -321,9 +321,9 @@ update_cluster_nodes_test(Config) ->
     assert_not_clustered(Hare),
     assert_clustered([Rabbit, Bunny]).
 
-erlang_config_with() -> start_abc.
+erlang_config_with() -> start_ab.
 erlang_config(Config) ->
-    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+    [Rabbit, Hare] = cluster_members(Config),
 
     ok = stop_app(Hare),
     ok = reset(Hare),
@@ -339,6 +339,17 @@ erlang_config(Config) ->
     ok = start_app(Hare),
     assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                           [Rabbit, Hare]),
+
+    %% Check having a stop_app'ed node around doesn't break completely.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = stop_app(Rabbit),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], disc}]),
+    ok = start_app(Hare),
+    ok = start_app(Rabbit),
+    assert_not_clustered(Hare),
+    assert_not_clustered(Rabbit),
 
     %% We get a warning but we start anyway
     ok = stop_app(Hare),

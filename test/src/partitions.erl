@@ -170,6 +170,9 @@ autoheal(Cfgs) ->
     set_mode(Cfgs, autoheal),
     Test = fun (Pairs) ->
                    block_unblock(Pairs),
+                   %% TODO is there a race here where await_running/2
+                   %% returns before autoheal has started?
+                   timer:sleep(1000),
                    [await_running(N, true) || N <- [A, B, C]],
                    [] = partitions(A),
                    [] = partitions(B),
