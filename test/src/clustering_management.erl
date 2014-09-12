@@ -106,7 +106,7 @@ join_to_start_interval(Config) ->
     assert_clustered([Rabbit, Hare]).
 
 forget_cluster_node_with() -> start_abc.
-forget_cluster_node(Config) ->
+forget_cluster_node([_, HareCfg, _] = Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Trying to remove a node not in the cluster should fail
@@ -145,9 +145,13 @@ forget_cluster_node(Config) ->
     ok = stop_app(Bunny),
     %% This is fine but we need the flag
     assert_failure(fun () -> forget_cluster_node(Hare, Bunny) end),
-    %% Hare was not the second-to-last to go down
-    ok = forget_cluster_node(Hare, Bunny, true),
-    ok = start_app(Hare),
+    %% Also fails because hare node is still running
+    assert_failure(fun () -> forget_cluster_node(Hare, Bunny, true) end),
+    %% But this works
+    HareCfg2 = rabbit_test_configs:stop_node(HareCfg),
+    rabbit_test_configs:rabbitmqctl(
+      HareCfg2, {"forget_cluster_node --offline ~s", [Bunny]}),
+    _HareCfg3 = rabbit_test_configs:start_node(HareCfg2),
     ok = start_app(Rabbit),
     %% Bunny still thinks its clustered with Rabbit and Hare
     assert_failure(fun () -> start_app(Bunny) end),
@@ -156,8 +160,8 @@ forget_cluster_node(Config) ->
     assert_not_clustered(Bunny),
     assert_clustered([Rabbit, Hare]).
 
-forget_cluster_node_removes_things_with() -> cluster_ab.
-forget_cluster_node_removes_things(Cfg) ->
+forget_removes_things_with() -> cluster_ab.
+forget_removes_things(Cfg) ->
     test_removes_things(Cfg, fun (R, H) -> ok = forget_cluster_node(H, R) end).
 
 reset_removes_things_with() -> cluster_ab.
@@ -165,26 +169,54 @@ reset_removes_things(Cfg) ->
     test_removes_things(Cfg, fun (R, _H) -> ok = reset(R) end).
 
 test_removes_things([RabbitCfg, HareCfg] = Config, LoseRabbit) ->
+    Unmirrored = <<"unmirrored-queue">>,
     [Rabbit, Hare] = cluster_members(Config),
     RCh = pget(channel, RabbitCfg),
-    declare_and_bind(RCh),
+    declare(RCh, Unmirrored),
     ok = stop_app(Rabbit),
 
     {_HConn, HCh} = rabbit_test_util:connect(HareCfg),
     {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
-        (catch amqp_channel:call(HCh, #'queue.declare'{queue   = <<"test">>,
-                                                       durable = true})),
+        (catch declare(HCh, Unmirrored)),
 
     ok = LoseRabbit(Rabbit, Hare),
     {_HConn2, HCh2} = rabbit_test_util:connect(HareCfg),
-    declare_and_bind(HCh2),
+    declare(HCh2, Unmirrored),
     ok.
 
-declare_and_bind(Ch) ->
-    amqp_channel:call(Ch, #'queue.declare'{queue   = <<"test">>,
-                                           durable = true}),
-    amqp_channel:call(Ch, #'queue.bind'{queue    = <<"test">>,
-                                        exchange = <<"amq.fanout">>}).
+forget_promotes_slave_with() -> [cluster_ab, ha_policy_all].
+forget_promotes_slave([Rabbit, Hare]) ->
+    RabbitCh = pget(channel, Rabbit),
+    Mirrored = <<"mirrored-queue">>,
+    declare(RabbitCh, Mirrored),
+    amqp_channel:call(RabbitCh, #'confirm.select'{}),
+    amqp_channel:cast(RabbitCh, #'basic.publish'{routing_key = Mirrored},
+                      #amqp_msg{props = #'P_basic'{delivery_mode = 2}}),
+    amqp_channel:wait_for_confirms(RabbitCh),
+
+    %% We should have a down slave on hare and a down master on rabbit.
+    Hare2 = rabbit_test_configs:stop_node(Hare),
+    _Rabbit2 = rabbit_test_configs:stop_node(Rabbit),
+
+    rabbit_test_configs:rabbitmqctl(
+      Hare2, {"forget_cluster_node --offline ~s", [pget(node, Rabbit)]}),
+
+    Hare3 = rabbit_test_configs:start_node(Hare2),
+
+    {_HConn2, HareCh2} = rabbit_test_util:connect(Hare3),
+    #'queue.declare_ok'{message_count = 1} = declare(HareCh2, Mirrored),
+
+    ok.
+
+force_boot_with() -> cluster_ab.
+force_boot([Rabbit, Hare]) ->
+    rabbit_test_configs:rabbitmqctl_fail(Rabbit, force_boot),
+    Rabbit2 = rabbit_test_configs:stop_node(Rabbit),
+    _Hare2 = rabbit_test_configs:stop_node(Hare),
+    rabbit_test_configs:start_node_fail(Rabbit2),
+    rabbit_test_configs:rabbitmqctl(Rabbit2, force_boot),
+    _Rabbit3 = rabbit_test_configs:start_node(Rabbit2),
+    ok.
 
 change_cluster_node_type_with() -> start_abc.
 change_cluster_node_type(Config) ->
@@ -289,9 +321,9 @@ update_cluster_nodes_test(Config) ->
     assert_not_clustered(Hare),
     assert_clustered([Rabbit, Bunny]).
 
-erlang_config_with() -> start_abc.
+erlang_config_with() -> start_ab.
 erlang_config(Config) ->
-    [Rabbit, Hare, _Bunny] = cluster_members(Config),
+    [Rabbit, Hare] = cluster_members(Config),
 
     ok = stop_app(Hare),
     ok = reset(Hare),
@@ -307,6 +339,17 @@ erlang_config(Config) ->
     ok = start_app(Hare),
     assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
                           [Rabbit, Hare]),
+
+    %% Check having a stop_app'ed node around doesn't break completely.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = stop_app(Rabbit),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], disc}]),
+    ok = start_app(Hare),
+    ok = start_app(Rabbit),
+    assert_not_clustered(Hare),
+    assert_not_clustered(Rabbit),
 
     %% We get a warning but we start anyway
     ok = stop_app(Hare),
@@ -451,3 +494,10 @@ control_action(Command, Node, Args, Opts) ->
     rpc:call(Node, rabbit_control_main, action,
              [Command, Node, Args, Opts,
               fun io:format/2]).
+
+declare(Ch, Name) ->
+    Res = amqp_channel:call(Ch, #'queue.declare'{durable = true,
+                                                 queue   = Name}),
+    amqp_channel:call(Ch, #'queue.bind'{queue    = Name,
+                                        exchange = <<"amq.fanout">>}),
+    Res.
