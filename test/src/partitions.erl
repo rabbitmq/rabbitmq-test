@@ -170,6 +170,8 @@ autoheal(Cfgs) ->
     set_mode(Cfgs, autoheal),
     Test = fun (Pairs) ->
                    block_unblock(Pairs),
+                   %% Sleep to make sure all the partitions are noticed
+                   timer:sleep(?DELAY),
                    [await_running(N, true) || N <- [A, B, C]],
                    [] = partitions(A),
                    [] = partitions(B),
