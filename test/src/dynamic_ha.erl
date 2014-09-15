@@ -101,13 +101,11 @@ change_cluster([CfgA, _CfgB, _CfgC] = CfgsABC) ->
 rapid_change_with() -> cluster_abc.
 rapid_change([CfgA, _CfgB, _CfgC]) ->
     ACh = pget(channel, CfgA),
-    Self = self(),
-    spawn_link(
-      fun() ->
-              [rapid_amqp_ops(ACh, I) || I <- lists:seq(1, 100)],
-              Self ! done
-      end),
-    rapid_loop(CfgA),
+    {_Pid, MRef} = spawn_monitor(
+                     fun() ->
+                             [rapid_amqp_ops(ACh, I) || I <- lists:seq(1, 100)]
+                     end),
+    rapid_loop(CfgA, MRef),
     ok.
 
 rapid_amqp_ops(Ch, I) ->
@@ -125,13 +123,16 @@ rapid_amqp_ops(Ch, I) ->
     end,
     amqp_channel:call(Ch, #'queue.delete'{queue = ?QNAME}).
 
-rapid_loop(Cfg) ->
-    receive done ->
-            ok
+rapid_loop(Cfg, MRef) ->
+    receive
+        {'DOWN', MRef, process, _Pid, normal} ->
+            ok;
+        {'DOWN', MRef, process, _Pid, Reason} ->
+            exit({amqp_ops_died, Reason})
     after 0 ->
-            set_ha_policy(Cfg, ?POLICY, <<"all">>),
-            clear_policy(Cfg, ?POLICY),
-            rapid_loop(Cfg)
+            %% set_ha_policy(Cfg, ?POLICY, <<"all">>),
+            %% clear_policy(Cfg, ?POLICY),
+            rapid_loop(Cfg, MRef)
     end.
 
 %% Vhost deletion needs to successfully tear down policies and queues
