@@ -130,8 +130,8 @@ rapid_loop(Cfg, MRef) ->
         {'DOWN', MRef, process, _Pid, Reason} ->
             exit({amqp_ops_died, Reason})
     after 0 ->
-            %% set_ha_policy(Cfg, ?POLICY, <<"all">>),
-            %% clear_policy(Cfg, ?POLICY),
+            set_ha_policy(Cfg, ?POLICY, <<"all">>),
+            clear_policy(Cfg, ?POLICY),
             rapid_loop(Cfg, MRef)
     end.
 
