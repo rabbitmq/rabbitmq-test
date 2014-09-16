@@ -66,15 +66,23 @@ give_up_after_repeated_crashes([CfgA, CfgB]) ->
     amqp_channel:call(ChA, #'confirm.select'{}),
     amqp_channel:call(ChA, #'queue.declare'{queue   = QName,
                                             durable = true}),
+    await_state(A, QName, running),
     publish(ChA, QName, durable),
     kill_queue_hard(A, QName),
     {'EXIT', _} = (catch amqp_channel:call(
                            ChA, #'queue.declare'{queue   = QName,
                                                  durable = true})),
+    await_state(A, QName, crashed),
     amqp_channel:call(ChB, #'queue.delete'{queue = QName}),
     amqp_channel:call(ChB, #'queue.declare'{queue   = QName,
                                             durable = true}),
+    await_state(A, QName, running),
+
+    %% Since it's convenient, also test absent queue status here.
+    rabbit_test_configs:stop_node(CfgB),
+    await_state(A, QName, down),
     ok.
+
 
 publish(Ch, QName, DelMode) ->
     Publish = #'basic.publish'{exchange = <<>>, routing_key = QName},
@@ -116,6 +124,23 @@ declare_racer_loop(Parent, Conn, Decl) ->
             end,
             declare_racer_loop(Parent, Conn, Decl)
     end.
+
+await_state(Node, QName, State) ->
+    case state(Node, QName) of
+        State ->
+            ok;
+        _ ->
+            timer:sleep(100),
+            await_state(Node, QName, State)
+    end.
+
+state(Node, QName) ->
+    V = <<"/">>,
+    Res = rabbit_misc:r(V, queue, QName),
+    [[{name,  Res},
+      {state, State}]] =
+        rpc:call(Node, rabbit_amqqueue, info_all, [V, [name, state]]),
+    State.
 
 kill_queue_hard(Node, QName) ->
     %% Needs to match MaxR in rabbit_amqqueue_sup
