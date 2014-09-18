@@ -25,6 +25,7 @@
 -export([run_in_broker/2, run_multi/5]).
 
 run_in_broker(Dir, Filter) ->
+    add_server_test_ebin_dir(),
     io:format("~nIn-broker tests~n================~n~n", []),
     eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).
 
@@ -219,3 +220,11 @@ error_logger_logfile_filename() ->
 	{error,_} -> {error, no_log_file};
 	Val       -> Val
     end.
+
+add_server_test_ebin_dir() ->
+    %% Some tests need modules from this dir, but it's not on the path
+    %% by default.
+    {file, Path} = code:is_loaded(rabbit),
+    Ebin = filename:dirname(Path),
+    TestEbin = filename:join([Ebin, "..", "test", "ebin"]),
+    code:add_path(TestEbin).
