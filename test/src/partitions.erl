@@ -164,6 +164,7 @@ prompt_disconnect_detection([CfgA, CfgB]) ->
     [] = rpc(CfgA, rabbit_amqqueue, info_all, [<<"/">>], ?DELAY),
     ok.
 
+%% NB: we test full and partial partitions here.
 autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
