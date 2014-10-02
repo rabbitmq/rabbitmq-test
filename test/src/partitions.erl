@@ -30,11 +30,11 @@
 ignore_with() -> ?CONFIG.
 ignore(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    block_unblock([{B, C}]),
+    block_unblock([{A, B}, {A, C}]),
     timer:sleep(?DELAY),
-    [] = partitions(A),
-    [C] = partitions(B),
-    [B] = partitions(C),
+    [B, C] = partitions(A),
+    [A] = partitions(B),
+    [A] = partitions(C),
     ok.
 
 pause_on_down_with() -> ?CONFIG.
