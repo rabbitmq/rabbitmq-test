@@ -30,11 +30,11 @@
 ignore_with() -> ?CONFIG.
 ignore(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    block_unblock([{B, C}]),
+    block_unblock([{A, B}, {A, C}]),
     timer:sleep(?DELAY),
-    [] = partitions(A),
-    [C] = partitions(B),
-    [B] = partitions(C),
+    [B, C] = partitions(A),
+    [A] = partitions(B),
+    [A] = partitions(C),
     ok.
 
 pause_on_down_with() -> ?CONFIG.
@@ -164,6 +164,7 @@ prompt_disconnect_detection([CfgA, CfgB]) ->
     [] = rpc(CfgA, rabbit_amqqueue, info_all, [<<"/">>], ?DELAY),
     ok.
 
+%% NB: we test full and partial partitions here.
 autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
@@ -180,6 +181,30 @@ autoheal(Cfgs) ->
     Test([{B, C}]),
     Test([{A, C}, {B, C}]),
     Test([{A, B}, {A, C}, {B, C}]),
+    ok.
+
+partial_to_full_with() -> ?CONFIG.
+partial_to_full(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    block_unblock([{A, B}]),
+    timer:sleep(?DELAY),
+    [B, C] = partitions(A),
+    [A, C] = partitions(B),
+    [A, B] = partitions(C),
+    ok.
+
+partial_pause_with() -> ?CONFIG.
+partial_pause(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, pause_minority),
+    block([{A, B}]),
+    [await_running(N, false) || N <- [A, B]],
+    await_running(C, true),
+    unblock([{A, B}]),
+    [await_listening(N, true) || N <- [A, B, C]],
+    [] = partitions(A),
+    [] = partitions(B),
+    [] = partitions(C),
     ok.
 
 set_mode(Cfgs, Mode) ->
