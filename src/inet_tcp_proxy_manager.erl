@@ -62,6 +62,7 @@ name() ->
 %%----------------------------------------------------------------------------
 
 init([]) ->
+    net_kernel:monitor_nodes(true),
     {ok, #state{ports   = dict:new(),
                 pending = []}}.
 
@@ -89,6 +90,13 @@ handle_call(_Req, _From, State) ->
 
 handle_cast(_C, State) ->
     {noreply, State}.
+
+handle_info({nodedown, Node}, State = #state{ports = Ports}) ->
+    Ports1 = dict:filter(
+               fun (_, {From, To}) ->
+                       Node =/= From andalso Node =/= To
+               end, Ports),
+    {noreply, State#state{ports = Ports1}};
 
 handle_info(_I, State) ->
     {noreply, State}.
