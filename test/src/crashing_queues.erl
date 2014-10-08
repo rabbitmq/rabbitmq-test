@@ -149,8 +149,24 @@ state(Node, QName) ->
     State.
 
 kill_queue_hard(Node, QName) ->
-    %% Needs to match MaxR in rabbit_amqqueue_sup
-    [kill_queue(Node, QName, I =/= 5) || I <- lists:seq(1, 5)].
+    {ok, SupPid} = sup_child(Node, rabbit_amqqueue_sup_sup),
+    {ok, QPid} = sup_child(Node, SupPid),
+    kill_queue(Node, QName, false),
+    kill_queue_hard_await(Node, QName, SupPid, QPid).
+
+kill_queue_hard_await(Node, QName, SupPid, QPid) ->
+    case sup_child(Node, SupPid) of
+        {ok, QPid}      -> timer:sleep(100),
+                           kill_queue_hard_await(Node, QName, SupPid, QPid);
+        {ok, _QPid2}    -> kill_queue_hard(Node, QName);
+        {error, no_sup} -> ok
+    end.
+
+sup_child(Node, Sup) ->
+    case rpc:call(Node, supervisor2, which_children, [Sup]) of
+        [{_, Child, _, _}]              -> {ok, Child};
+        {badrpc, {'EXIT', {noproc, _}}} -> {error, no_sup}
+    end.
 
 kill_queue(Node, QName) ->
     kill_queue(Node, QName, true).
