@@ -126,12 +126,18 @@ declare_racer_loop(Parent, Conn, Decl) ->
     end.
 
 await_state(Node, QName, State) ->
+    await_state(Node, QName, State, 30000).
+
+await_state(Node, QName, State, Time) ->
     case state(Node, QName) of
         State ->
             ok;
-        _ ->
-            timer:sleep(100),
-            await_state(Node, QName, State)
+        Other ->
+            case Time of
+                0 -> exit({timeout_awaiting_state, State, Other});
+                _ -> timer:sleep(100),
+                     await_state(Node, QName, State, Time - 100)
+            end
     end.
 
 state(Node, QName) ->
