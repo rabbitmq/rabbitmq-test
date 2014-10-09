@@ -149,39 +149,34 @@ state(Node, QName) ->
     State.
 
 kill_queue_hard(Node, QName) ->
-    {ok, SupPid} = sup_child(Node, rabbit_amqqueue_sup_sup),
-    {ok, QPid} = sup_child(Node, SupPid),
-    kill_queue(Node, QName, false),
-    kill_queue_hard_await(Node, QName, SupPid, QPid).
+    case kill_queue(Node, QName) of
+        crashed -> ok;
+        _NewPid -> timer:sleep(100),
+                   kill_queue_hard(Node, QName)
+    end.
 
-kill_queue_hard_await(Node, QName, SupPid, QPid) ->
-    case sup_child(Node, SupPid) of
-        {ok, QPid}      -> timer:sleep(100),
-                           kill_queue_hard_await(Node, QName, SupPid, QPid);
-        {ok, _QPid2}    -> kill_queue_hard(Node, QName);
-        {error, no_sup} -> ok
+kill_queue(Node, QName) ->
+    Pid1 = queue_pid(Node, QName),
+    exit(Pid1, boom),
+    await_new_pid(Node, QName, Pid1).
+
+queue_pid(Node, QName) ->
+    #amqqueue{pid   = QPid,
+              state = State} = lookup(Node, QName),
+    case State of
+        crashed -> case sup_child(Node, rabbit_amqqueue_sup_sup) of
+                       {ok, _}           -> QPid;   %% restarting
+                       {error, no_child} -> crashed %% given up
+                   end;
+        _       -> QPid
     end.
 
 sup_child(Node, Sup) ->
     case rpc:call(Node, supervisor2, which_children, [Sup]) of
         [{_, Child, _, _}]              -> {ok, Child};
+        []                              -> {error, no_child};
         {badrpc, {'EXIT', {noproc, _}}} -> {error, no_sup}
     end.
-
-kill_queue(Node, QName) ->
-    kill_queue(Node, QName, true).
-
-kill_queue(Node, QName, Await) ->
-    Pid1 = queue_pid(Node, QName),
-    exit(Pid1, boom),
-    case Await of
-        true  -> await_new_pid(Node, QName, Pid1);
-        false -> ok
-    end.
-
-queue_pid(Node, QName) ->
-    #amqqueue{pid = QPid} = lookup(Node, QName),
-    QPid.
 
 lookup(Node, QName) ->
     {ok, Q} = rpc:call(Node, rabbit_amqqueue, lookup,
@@ -192,7 +187,7 @@ await_new_pid(Node, QName, OldPid) ->
     case queue_pid(Node, QName) of
         OldPid -> timer:sleep(10),
                   await_new_pid(Node, QName, OldPid);
-        _      -> ok
+        New    -> New
     end.
 
 assert_message_count(Count, Ch, QName) ->
