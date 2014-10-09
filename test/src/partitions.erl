@@ -188,10 +188,17 @@ partial_to_full(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     block_unblock([{A, B}]),
     timer:sleep(?DELAY),
-    [B, C] = partitions(A),
-    [A, C] = partitions(B),
-    [A, B] = partitions(C),
-    ok.
+    %% There are several valid ways this could go, depending on how
+    %% the DOWN messages race: either A gets disconnected first and BC
+    %% stay together, or B gets disconnected first and AC stay
+    %% together, or both make it through and all three get
+    %% disconnected.
+    case {partitions(A), partitions(B), partitions(C)} of
+        {[B, C], [A],    [A]}    -> ok;
+        {[B],    [A, C], [B]}    -> ok;
+        {[B, C], [A, C], [A, B]} -> ok;
+        Partitions               -> exit({partitions, Partitions})
+    end.
 
 partial_pause_with() -> ?CONFIG.
 partial_pause(Cfgs) ->
