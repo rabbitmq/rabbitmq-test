@@ -173,8 +173,7 @@ autoheal(Cfgs) ->
                    block_unblock(Pairs),
                    %% Sleep to make sure all the partitions are noticed
                    %% ?DELAY for the net_tick timeout
-                   %% + 1000 for the initial autoheal sleep.
-                   timer:sleep(?DELAY + 1000),
+                   timer:sleep(?DELAY),
                    [await_running(N, true) || N <- [A, B, C]],
                    [] = partitions(A),
                    [] = partitions(B),
