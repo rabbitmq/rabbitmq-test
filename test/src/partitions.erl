@@ -30,11 +30,11 @@
 ignore_with() -> ?CONFIG.
 ignore(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
-    block_unblock([{B, C}]),
+    block_unblock([{A, B}, {A, C}]),
     timer:sleep(?DELAY),
-    [] = partitions(A),
-    [C] = partitions(B),
-    [B] = partitions(C),
+    [B, C] = partitions(A),
+    [A] = partitions(B),
+    [A] = partitions(C),
     ok.
 
 pause_on_down_with() -> ?CONFIG.
@@ -164,6 +164,7 @@ prompt_disconnect_detection([CfgA, CfgB]) ->
     [] = rpc(CfgA, rabbit_amqqueue, info_all, [<<"/">>], ?DELAY),
     ok.
 
+%% NB: we test full and partial partitions here.
 autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
@@ -182,6 +183,37 @@ autoheal(Cfgs) ->
     Test([{B, C}]),
     Test([{A, C}, {B, C}]),
     Test([{A, B}, {A, C}, {B, C}]),
+    ok.
+
+partial_to_full_with() -> ?CONFIG.
+partial_to_full(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    block_unblock([{A, B}]),
+    timer:sleep(?DELAY),
+    %% There are several valid ways this could go, depending on how
+    %% the DOWN messages race: either A gets disconnected first and BC
+    %% stay together, or B gets disconnected first and AC stay
+    %% together, or both make it through and all three get
+    %% disconnected.
+    case {partitions(A), partitions(B), partitions(C)} of
+        {[B, C], [A],    [A]}    -> ok;
+        {[B],    [A, C], [B]}    -> ok;
+        {[B, C], [A, C], [A, B]} -> ok;
+        Partitions               -> exit({partitions, Partitions})
+    end.
+
+partial_pause_with() -> ?CONFIG.
+partial_pause(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, pause_minority),
+    block([{A, B}]),
+    [await_running(N, false) || N <- [A, B]],
+    await_running(C, true),
+    unblock([{A, B}]),
+    [await_listening(N, true) || N <- [A, B, C]],
+    [] = partitions(A),
+    [] = partitions(B),
+    [] = partitions(C),
     ok.
 
 set_mode(Cfgs, Mode) ->
