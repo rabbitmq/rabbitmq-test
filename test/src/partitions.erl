@@ -174,7 +174,7 @@ autoheal(Cfgs) ->
                    %% Sleep to make sure all the partitions are noticed
                    %% ?DELAY for the net_tick timeout
                    timer:sleep(?DELAY),
-                   [await_running(N, true) || N <- [A, B, C]],
+                   [await_listening(N, true) || N <- [A, B, C]],
                    [] = partitions(A),
                    [] = partitions(B),
                    [] = partitions(C)
