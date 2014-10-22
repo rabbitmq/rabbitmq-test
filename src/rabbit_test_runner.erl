@@ -25,6 +25,7 @@
 -export([run_in_broker/2, run_multi/5]).
 
 run_in_broker(Dir, Filter) ->
+    add_server_test_ebin_dir(),
     io:format("~nIn-broker tests~n================~n~n", []),
     eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).
 
@@ -124,8 +125,15 @@ make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, InitialCfg) ->
                fun () ->
                        [link(pget(linked_pid, N)) || N <- Nodes],
                        io:format(user, " [running]", []),
-                       M:F(Nodes),
-                       io:format(user, " [PASSED]", [])
+                       %%try
+                           M:F(Nodes),
+                           io:format(user, " [PASSED]", [])
+                       %% catch
+                       %%     Type:Reason ->
+                       %%         io:format(user, "YYY stop~n", []),
+                       %%         rabbit_test_configs:stop_nodes(Nodes),
+                       %%         exit({Type, Reason, erlang:get_stacktrace()})
+                       %% end
                end}]
      end}.
 %% [0] If we didn't get as far as starting any nodes then we only have
@@ -212,3 +220,11 @@ error_logger_logfile_filename() ->
 	{error,_} -> {error, no_log_file};
 	Val       -> Val
     end.
+
+add_server_test_ebin_dir() ->
+    %% Some tests need modules from this dir, but it's not on the path
+    %% by default.
+    {file, Path} = code:is_loaded(rabbit),
+    Ebin = filename:dirname(Path),
+    TestEbin = filename:join([Ebin, "..", "test", "ebin"]),
+    code:add_path(TestEbin).

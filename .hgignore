@@ -7,3 +7,4 @@ syntax: regexp
 ^ebin/
 ^test/ebin/
 .*~
+^multi-node/
