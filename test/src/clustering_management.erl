@@ -187,8 +187,15 @@ test_removes_things([RabbitCfg, HareCfg] = Config, LoseRabbit) ->
 forget_offline_removes_things_with() -> cluster_ab.
 forget_offline_removes_things([Rabbit, Hare]) ->
     Unmirrored = <<"unmirrored-queue">>,
+    X = <<"X">>,
     RCh = pget(channel, Rabbit),
     declare(RCh, Unmirrored),
+
+    amqp_channel:call(RCh, #'exchange.declare'{durable     = true,
+                                               exchange    = X,
+                                               auto_delete = true}),
+    amqp_channel:call(RCh, #'queue.bind'{queue    = Unmirrored,
+                                         exchange = X}),
     ok = stop_app(pget(node, Rabbit)),
 
     {_HConn, HCh} = rabbit_test_util:connect(Hare),
@@ -203,6 +210,11 @@ forget_offline_removes_things([Rabbit, Hare]) ->
 
     {_HConn2, HCh2} = rabbit_test_util:connect(Hare3),
     declare(HCh2, Unmirrored),
+    {'EXIT',{{shutdown,{server_initiated_close,404,_}}, _}} =
+        (catch amqp_channel:call(HCh2,#'exchange.declare'{durable     = true,
+                                                          exchange    = X,
+                                                          auto_delete = true,
+                                                          passive     = true})),
     ok.
 
 forget_offline_promotes_slave_with() -> [cluster_ab, ha_policy_all].
