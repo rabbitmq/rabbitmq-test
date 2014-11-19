@@ -51,7 +51,7 @@ full:
 	$(MAKE) prepare && \
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
-	{ ( cd $(TEST_DIR) && ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
+	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
 unit:
@@ -64,14 +64,14 @@ lite:
 	OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
-	{ ( cd $(TEST_DIR) && ant test-suite ) || OK=false; } && \
+	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 conformance16:
 	OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
-	{ ( cd $(TEST_DIR) && ant test-suite ) || OK=false; } && \
+	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 qpid_testsuite:
