@@ -398,9 +398,8 @@ erlang_config(Config) ->
     ok = reset(Hare),
     ok = rpc:call(Hare, application, set_env,
                   [rabbit, cluster_nodes, [Rabbit]]),
-    ok = start_app(Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit).
 
 force_reset_test_with() -> start_abc.
 force_reset_test(Config) ->
