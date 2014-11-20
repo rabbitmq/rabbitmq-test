@@ -164,7 +164,7 @@ prompt_disconnect_detection([CfgA, CfgB]) ->
     [] = rpc(CfgA, rabbit_amqqueue, info_all, [<<"/">>], ?DELAY),
     ok.
 
-ctl_ticktime_sync_with() -> ?CONFIG.
+ctl_ticktime_sync_with() -> [start_ab, short_ticktime(1)].
 ctl_ticktime_sync([CfgA | _]) ->
     %% Server has 1s net_ticktime, make sure ctl doesn't get disconnected
     "ok\n" = rabbit_test_configs:rabbitmqctl(CfgA, "eval 'timer:sleep(5000).'"),
