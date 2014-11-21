@@ -236,7 +236,14 @@ block(Pairs)   -> [block(X, Y) || {X, Y} <- Pairs].
 unblock(Pairs) -> [allow(X, Y) || {X, Y} <- Pairs].
 
 partitions(Node) ->
-    rpc:call(Node, rabbit_node_monitor, partitions, []).
+    case rpc:call(Node, rabbit_node_monitor, partitions, []) of
+        {badrpc, {'EXIT', E}} = R -> case rabbit_misc:is_abnormal_exit(E) of
+                                         true  -> R;
+                                         false -> timer:sleep(1000),
+                                                  partitions(Node)
+                                     end;
+        Partitions                -> Partitions
+    end.
 
 block(X, Y) ->
     rpc:call(X, inet_tcp_proxy, block, [Y]),
