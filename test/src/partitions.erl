@@ -190,6 +190,24 @@ autoheal(Cfgs) ->
     Test([{A, B}, {A, C}, {B, C}]),
     ok.
 
+partial_false_positive_with() -> ?CONFIG.
+partial_false_positive(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    block([{A, B}]),
+    timer:sleep(1000),
+    block([{A, C}]),
+    timer:sleep(?DELAY),
+    unblock([{A, B}, {A, C}]),
+    timer:sleep(?DELAY),
+    %% When B times out A's connection, it will check with C. C will
+    %% not have timed out A yet, but already it can't talk to it. We
+    %% need to not consider this a partial partition; B and C should
+    %% still talk to each other.
+    [B, C] = partitions(A),
+    [A] = partitions(B),
+    [A] = partitions(C),
+    ok.
+
 partial_to_full_with() -> ?CONFIG.
 partial_to_full(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
