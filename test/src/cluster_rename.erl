@@ -77,7 +77,7 @@ rename_node(Cfg, Nodename, Extra) ->
     Node = rabbit_nodes:make(Nodename),
     NewCfg = [{nodename, Nodename} | proplists:delete(nodename, Cfg)],
     rabbit_test_configs:rabbitmqctl(
-      NewCfg, {"rename_current_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
+      NewCfg, {"rename_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
     NewCfg.
 
 publish(Cfg, Q) ->
