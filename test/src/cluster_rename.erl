@@ -62,6 +62,17 @@ rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
+abortive_rename_with() -> cluster_ab.
+abortive_rename([Bugs, Bigwig]) ->
+    publish(Bugs,  <<"bugs">>),
+
+    Bugs1   = rabbit_test_configs:stop_node(Bugs),
+    _Jessica = rename_node(Bugs1, jessica),
+    Bugs2 = rabbit_test_configs:start_node(Bugs1),
+
+    consume(Bugs2, <<"bugs">>),
+    ok.
+
 %% ----------------------------------------------------------------------------
 
 %% Normal post-test stop does not work since names have changed...
