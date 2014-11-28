@@ -112,7 +112,7 @@ rename_node(Cfg, OldNodename, Nodename, Extra, Ctl) ->
     OldNode = rabbit_nodes:make(OldNodename),
     Node = rabbit_nodes:make(Nodename),
     NewCfg = [{nodename, Nodename} | proplists:delete(nodename, Cfg)],
-    Ctl(NewCfg, {"rename_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
+    Ctl(NewCfg, {"rename_cluster_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
     NewCfg.
 
 publish(Cfg, Q) ->
