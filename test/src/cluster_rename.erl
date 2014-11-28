@@ -63,7 +63,7 @@ rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     ok.
 
 abortive_rename_with() -> cluster_ab.
-abortive_rename([Bugs, Bigwig]) ->
+abortive_rename([Bugs, _Bigwig]) ->
     publish(Bugs,  <<"bugs">>),
 
     Bugs1   = rabbit_test_configs:stop_node(Bugs),
@@ -71,6 +71,23 @@ abortive_rename([Bugs, Bigwig]) ->
     Bugs2 = rabbit_test_configs:start_node(Bugs1),
 
     consume(Bugs2, <<"bugs">>),
+    ok.
+
+rename_twice_with() -> cluster_ab.
+rename_twice([Bugs, _Bigwig]) ->
+    publish(Bugs,  <<"bugs">>),
+
+    Bugs1 = rabbit_test_configs:stop_node(Bugs),
+    _Indecisive = rename_node(Bugs1, indecisive),
+    Jessica = rabbit_test_configs:start_node(rename_node(Bugs1, jessica)),
+
+    consume(Jessica, <<"bugs">>),
+    ok.
+
+rename_fail_with() -> cluster_ab.
+rename_fail([Bugs, _Bigwig]) ->
+    Bugs1 = rabbit_test_configs:stop_node(Bugs),
+    rename_node_fail(Bugs1, bugzilla, jessica, []),
     ok.
 
 %% ----------------------------------------------------------------------------
@@ -82,13 +99,20 @@ stop_all(Cfgs) ->
 rename_node(Cfg, Nodename) -> rename_node(Cfg, Nodename, []).
 
 rename_node(Cfg, Nodename, Extra) ->
+    rename_node(Cfg, pget(nodename, Cfg), Nodename, Extra,
+                fun rabbit_test_configs:rabbitmqctl/2).
+
+rename_node_fail(Cfg, OldNodename, Nodename, Extra) ->
+    rename_node(Cfg, OldNodename, Nodename, Extra,
+                fun rabbit_test_configs:rabbitmqctl_fail/2).
+
+rename_node(Cfg, OldNodename, Nodename, Extra, Ctl) ->
     ExtraS = string:join(
                [atom_to_list(rabbit_nodes:make(N)) || N <- Extra], " "),
-    OldNode = rabbit_nodes:make(pget(nodename, Cfg)),
+    OldNode = rabbit_nodes:make(OldNodename),
     Node = rabbit_nodes:make(Nodename),
     NewCfg = [{nodename, Nodename} | proplists:delete(nodename, Cfg)],
-    rabbit_test_configs:rabbitmqctl(
-      NewCfg, {"rename_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
+    Ctl(NewCfg, {"rename_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
     NewCfg.
 
 publish(Cfg, Q) ->

@@ -195,6 +195,7 @@ execute(Cfg, Cmd) ->
 execute(Env0, Cmd0, AcceptableExitCodes) ->
     Env = [{"RABBITMQ_" ++ K, fmt(V)} || {K, V} <- Env0],
     Cmd = fmt(Cmd0),
+    %%io:format(user, "~s~n", [Cmd]),
     Port = erlang:open_port(
              {spawn, "/usr/bin/env sh -c \"" ++ Cmd ++ "\""},
              [{env, Env}, exit_status,
@@ -246,7 +247,8 @@ port_receive_loop(Port, Stdout, AcceptableExitCodes) ->
     receive
         {Port, {exit_status, X}} ->
             case lists:member(X, AcceptableExitCodes) of
-                true  -> Stdout;
+                true  -> %%io:format(user, "Exited with ~p~n", [X]),
+                         Stdout;
                 false -> exit({exit_status, X, AcceptableExitCodes, Stdout})
             end;
         {Port, {data, Out}} ->
