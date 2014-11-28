@@ -31,7 +31,7 @@
 -import(rabbit_misc, [pget/2, pget/3]).
 
 -define(INITIAL_KEYS, [cover, base, server, plugins]).
--define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port]).
+-define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port, mnesia_dir]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
 cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
@@ -53,7 +53,9 @@ start_nodes(InitialCfg0, NodeNames, FirstPort) ->
                       [{_, _}|_] -> [InitialCfg0 || _ <- NodeNames];
                       _          -> InitialCfg0
                   end,
-    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(Cfg)]
+    Nodes = [[{nodename, N}, {port, P},
+              {mnesia_dir, rabbit_misc:format("rabbitmq-~s-mnesia", [N])} |
+              strip_non_initial(Cfg)]
              || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
     [start_node(Node) || Node <- Nodes].
 
@@ -209,13 +211,14 @@ environment(Cfg) ->
             Port = pget(port, Cfg),
             Base = pget(base, Cfg),
             Server = pget(server, Cfg),
-            [{"MNESIA_BASE", {"~s/rabbitmq-~s-mnesia", [Base, Nodename]}},
-             {"LOG_BASE",    {"~s", [Base]}},
-             {"NODENAME",    {"~s", [Nodename]}},
-             {"NODE_PORT",   {"~B", [Port]}},
-             {"PID_FILE",    pid_file(Cfg)},
-             {"CONFIG_FILE", "/some/path/which/does/not/exist"},
-             {"ALLOW_INPUT", "1"}, %% Needed to make it close on exit
+            [{"MNESIA_DIR",         {"~s/~s", [Base, pget(mnesia_dir, Cfg)]}},
+             {"PLUGINS_EXPAND_DIR", {"~s/~s-plugins-expand", [Base, Nodename]}},
+             {"LOG_BASE",           {"~s", [Base]}},
+             {"NODENAME",           {"~s", [Nodename]}},
+             {"NODE_PORT",          {"~B", [Port]}},
+             {"PID_FILE",           pid_file(Cfg)},
+             {"CONFIG_FILE",        "/some/path/which/does/not/exist"},
+             {"ALLOW_INPUT",        "1"}, %% Needed to make it close on exit
              %% Bit of a hack - only needed for mgmt tests.
              {"SERVER_START_ARGS",
               {"-rabbitmq_management listener [{port,1~B}]", [Port]}},
