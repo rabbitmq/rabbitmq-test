@@ -37,6 +37,7 @@ rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
     consume(Jessica, <<"bugs">>),
     consume(Hazel,   <<"bigwig">>),
     consume(Flopsy,  <<"peter">>),
+    stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
 rename_cluster_big_bang_with() -> cluster_abc.
@@ -58,10 +59,14 @@ rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     consume(Jessica, <<"bugs">>),
     consume(Hazel,   <<"bigwig">>),
     consume(Flopsy,  <<"peter">>),
+    stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
-
 %% ----------------------------------------------------------------------------
+
+%% Normal post-test stop does not work since names have changed...
+stop_all(Cfgs) ->
+     [rabbit_test_configs:stop_node(Cfg) || Cfg <- Cfgs].
 
 rename_node(Cfg, Nodename) -> rename_node(Cfg, Nodename, []).
 
