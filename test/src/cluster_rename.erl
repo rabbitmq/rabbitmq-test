@@ -82,6 +82,7 @@ rename_twice([Bugs, _Bigwig]) ->
     Jessica = rabbit_test_configs:start_node(rename_node(Bugs1, jessica)),
 
     consume(Jessica, <<"bugs">>),
+    stop_all([Jessica]),
     ok.
 
 rename_fail_with() -> cluster_ab.
