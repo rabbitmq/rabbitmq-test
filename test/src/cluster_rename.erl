@@ -27,6 +27,7 @@
 -define(CLUSTER3,
         fun(C) -> rabbit_test_configs:cluster(C, [bugs, bigwig, peter]) end).
 
+%% Rolling rename of a cluster, each node should do a secondary rename.
 rename_cluster_one_by_one_with() -> ?CLUSTER3.
 rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
     publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
@@ -39,6 +40,7 @@ rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
     stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
+%% Big bang rename of a cluster, bugs should do a primary rename.
 rename_cluster_big_bang_with() -> ?CLUSTER3.
 rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
@@ -60,6 +62,7 @@ rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
+%% Here we test that bugs copes with things being renamed around it.
 partial_rename_cluster_one_by_one_with() -> ?CLUSTER3.
 partial_rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
     publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
@@ -71,6 +74,7 @@ partial_rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
     stop_all([Jessica, Hazel, Peter]),
     ok.
 
+%% Here we test that bugs copes with things being renamed around it.
 partial_rename_cluster_big_bang_with() -> ?CLUSTER3.
 partial_rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
@@ -91,6 +95,25 @@ partial_rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     stop_all([Bugs2, Hazel, Flopsy]),
     ok.
 
+%% We should be able to specify the -n parameter on ctl with either
+%% the before or after name for the local node (since in real cases
+%% one might want to invoke the command before or after the hostname
+%% has changed) - usually we test before so here we test after.
+post_change_nodename_with() -> ?CLUSTER2.
+post_change_nodename([Bugs, _Bigwig]) ->
+    publish(Bugs, <<"bugs">>),
+
+    Bugs1    = rabbit_test_configs:stop_node(Bugs),
+    Bugs2    = [{nodename, jessica} | proplists:delete(nodename, Bugs1)],
+    Jessica0 = rename_node(Bugs2, jessica, [bugs, jessica]),
+    Jessica  = rabbit_test_configs:start_node(Jessica0),
+
+    consume(Jessica, <<"bugs">>),
+    stop_all([Jessica]),
+    ok.
+
+%% If we invoke rename but the node name does not actually change, we
+%% should roll back.
 abortive_rename_with() -> ?CLUSTER2.
 abortive_rename([Bugs, _Bigwig]) ->
     publish(Bugs,  <<"bugs">>),
@@ -102,6 +125,8 @@ abortive_rename([Bugs, _Bigwig]) ->
     consume(Bugs2, <<"bugs">>),
     ok.
 
+%% It should be possible to reissue the rename command before
+%% restarting, if you change your mind.
 rename_twice_with() -> ?CLUSTER2.
 rename_twice([Bugs, _Bigwig]) ->
     publish(Bugs,  <<"bugs">>),
@@ -115,11 +140,15 @@ rename_twice([Bugs, _Bigwig]) ->
     stop_all([Jessica]),
     ok.
 
+%% And test some ways the command can fail.
 rename_fail_with() -> ?CLUSTER2.
 rename_fail([Bugs, _Bigwig]) ->
     Bugs1 = rabbit_test_configs:stop_node(Bugs),
+    %% Rename from a node that does not exist
     rename_node_fail(Bugs1, jessica, [bugzilla, jessica]),
+    %% Rename to a node which does
     rename_node_fail(Bugs1, bugwig,  [bugs, bigwig]),
+    %% Rename two nodes to the same thing
     rename_node_fail(Bugs1, jessica, [bugs, jessica, bigwig, jessica]),
     ok.
 
