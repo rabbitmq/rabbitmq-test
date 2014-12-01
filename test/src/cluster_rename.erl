@@ -63,8 +63,8 @@ rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
     ok.
 
 %% Here we test that bugs copes with things being renamed around it.
-partial_rename_cluster_one_by_one_with() -> ?CLUSTER3.
-partial_rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
+partial_one_by_one_with() -> ?CLUSTER3.
+partial_one_by_one([Bugs, Bigwig, Peter]) ->
     publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
 
     Jessica = stop_rename_start(Bugs,   jessica, [bugs, jessica]),
@@ -75,8 +75,8 @@ partial_rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
     ok.
 
 %% Here we test that bugs copes with things being renamed around it.
-partial_rename_cluster_big_bang_with() -> ?CLUSTER3.
-partial_rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
+partial_big_bang_with() -> ?CLUSTER3.
+partial_big_bang([Bugs, Bigwig, Peter]) ->
     publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
 
     Peter1  = rabbit_test_configs:stop_node(Peter),
