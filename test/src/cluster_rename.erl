@@ -21,74 +21,106 @@
 
 -import(rabbit_misc, [pget/2]).
 
-rename_cluster_one_by_one_with() -> cluster_abc.
+-define(CLUSTER2,
+        fun(C) -> rabbit_test_configs:cluster(C, [bugs, bigwig]) end).
+
+-define(CLUSTER3,
+        fun(C) -> rabbit_test_configs:cluster(C, [bugs, bigwig, peter]) end).
+
+rename_cluster_one_by_one_with() -> ?CLUSTER3.
 rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
-    publish(Bugs,   <<"bugs">>),
-    publish(Bigwig, <<"bigwig">>),
-    publish(Peter,  <<"peter">>),
+    publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
 
-    Jessica = rabbit_test_configs:start_node(
-                rename_node(rabbit_test_configs:stop_node(Bugs),   jessica)),
-    Hazel   = rabbit_test_configs:start_node(
-                rename_node(rabbit_test_configs:stop_node(Bigwig), hazel)),
-    Flopsy  = rabbit_test_configs:start_node(
-                rename_node(rabbit_test_configs:stop_node(Peter),  flopsy)),
+    Jessica = stop_rename_start(Bugs,   jessica, [bugs, jessica]),
+    Hazel   = stop_rename_start(Bigwig, hazel,   [bigwig, hazel]),
+    Flopsy  = stop_rename_start(Peter,  flopsy,  [peter, flopsy]),
 
-    consume(Jessica, <<"bugs">>),
-    consume(Hazel,   <<"bigwig">>),
-    consume(Flopsy,  <<"peter">>),
+    consume_all([{Jessica, <<"1">>}, {Hazel, <<"2">>}, {Flopsy, <<"3">>}]),
     stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
-rename_cluster_big_bang_with() -> cluster_abc.
+rename_cluster_big_bang_with() -> ?CLUSTER3.
 rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
-    publish(Bugs,   <<"bugs">>),
-    publish(Bigwig, <<"bigwig">>),
-    publish(Peter,  <<"peter">>),
+    publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
 
-    Bugs1   = rabbit_test_configs:stop_node(Bugs),
-    Bigwig1 = rabbit_test_configs:stop_node(Bigwig),
     Peter1  = rabbit_test_configs:stop_node(Peter),
-    Jessica0 = rename_node(Bugs1,   jessica, [bigwig, hazel, peter, flopsy]),
-    Hazel0   = rename_node(Bigwig1, hazel,   [bugs, jessica, peter, flopsy]),
-    Flopsy0  = rename_node(Peter1,  flopsy,  [bugs, jessica, bigwig, hazel]),
+    Bigwig1 = rabbit_test_configs:stop_node(Bigwig),
+    Bugs1   = rabbit_test_configs:stop_node(Bugs),
+
+    Map = [bugs, jessica, bigwig, hazel, peter, flopsy],
+    Jessica0 = rename_node(Bugs1,   jessica, Map),
+    Hazel0   = rename_node(Bigwig1, hazel,   Map),
+    Flopsy0  = rename_node(Peter1,  flopsy,  Map),
+
     Jessica = rabbit_test_configs:start_node(Jessica0),
     Hazel   = rabbit_test_configs:start_node(Hazel0),
     Flopsy  = rabbit_test_configs:start_node(Flopsy0),
 
-    consume(Jessica, <<"bugs">>),
-    consume(Hazel,   <<"bigwig">>),
-    consume(Flopsy,  <<"peter">>),
+    consume_all([{Jessica, <<"1">>}, {Hazel, <<"2">>}, {Flopsy, <<"3">>}]),
     stop_all([Jessica, Hazel, Flopsy]),
     ok.
 
-abortive_rename_with() -> cluster_ab.
+partial_rename_cluster_one_by_one_with() -> ?CLUSTER3.
+partial_rename_cluster_one_by_one([Bugs, Bigwig, Peter]) ->
+    publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
+
+    Jessica = stop_rename_start(Bugs,   jessica, [bugs, jessica]),
+    Hazel   = stop_rename_start(Bigwig, hazel,   [bigwig, hazel]),
+
+    consume_all([{Jessica, <<"1">>}, {Hazel, <<"2">>}, {Peter, <<"3">>}]),
+    stop_all([Jessica, Hazel, Peter]),
+    ok.
+
+partial_rename_cluster_big_bang_with() -> ?CLUSTER3.
+partial_rename_cluster_big_bang([Bugs, Bigwig, Peter]) ->
+    publish_all([{Bugs, <<"1">>}, {Bigwig, <<"2">>}, {Peter, <<"3">>}]),
+
+    Peter1  = rabbit_test_configs:stop_node(Peter),
+    Bigwig1 = rabbit_test_configs:stop_node(Bigwig),
+    Bugs1   = rabbit_test_configs:stop_node(Bugs),
+
+    Map = [bigwig, hazel, peter, flopsy],
+    Hazel0   = rename_node(Bigwig1, hazel,   Map),
+    Flopsy0  = rename_node(Peter1,  flopsy,  Map),
+
+    Bugs2  = rabbit_test_configs:start_node(Bugs1),
+    Hazel  = rabbit_test_configs:start_node(Hazel0),
+    Flopsy = rabbit_test_configs:start_node(Flopsy0),
+
+    consume_all([{Bugs2, <<"1">>}, {Hazel, <<"2">>}, {Flopsy, <<"3">>}]),
+    stop_all([Bugs2, Hazel, Flopsy]),
+    ok.
+
+abortive_rename_with() -> ?CLUSTER2.
 abortive_rename([Bugs, _Bigwig]) ->
     publish(Bugs,  <<"bugs">>),
 
     Bugs1   = rabbit_test_configs:stop_node(Bugs),
-    _Jessica = rename_node(Bugs1, jessica),
+    _Jessica = rename_node(Bugs1, jessica, [bugs, jessica]),
     Bugs2 = rabbit_test_configs:start_node(Bugs1),
 
     consume(Bugs2, <<"bugs">>),
     ok.
 
-rename_twice_with() -> cluster_ab.
+rename_twice_with() -> ?CLUSTER2.
 rename_twice([Bugs, _Bigwig]) ->
     publish(Bugs,  <<"bugs">>),
 
     Bugs1 = rabbit_test_configs:stop_node(Bugs),
-    _Indecisive = rename_node(Bugs1, indecisive),
-    Jessica = rabbit_test_configs:start_node(rename_node(Bugs1, jessica)),
+    _Indecisive = rename_node(Bugs1, indecisive, [bugs, indecisive]),
+    Jessica = rabbit_test_configs:start_node(
+                rename_node(Bugs1, jessica, [bugs, jessica])),
 
     consume(Jessica, <<"bugs">>),
     stop_all([Jessica]),
     ok.
 
-rename_fail_with() -> cluster_ab.
+rename_fail_with() -> ?CLUSTER2.
 rename_fail([Bugs, _Bigwig]) ->
     Bugs1 = rabbit_test_configs:stop_node(Bugs),
-    rename_node_fail(Bugs1, bugzilla, jessica, []),
+    rename_node_fail(Bugs1, jessica, [bugzilla, jessica]),
+    rename_node_fail(Bugs1, bugwig,  [bugs, bigwig]),
+    rename_node_fail(Bugs1, jessica, [bugs, jessica, bigwig, jessica]),
     ok.
 
 %% ----------------------------------------------------------------------------
@@ -97,24 +129,21 @@ rename_fail([Bugs, _Bigwig]) ->
 stop_all(Cfgs) ->
      [rabbit_test_configs:stop_node(Cfg) || Cfg <- Cfgs].
 
-rename_node(Cfg, Nodename) -> rename_node(Cfg, Nodename, []).
+stop_rename_start(Cfg, Nodename, Map) ->
+    rabbit_test_configs:start_node(
+      rename_node(rabbit_test_configs:stop_node(Cfg), Nodename, Map)).
 
-rename_node(Cfg, Nodename, Extra) ->
-    rename_node(Cfg, pget(nodename, Cfg), Nodename, Extra,
-                fun rabbit_test_configs:rabbitmqctl/2).
+rename_node(Cfg, Nodename, Map) ->
+    rename_node(Cfg, Nodename, Map, fun rabbit_test_configs:rabbitmqctl/2).
 
-rename_node_fail(Cfg, OldNodename, Nodename, Extra) ->
-    rename_node(Cfg, OldNodename, Nodename, Extra,
-                fun rabbit_test_configs:rabbitmqctl_fail/2).
+rename_node_fail(Cfg, Nodename, Map) ->
+    rename_node(Cfg, Nodename, Map, fun rabbit_test_configs:rabbitmqctl_fail/2).
 
-rename_node(Cfg, OldNodename, Nodename, Extra, Ctl) ->
-    ExtraS = string:join(
-               [atom_to_list(rabbit_nodes:make(N)) || N <- Extra], " "),
-    OldNode = rabbit_nodes:make(OldNodename),
-    Node = rabbit_nodes:make(Nodename),
-    NewCfg = [{nodename, Nodename} | proplists:delete(nodename, Cfg)],
-    Ctl(NewCfg, {"rename_cluster_node ~s ~s ~s", [OldNode, Node, ExtraS]}),
-    NewCfg.
+rename_node(Cfg, Nodename, Map, Ctl) ->
+    MapS = string:join(
+             [atom_to_list(rabbit_nodes:make(N)) || N <- Map], " "),
+    Ctl(Cfg, {"rename_cluster_node ~s", [MapS]}),
+    [{nodename, Nodename} | proplists:delete(nodename, Cfg)].
 
 publish(Cfg, Q) ->
     Ch = pget(channel, Cfg),
@@ -130,3 +159,10 @@ consume(Cfg, Q) ->
     amqp_channel:call(Ch, #'queue.declare'{queue = Q, durable = true}),
     {#'basic.get_ok'{}, #amqp_msg{payload = Q}} =
         amqp_channel:call(Ch, #'basic.get'{queue = Q}).
+
+
+publish_all(CfgsKeys) ->
+    [publish(Cfg, Key) || {Cfg, Key} <- CfgsKeys].
+
+consume_all(CfgsKeys) ->
+    [consume(Cfg, Key) || {Cfg, Key} <- CfgsKeys].
