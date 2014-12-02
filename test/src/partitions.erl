@@ -37,8 +37,8 @@ ignore(Cfgs) ->
     [A] = partitions(C),
     ok.
 
-pause_on_down_with() -> ?CONFIG.
-pause_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
+pause_minority_on_down_with() -> ?CONFIG.
+pause_minority_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
     A = pget(node, CfgA),
     set_mode(Cfgs, pause_minority),
     true = is_running(A),
@@ -51,10 +51,42 @@ pause_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
     await_running(A, false),
     ok.
 
-pause_on_blocked_with() -> ?CONFIG.
-pause_on_blocked(Cfgs) ->
+pause_minority_on_blocked_with() -> ?CONFIG.
+pause_minority_on_blocked(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, pause_minority),
+    [(true = is_running(N)) || N <- [A, B, C]],
+    block([{A, B}, {A, C}]),
+    await_running(A, false),
+    [await_running(N, true) || N <- [B, C]],
+    unblock([{A, B}, {A, C}]),
+    [await_running(N, true) || N <- [A, B, C]],
+    Status = rpc:call(B, rabbit_mnesia, status, []),
+    [] = pget(partitions, Status),
+    ok.
+
+keep_preferred_on_down_with() -> ?CONFIG.
+keep_preferred_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, {keep_preferred, C}),
+    true = is_running(A),
+    true = is_running(B),
+    true = is_running(C),
+
+    rabbit_test_util:kill(CfgB, sigkill),
+    timer:sleep(?DELAY),
+    true = is_running(A),
+    true = is_running(C),
+
+    rabbit_test_util:kill(CfgC, sigkill),
+    timer:sleep(?DELAY),
+    await_running(A, false),
+    ok.
+
+keep_preferred_on_blocked_with() -> ?CONFIG.
+keep_preferred_on_blocked(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, {keep_preferred, C}),
     [(true = is_running(N)) || N <- [A, B, C]],
     block([{A, B}, {A, C}]),
     await_running(A, false),
@@ -77,23 +109,39 @@ pause_on_blocked(Cfgs) ->
 %% test to pass since there are a lot of things in the broker that can
 %% suddenly take several seconds to time out when TCP connections
 %% won't establish.
-pause_false_promises_mirrored_with() ->
+pause_minority_false_promises_mirrored_with() ->
     [start_ab, fun enable_dist_proxy/1,
      build_cluster, short_ticktime(10), start_connections, ha_policy_all].
 
-pause_false_promises_mirrored(Cfgs) ->
-    pause_false_promises(Cfgs).
+pause_minority_false_promises_mirrored(Cfgs) ->
+    pause_false_promises(Cfgs, pause_minority).
 
-pause_false_promises_unmirrored_with() ->
+pause_minority_false_promises_unmirrored_with() ->
     [start_ab, fun enable_dist_proxy/1,
      build_cluster, short_ticktime(10), start_connections].
 
-pause_false_promises_unmirrored(Cfgs) ->
-    pause_false_promises(Cfgs).
+pause_minority_false_promises_unmirrored(Cfgs) ->
+    pause_false_promises(Cfgs, pause_minority).
 
-pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
+keep_preferred_false_promises_mirrored_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(10), start_connections, ha_policy_all].
+
+keep_preferred_false_promises_mirrored([_, CfgB | _] = Cfgs) ->
+    B = pget(node, CfgB),
+    pause_false_promises(Cfgs, {keep_preferred, B}).
+
+keep_preferred_false_promises_unmirrored_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(10), start_connections].
+
+keep_preferred_false_promises_unmirrored([_, CfgB | _] = Cfgs) ->
+    B = pget(node, CfgB),
+    pause_false_promises(Cfgs, {keep_preferred, B}).
+
+pause_false_promises([CfgA, CfgB | _] = Cfgs, ClusterPartitionHandling) ->
     [A, B] = [pget(node, Cfg) || Cfg <- Cfgs],
-    set_mode([CfgA], pause_minority),
+    set_mode([CfgA], ClusterPartitionHandling),
     ChA = pget(channel, CfgA),
     ChB = pget(channel, CfgB),
     amqp_channel:call(ChB, #'queue.declare'{queue   = <<"test">>,
@@ -225,13 +273,27 @@ partial_to_full(Cfgs) ->
         Partitions               -> exit({partitions, Partitions})
     end.
 
-partial_pause_with() -> ?CONFIG.
-partial_pause(Cfgs) ->
+partial_pause_minority_with() -> ?CONFIG.
+partial_pause_minority(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, pause_minority),
     block([{A, B}]),
     [await_running(N, false) || N <- [A, B]],
     await_running(C, true),
+    unblock([{A, B}]),
+    [await_listening(N, true) || N <- [A, B, C]],
+    [] = partitions(A),
+    [] = partitions(B),
+    [] = partitions(C),
+    ok.
+
+partial_keep_preferred_with() -> ?CONFIG.
+partial_keep_preferred(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, {keep_preferred, B}),
+    block([{A, B}]),
+    await_running(A, false),
+    [await_running(N, true) || N <- [B, C]],
     unblock([{A, B}]),
     [await_listening(N, true) || N <- [A, B, C]],
     [] = partitions(A),
