@@ -145,11 +145,13 @@ rename_fail_with() -> ?CLUSTER2.
 rename_fail([Bugs, _Bigwig]) ->
     Bugs1 = rabbit_test_configs:stop_node(Bugs),
     %% Rename from a node that does not exist
-    rename_node_fail(Bugs1, jessica, [bugzilla, jessica]),
+    rename_node_fail(Bugs1, [bugzilla, jessica]),
     %% Rename to a node which does
-    rename_node_fail(Bugs1, bugwig,  [bugs, bigwig]),
+    rename_node_fail(Bugs1, [bugs, bigwig]),
     %% Rename two nodes to the same thing
-    rename_node_fail(Bugs1, jessica, [bugs, jessica, bigwig, jessica]),
+    rename_node_fail(Bugs1, [bugs, jessica, bigwig, jessica]),
+    %% Rename while impersonating a node not in the cluster
+    rename_node_fail(set_node(rabbit, Bugs1), [bugs, jessica]),
     ok.
 
 %% ----------------------------------------------------------------------------
@@ -165,14 +167,14 @@ stop_rename_start(Cfg, Nodename, Map) ->
 rename_node(Cfg, Nodename, Map) ->
     rename_node(Cfg, Nodename, Map, fun rabbit_test_configs:rabbitmqctl/2).
 
-rename_node_fail(Cfg, Nodename, Map) ->
-    rename_node(Cfg, Nodename, Map, fun rabbit_test_configs:rabbitmqctl_fail/2).
+rename_node_fail(Cfg, Map) ->
+    rename_node(Cfg, ignored, Map, fun rabbit_test_configs:rabbitmqctl_fail/2).
 
 rename_node(Cfg, Nodename, Map, Ctl) ->
     MapS = string:join(
              [atom_to_list(rabbit_nodes:make(N)) || N <- Map], " "),
     Ctl(Cfg, {"rename_cluster_node ~s", [MapS]}),
-    [{nodename, Nodename} | proplists:delete(nodename, Cfg)].
+    set_node(Nodename, Cfg).
 
 publish(Cfg, Q) ->
     Ch = pget(channel, Cfg),
@@ -195,3 +197,6 @@ publish_all(CfgsKeys) ->
 
 consume_all(CfgsKeys) ->
     [consume(Cfg, Key) || {Cfg, Key} <- CfgsKeys].
+
+set_node(Nodename, Cfg) ->
+    [{nodename, Nodename} | proplists:delete(nodename, Cfg)].
