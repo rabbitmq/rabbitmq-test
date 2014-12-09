@@ -125,21 +125,6 @@ abortive_rename([Bugs, _Bigwig]) ->
     consume(Bugs2, <<"bugs">>),
     ok.
 
-%% It should be possible to reissue the rename command before
-%% restarting, if you change your mind.
-rename_twice_with() -> ?CLUSTER2.
-rename_twice([Bugs, _Bigwig]) ->
-    publish(Bugs,  <<"bugs">>),
-
-    Bugs1 = rabbit_test_configs:stop_node(Bugs),
-    _Indecisive = rename_node(Bugs1, indecisive, [bugs, indecisive]),
-    Jessica = rabbit_test_configs:start_node(
-                rename_node(Bugs1, jessica, [bugs, jessica])),
-
-    consume(Jessica, <<"bugs">>),
-    stop_all([Jessica]),
-    ok.
-
 %% And test some ways the command can fail.
 rename_fail_with() -> ?CLUSTER2.
 rename_fail([Bugs, _Bigwig]) ->
@@ -152,6 +137,13 @@ rename_fail([Bugs, _Bigwig]) ->
     rename_node_fail(Bugs1, [bugs, jessica, bigwig, jessica]),
     %% Rename while impersonating a node not in the cluster
     rename_node_fail(set_node(rabbit, Bugs1), [bugs, jessica]),
+    ok.
+
+rename_twice_fail_with() -> ?CLUSTER2.
+rename_twice_fail([Bugs, _Bigwig]) ->
+    Bugs1 = rabbit_test_configs:stop_node(Bugs),
+    Indecisive = rename_node(Bugs1, indecisive, [bugs, indecisive]),
+    rename_node_fail(Indecisive, [indecisive, jessica]),
     ok.
 
 %% ----------------------------------------------------------------------------
