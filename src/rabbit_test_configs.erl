@@ -193,6 +193,7 @@ execute(Cfg, Cmd) ->
 execute(Env0, Cmd0, AcceptableExitCodes) ->
     Env = [{"RABBITMQ_" ++ K, fmt(V)} || {K, V} <- Env0],
     Cmd = fmt(Cmd0),
+    error_logger:info_msg("Invoking '~s'~n", [Cmd]),
     Port = erlang:open_port(
              {spawn, "/usr/bin/env sh -c \"" ++ Cmd ++ "\""},
              [{env, Env}, exit_status,
@@ -242,12 +243,15 @@ pid_file(Cfg) ->
 port_receive_loop(Port, Stdout, AcceptableExitCodes) ->
     receive
         {Port, {exit_status, X}} ->
+            Fmt = "Command exited with code ~p~nStdout: ~s~n",
+            Args = [X, Stdout],
             case lists:member(X, AcceptableExitCodes) of
-                true  -> Stdout;
-                false -> exit({exit_status, X, AcceptableExitCodes, Stdout})
+                true  -> error_logger:info_msg(Fmt, Args),
+                         Stdout;
+                false -> error_logger:error_msg(Fmt, Args),
+                         exit({exit_status, X, AcceptableExitCodes, Stdout})
             end;
         {Port, {data, Out}} ->
-            %%io:format(user, "~s", [Out]),
             port_receive_loop(Port, Stdout ++ Out, AcceptableExitCodes)
     end.
 
