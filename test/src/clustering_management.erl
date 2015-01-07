@@ -393,14 +393,44 @@ erlang_config(Config) ->
     assert_not_clustered(Hare),
     assert_not_clustered(Rabbit),
 
-    %% If we use a legacy config file, it still works (and a warning is emitted)
+    %% If we use a legacy config file, the node fails to start.
     ok = stop_app(Hare),
     ok = reset(Hare),
     ok = rpc:call(Hare, application, set_env,
                   [rabbit, cluster_nodes, [Rabbit]]),
-    ok = start_app(Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    %% If we use an invalid node name, the node fails to start.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {["Mike's computer"], disc}]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    %% If we use an invalid node type, the node fails to start.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], blue}]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    %% If we use an invalid cluster_nodes conf, the node fails to start.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, true]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, "Yes, please"]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit).
 
 force_reset_test_with() -> start_abc.
 force_reset_test(Config) ->
