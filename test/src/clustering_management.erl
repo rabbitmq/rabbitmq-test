@@ -227,9 +227,12 @@ forget_offline_promotes_slave([Rabbit, Hare]) ->
                       #amqp_msg{props = #'P_basic'{delivery_mode = 2}}),
     amqp_channel:wait_for_confirms(RabbitCh),
 
-    %% We should have a down slave on hare and a down master on rabbit.
-    Hare2 = rabbit_test_configs:stop_node(Hare),
-    _Rabbit2 = rabbit_test_configs:stop_node(Rabbit),
+    %% We should have a down slave on hare and a down master on
+    %% rabbit. We kill nodes rather than stop them in order to make sure
+    %% that we aren't dependent on anything that happens as they shut
+    %% down (see bug 26467).
+    Hare2 = rabbit_test_configs:kill_node(Hare),
+    _Rabbit2 = rabbit_test_configs:kill_node(Rabbit),
 
     rabbit_test_configs:rabbitmqctl(
       Hare2, {"forget_cluster_node --offline ~s", [pget(node, Rabbit)]}),
