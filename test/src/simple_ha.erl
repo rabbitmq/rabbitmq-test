@@ -35,6 +35,26 @@ rapid_redeclare([CfgA | _]) ->
      end || _I <- lists:seq(1, 20)],
     ok.
 
+%% Check that by the time we get a declare-ok back, the slaves are up
+%% and in Mnesia.
+declare_synchrony_with() -> [cluster_ab, ha_policy_all].
+declare_synchrony([Rabbit, Hare]) ->
+    RabbitCh = pget(channel, Rabbit),
+    HareCh = pget(channel, Hare),
+    Q = <<"mirrored-queue">>,
+    declare(RabbitCh, Q),
+    amqp_channel:call(RabbitCh, #'confirm.select'{}),
+    amqp_channel:cast(RabbitCh, #'basic.publish'{routing_key = Q},
+                      #amqp_msg{props = #'P_basic'{delivery_mode = 2}}),
+    amqp_channel:wait_for_confirms(RabbitCh),
+    _Rabbit2 = rabbit_test_configs:kill_node(Rabbit),
+
+    #'queue.declare_ok'{message_count = 1} = declare(HareCh, Q),
+    ok.
+
+declare(Ch, Name) ->
+    amqp_channel:call(Ch, #'queue.declare'{durable = true, queue = Name}).
+
 consume_survives_stop_with()     -> ?CONFIG.
 consume_survives_sigkill_with()  -> ?CONFIG.
 consume_survives_policy_with()   -> ?CONFIG.
