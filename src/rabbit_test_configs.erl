@@ -163,8 +163,17 @@ stop_node(Cfg) ->
 
 kill_node(Cfg) ->
     maybe_flush_cover(Cfg),
-    catch execute(Cfg, {"kill -9 ~s", [pget(os_pid, Cfg)]}),
+    OSPid = pget(os_pid, Cfg),
+    catch execute(Cfg, {"kill -9 ~s", [OSPid]}),
+    await_os_pid_death(OSPid),
     strip_running(Cfg).
+
+await_os_pid_death(OSPid) ->
+    case rabbit_misc:is_os_process_alive(OSPid) of
+        true  -> timer:sleep(100),
+                 await_os_pid_death(OSPid);
+        false -> ok
+    end.
 
 restart_node(Cfg) ->
     start_node(stop_node(Cfg)).
