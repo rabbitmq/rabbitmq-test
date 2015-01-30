@@ -66,7 +66,7 @@ do_setup(Kernel, Node, Type, MyNode, LongOrShortNames,SetupTime) ->
                     %% Modification START
                     ProxyPort = case TcpPort >= 25672 andalso TcpPort < 25700
                                     andalso inet_tcp_proxy:is_enabled() of
-                                    true  -> TcpPort + 10000;
+                                    true  -> TcpPort + 5000;
                                     false -> TcpPort
                                 end,
 		    case inet_tcp:connect(Ip, ProxyPort, 
