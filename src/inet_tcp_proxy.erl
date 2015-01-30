@@ -61,7 +61,7 @@ error_handler(Thunk) ->
 go() ->
     ets:new(?TABLE, [public, named_table]),
     {ok, Port} = application:get_env(kernel, inet_dist_listen_min),
-    ProxyPort = Port + 10000,
+    ProxyPort = Port + 5000,
     {ok, Sock} = gen_tcp:listen(ProxyPort, [inet,
                                             {reuseaddr, true}]),
     accept_loop(Sock, Port).
