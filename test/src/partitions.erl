@@ -55,15 +55,7 @@ pause_minority_on_blocked_with() -> ?CONFIG.
 pause_minority_on_blocked(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, pause_minority),
-    [(true = is_running(N)) || N <- [A, B, C]],
-    block([{A, B}, {A, C}]),
-    await_running(A, false),
-    [await_running(N, true) || N <- [B, C]],
-    unblock([{A, B}, {A, C}]),
-    [await_running(N, true) || N <- [A, B, C]],
-    Status = rpc:call(B, rabbit_mnesia, status, []),
-    [] = pget(partitions, Status),
-    ok.
+    pause_on_blocked(A, B, C).
 
 pause_if_all_down_on_down_with() -> ?CONFIG.
 pause_if_all_down_on_down([_, CfgB, CfgC] = Cfgs) ->
@@ -84,6 +76,9 @@ pause_if_all_down_on_blocked_with() -> ?CONFIG.
 pause_if_all_down_on_blocked(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, {pause_if_all_down, [C], ignore}),
+    pause_on_blocked(A, B, C).
+
+pause_on_blocked(A, B, C) ->
     [(true = is_running(N)) || N <- [A, B, C]],
     block([{A, B}, {A, C}]),
     await_running(A, false),
