@@ -181,7 +181,7 @@ autoheal(Cfgs) ->
                    %% ?DELAY for the net_tick timeout
                    timer:sleep(?DELAY),
                    [await_listening(N, true) || N <- [A, B, C]],
-                   [await(N, [], fun partitions/1) || N <- [A, B, C]]
+                   [await_partitions(N, []) || N <- [A, B, C]]
            end,
     Test([{B, C}]),
     Test([{A, C}, {B, C}]),
@@ -269,14 +269,15 @@ allow(X, Y) ->
     rpc:call(X, inet_tcp_proxy, allow, [Y]),
     rpc:call(Y, inet_tcp_proxy, allow, [X]).
 
-await_running  (Node, Bool) -> await(Node, Bool, fun is_running/1).
-await_listening(Node, Bool) -> await(Node, Bool, fun is_listening/1).
+await_running   (Node, Bool)  -> await(Node, Bool,  fun is_running/1).
+await_listening (Node, Bool)  -> await(Node, Bool,  fun is_listening/1).
+await_partitions(Node, Parts) -> await(Node, Parts, fun partitions/1).
 
-await(Node, Bool, Fun) ->
+await(Node, Res, Fun) ->
     case Fun(Node) of
-        Bool -> ok;
-        _    -> timer:sleep(100),
-                await(Node, Bool, Fun)
+        Res -> ok;
+        _   -> timer:sleep(100),
+               await(Node, Res, Fun)
     end.
 
 is_running(Node) -> rpc:call(Node, rabbit, is_running, []).
