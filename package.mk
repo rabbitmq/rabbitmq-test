@@ -1,6 +1,7 @@
 DEPS:=rabbitmq-erlang-client
 FILTER:=all
 COVER:=false
+WITH_BROKER_TEST_COMMANDS:=rabbit_test_runner:run_in_broker(\"$(PACKAGE_DIR)/test/ebin\",\"$(FILTER)\")
 STANDALONE_TEST_COMMANDS:=rabbit_test_runner:run_multi(\"$(UMBRELLA_BASE_DIR)/rabbitmq-server\",\"$(PACKAGE_DIR)/test/ebin\",\"$(FILTER)\",$(COVER),none)
 
 ## Require R15B to compile inet_proxy_dist since it requires includes
