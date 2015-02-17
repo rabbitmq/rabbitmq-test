@@ -31,7 +31,7 @@
 -import(rabbit_misc, [pget/2, pget/3]).
 
 -define(INITIAL_KEYS, [cover, base, server, plugins]).
--define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port]).
+-define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port, mnesia_dir]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
 cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
@@ -53,7 +53,9 @@ start_nodes(InitialCfg0, NodeNames, FirstPort) ->
                       [{_, _}|_] -> [InitialCfg0 || _ <- NodeNames];
                       _          -> InitialCfg0
                   end,
-    Nodes = [[{nodename, N}, {port, P} | strip_non_initial(Cfg)]
+    Nodes = [[{nodename, N}, {port, P},
+              {mnesia_dir, rabbit_misc:format("rabbitmq-~s-mnesia", [N])} |
+              strip_non_initial(Cfg)]
              || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
     [start_node(Node) || Node <- Nodes].
 
@@ -161,8 +163,17 @@ stop_node(Cfg) ->
 
 kill_node(Cfg) ->
     maybe_flush_cover(Cfg),
-    catch execute(Cfg, {"kill -9 ~s", [pget(os_pid, Cfg)]}),
+    OSPid = pget(os_pid, Cfg),
+    catch execute(Cfg, {"kill -9 ~s", [OSPid]}),
+    await_os_pid_death(OSPid),
     strip_running(Cfg).
+
+await_os_pid_death(OSPid) ->
+    case rabbit_misc:is_os_process_alive(OSPid) of
+        true  -> timer:sleep(100),
+                 await_os_pid_death(OSPid);
+        false -> ok
+    end.
 
 restart_node(Cfg) ->
     start_node(stop_node(Cfg)).
@@ -193,6 +204,7 @@ execute(Cfg, Cmd) ->
 execute(Env0, Cmd0, AcceptableExitCodes) ->
     Env = [{"RABBITMQ_" ++ K, fmt(V)} || {K, V} <- Env0],
     Cmd = fmt(Cmd0),
+    error_logger:info_msg("Invoking '~s'~n", [Cmd]),
     Port = erlang:open_port(
              {spawn, "/usr/bin/env sh -c \"" ++ Cmd ++ "\""},
              [{env, Env}, exit_status,
@@ -209,13 +221,14 @@ environment(Cfg) ->
             Port = pget(port, Cfg),
             Base = pget(base, Cfg),
             Server = pget(server, Cfg),
-            [{"MNESIA_BASE", {"~s/rabbitmq-~s-mnesia", [Base, Nodename]}},
-             {"LOG_BASE",    {"~s", [Base]}},
-             {"NODENAME",    {"~s", [Nodename]}},
-             {"NODE_PORT",   {"~B", [Port]}},
-             {"PID_FILE",    pid_file(Cfg)},
-             {"CONFIG_FILE", "/some/path/which/does/not/exist"},
-             {"ALLOW_INPUT", "1"}, %% Needed to make it close on exit
+            [{"MNESIA_DIR",         {"~s/~s", [Base, pget(mnesia_dir, Cfg)]}},
+             {"PLUGINS_EXPAND_DIR", {"~s/~s-plugins-expand", [Base, Nodename]}},
+             {"LOG_BASE",           {"~s", [Base]}},
+             {"NODENAME",           {"~s", [Nodename]}},
+             {"NODE_PORT",          {"~B", [Port]}},
+             {"PID_FILE",           pid_file(Cfg)},
+             {"CONFIG_FILE",        "/some/path/which/does/not/exist"},
+             {"ALLOW_INPUT",        "1"}, %% Needed to make it close on exit
              %% Bit of a hack - only needed for mgmt tests.
              {"SERVER_START_ARGS",
               {"-rabbitmq_management listener [{port,1~B}]", [Port]}},
@@ -242,12 +255,15 @@ pid_file(Cfg) ->
 port_receive_loop(Port, Stdout, AcceptableExitCodes) ->
     receive
         {Port, {exit_status, X}} ->
+            Fmt = "Command exited with code ~p~nStdout: ~s~n",
+            Args = [X, Stdout],
             case lists:member(X, AcceptableExitCodes) of
-                true  -> Stdout;
-                false -> exit({exit_status, X, AcceptableExitCodes, Stdout})
+                true  -> error_logger:info_msg(Fmt, Args),
+                         Stdout;
+                false -> error_logger:error_msg(Fmt, Args),
+                         exit({exit_status, X, AcceptableExitCodes, Stdout})
             end;
         {Port, {data, Out}} ->
-            %%io:format(user, "~s", [Out]),
             port_receive_loop(Port, Stdout ++ Out, AcceptableExitCodes)
     end.
 
