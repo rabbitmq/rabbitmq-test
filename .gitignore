@@ -1,0 +1,14 @@
+*~
+.sw?
+.*.sw?
+*.beam
+erl_crash.dump
+/build/
+/certs/
+/cover/
+/dist/
+/ebin/
+/multi-node/
+/qpid_testsuite/
+/test/ebin/
+/tmp/
