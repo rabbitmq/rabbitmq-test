@@ -373,8 +373,8 @@ change_cluster_when_node_offline(Config) ->
                           [Rabbit, Hare]),
     assert_not_clustered(Bunny).
 
-update_cluster_nodes_test_with() -> start_abc.
-update_cluster_nodes_test(Config) ->
+update_cluster_nodes_with() -> start_abc.
+update_cluster_nodes(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Mnesia is running...
@@ -474,8 +474,8 @@ erlang_config(Config) ->
     assert_failure(fun () -> start_app(Hare) end),
     assert_not_clustered(Rabbit).
 
-force_reset_test_with() -> start_abc.
-force_reset_test(Config) ->
+force_reset_node_with() -> start_abc.
+force_reset_node(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
     stop_join_start(Rabbit, Hare),
