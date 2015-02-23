@@ -37,8 +37,8 @@ ignore(Cfgs) ->
     [A] = partitions(C),
     ok.
 
-pause_on_down_with() -> ?CONFIG.
-pause_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
+pause_minority_on_down_with() -> ?CONFIG.
+pause_minority_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
     A = pget(node, CfgA),
     set_mode(Cfgs, pause_minority),
     true = is_running(A),
@@ -51,10 +51,34 @@ pause_on_down([CfgA, CfgB, CfgC] = Cfgs) ->
     await_running(A, false),
     ok.
 
-pause_on_blocked_with() -> ?CONFIG.
-pause_on_blocked(Cfgs) ->
+pause_minority_on_blocked_with() -> ?CONFIG.
+pause_minority_on_blocked(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, pause_minority),
+    pause_on_blocked(A, B, C).
+
+pause_if_all_down_on_down_with() -> ?CONFIG.
+pause_if_all_down_on_down([_, CfgB, CfgC] = Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, {pause_if_all_down, [C], ignore}),
+    [(true = is_running(N)) || N <- [A, B, C]],
+
+    rabbit_test_util:kill(CfgB, sigkill),
+    timer:sleep(?DELAY),
+    [(true = is_running(N)) || N <- [A, C]],
+
+    rabbit_test_util:kill(CfgC, sigkill),
+    timer:sleep(?DELAY),
+    await_running(A, false),
+    ok.
+
+pause_if_all_down_on_blocked_with() -> ?CONFIG.
+pause_if_all_down_on_blocked(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, {pause_if_all_down, [C], ignore}),
+    pause_on_blocked(A, B, C).
+
+pause_on_blocked(A, B, C) ->
     [(true = is_running(N)) || N <- [A, B, C]],
     block([{A, B}, {A, C}]),
     await_running(A, false),
@@ -77,23 +101,39 @@ pause_on_blocked(Cfgs) ->
 %% test to pass since there are a lot of things in the broker that can
 %% suddenly take several seconds to time out when TCP connections
 %% won't establish.
-pause_false_promises_mirrored_with() ->
+pause_minority_false_promises_mirrored_with() ->
     [start_ab, fun enable_dist_proxy/1,
      build_cluster, short_ticktime(10), start_connections, ha_policy_all].
 
-pause_false_promises_mirrored(Cfgs) ->
-    pause_false_promises(Cfgs).
+pause_minority_false_promises_mirrored(Cfgs) ->
+    pause_false_promises(Cfgs, pause_minority).
 
-pause_false_promises_unmirrored_with() ->
+pause_minority_false_promises_unmirrored_with() ->
     [start_ab, fun enable_dist_proxy/1,
      build_cluster, short_ticktime(10), start_connections].
 
-pause_false_promises_unmirrored(Cfgs) ->
-    pause_false_promises(Cfgs).
+pause_minority_false_promises_unmirrored(Cfgs) ->
+    pause_false_promises(Cfgs, pause_minority).
 
-pause_false_promises([CfgA, CfgB | _] = Cfgs) ->
+pause_if_all_down_false_promises_mirrored_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(10), start_connections, ha_policy_all].
+
+pause_if_all_down_false_promises_mirrored([_, CfgB | _] = Cfgs) ->
+    B = pget(node, CfgB),
+    pause_false_promises(Cfgs, {pause_if_all_down, [B], ignore}).
+
+pause_if_all_down_false_promises_unmirrored_with() ->
+    [start_ab, fun enable_dist_proxy/1,
+     build_cluster, short_ticktime(10), start_connections].
+
+pause_if_all_down_false_promises_unmirrored([_, CfgB | _] = Cfgs) ->
+    B = pget(node, CfgB),
+    pause_false_promises(Cfgs, {pause_if_all_down, [B], ignore}).
+
+pause_false_promises([CfgA, CfgB | _] = Cfgs, ClusterPartitionHandling) ->
     [A, B] = [pget(node, Cfg) || Cfg <- Cfgs],
-    set_mode([CfgA], pause_minority),
+    set_mode([CfgA], ClusterPartitionHandling),
     ChA = pget(channel, CfgA),
     ChB = pget(channel, CfgB),
     amqp_channel:call(ChB, #'queue.declare'{queue   = <<"test">>,
@@ -173,8 +213,18 @@ ctl_ticktime_sync([CfgA | _]) ->
 %% NB: we test full and partial partitions here.
 autoheal_with() -> ?CONFIG.
 autoheal(Cfgs) ->
-    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, autoheal),
+    do_autoheal(Cfgs).
+
+autoheal_after_pause_if_all_down_with() -> ?CONFIG.
+autoheal_after_pause_if_all_down([_, CfgB, CfgC | _] = Cfgs) ->
+    B = pget(node, CfgB),
+    C = pget(node, CfgC),
+    set_mode(Cfgs, {pause_if_all_down, [B, C], autoheal}),
+    do_autoheal(Cfgs).
+
+do_autoheal(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     Test = fun (Pairs) ->
                    block_unblock(Pairs),
                    %% Sleep to make sure all the partitions are noticed
@@ -223,13 +273,27 @@ partial_to_full(Cfgs) ->
         Partitions               -> exit({partitions, Partitions})
     end.
 
-partial_pause_with() -> ?CONFIG.
-partial_pause(Cfgs) ->
+partial_pause_minority_with() -> ?CONFIG.
+partial_pause_minority(Cfgs) ->
     [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
     set_mode(Cfgs, pause_minority),
     block([{A, B}]),
     [await_running(N, false) || N <- [A, B]],
     await_running(C, true),
+    unblock([{A, B}]),
+    [await_listening(N, true) || N <- [A, B, C]],
+    [] = partitions(A),
+    [] = partitions(B),
+    [] = partitions(C),
+    ok.
+
+partial_pause_if_all_down_with() -> ?CONFIG.
+partial_pause_if_all_down(Cfgs) ->
+    [A, B, C] = [pget(node, Cfg) || Cfg <- Cfgs],
+    set_mode(Cfgs, {pause_if_all_down, [B], ignore}),
+    block([{A, B}]),
+    await_running(A, false),
+    [await_running(N, true) || N <- [B, C]],
     unblock([{A, B}]),
     [await_listening(N, true) || N <- [A, B, C]],
     [] = partitions(A),
