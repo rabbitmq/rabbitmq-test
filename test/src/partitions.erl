@@ -282,9 +282,7 @@ partial_pause_minority(Cfgs) ->
     await_running(C, true),
     unblock([{A, B}]),
     [await_listening(N, true) || N <- [A, B, C]],
-    [] = partitions(A),
-    [] = partitions(B),
-    [] = partitions(C),
+    [await_partitions(N, []) || N <- [A, B, C]],
     ok.
 
 partial_pause_if_all_down_with() -> ?CONFIG.
@@ -296,9 +294,7 @@ partial_pause_if_all_down(Cfgs) ->
     [await_running(N, true) || N <- [B, C]],
     unblock([{A, B}]),
     [await_listening(N, true) || N <- [A, B, C]],
-    [] = partitions(A),
-    [] = partitions(B),
-    [] = partitions(C),
+    [await_partitions(N, []) || N <- [A, B, C]],
     ok.
 
 set_mode(Cfgs, Mode) ->
