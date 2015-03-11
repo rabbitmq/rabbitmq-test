@@ -217,29 +217,71 @@ forget_offline_removes_things([Rabbit, Hare]) ->
                                                           passive     = true})),
     ok.
 
-forget_offline_promotes_slave_with() -> [cluster_ab, ha_policy_all].
-forget_offline_promotes_slave([Rabbit, Hare]) ->
-    RabbitCh = pget(channel, Rabbit),
-    Mirrored = <<"mirrored-queue">>,
-    declare(RabbitCh, Mirrored),
-    amqp_channel:call(RabbitCh, #'confirm.select'{}),
-    amqp_channel:cast(RabbitCh, #'basic.publish'{routing_key = Mirrored},
+forget_promotes_offline_slave_with() ->
+    fun (Cfgs) ->
+            rabbit_test_configs:cluster(Cfgs, [a, b, c, d])
+    end.
+
+forget_promotes_offline_slave([A, B, C, D]) ->
+    ACh = pget(channel, A),
+    ANode = pget(node, A),
+    Q = <<"mirrored-queue">>,
+    declare(ACh, Q),
+    set_ha_policy(Q, A, [B, C]),
+    set_ha_policy(Q, A, [C, D]), %% Test add and remove from recoverable_slaves
+
+    %% Publish and confirm
+    amqp_channel:call(ACh, #'confirm.select'{}),
+    amqp_channel:cast(ACh, #'basic.publish'{routing_key = Q},
                       #amqp_msg{props = #'P_basic'{delivery_mode = 2}}),
-    amqp_channel:wait_for_confirms(RabbitCh),
+    amqp_channel:wait_for_confirms(ACh),
 
-    %% We should have a down slave on hare and a down master on rabbit.
-    Hare2 = rabbit_test_configs:stop_node(Hare),
-    _Rabbit2 = rabbit_test_configs:stop_node(Rabbit),
+    %% We kill nodes rather than stop them in order to make sure
+    %% that we aren't dependent on anything that happens as they shut
+    %% down (see bug 26467).
+    D2 = rabbit_test_configs:kill_node(D),
+    C2 = rabbit_test_configs:kill_node(C),
+    _B2 = rabbit_test_configs:kill_node(B),
+    _A2 = rabbit_test_configs:kill_node(A),
 
-    rabbit_test_configs:rabbitmqctl(
-      Hare2, {"forget_cluster_node --offline ~s", [pget(node, Rabbit)]}),
+    rabbit_test_configs:rabbitmqctl(C2, "force_boot"),
 
-    Hare3 = rabbit_test_configs:start_node(Hare2),
+    C3 = rabbit_test_configs:start_node(C2),
 
-    {_HConn2, HareCh2} = rabbit_test_util:connect(Hare3),
-    #'queue.declare_ok'{message_count = 1} = declare(HareCh2, Mirrored),
+    %% We should now have the following dramatis personae:
+    %% A - down, master
+    %% B - down, used to be slave, no longer is, never had the message
+    %% C - running, should be slave, but has wiped the message on restart
+    %% D - down, recoverable slave, contains message
+    %%
+    %% So forgetting A should offline-promote the queue to D, keeping
+    %% the message.
 
+    rabbit_test_configs:rabbitmqctl(C3, {"forget_cluster_node ~s", [ANode]}),
+
+    D3 = rabbit_test_configs:start_node(D2),
+    {_DConn2, DCh2} = rabbit_test_util:connect(D3),
+    #'queue.declare_ok'{message_count = 1} = declare(DCh2, Q),
     ok.
+
+set_ha_policy(Q, MasterCfg, SlaveCfgs) ->
+    Nodes = [list_to_binary(atom_to_list(pget(node, N))) ||
+                N <- [MasterCfg | SlaveCfgs]],
+    rabbit_test_util:set_ha_policy(MasterCfg, Q, {<<"nodes">>, Nodes}),
+    await_slaves(Q, pget(node, MasterCfg), [pget(node, C) || C <- SlaveCfgs]).
+
+await_slaves(Q, MNode, SNodes) ->
+    {ok, #amqqueue{pid        = MPid,
+                   slave_pids = SPids}} =
+        rpc:call(MNode, rabbit_amqqueue, lookup,
+                 [rabbit_misc:r(<<"/">>, queue, Q)]),
+    ActMNode = node(MPid),
+    ActSNodes = lists:usort([node(P) || P <- SPids]),
+    case {MNode, lists:usort(SNodes)} of
+        {ActMNode, ActSNodes} -> ok;
+        _                     -> timer:sleep(100),
+                                 await_slaves(Q, MNode, SNodes)
+    end.
 
 force_boot_with() -> cluster_ab.
 force_boot([Rabbit, Hare]) ->
@@ -331,8 +373,8 @@ change_cluster_when_node_offline(Config) ->
                           [Rabbit, Hare]),
     assert_not_clustered(Bunny).
 
-update_cluster_nodes_test_with() -> start_abc.
-update_cluster_nodes_test(Config) ->
+update_cluster_nodes_with() -> start_abc.
+update_cluster_nodes(Config) ->
     [Rabbit, Hare, Bunny] = cluster_members(Config),
 
     %% Mnesia is running...
@@ -393,17 +435,47 @@ erlang_config(Config) ->
     assert_not_clustered(Hare),
     assert_not_clustered(Rabbit),
 
-    %% If we use a legacy config file, it still works (and a warning is emitted)
+    %% If we use a legacy config file, the node fails to start.
     ok = stop_app(Hare),
     ok = reset(Hare),
     ok = rpc:call(Hare, application, set_env,
                   [rabbit, cluster_nodes, [Rabbit]]),
-    ok = start_app(Hare),
-    assert_cluster_status({[Rabbit, Hare], [Rabbit], [Rabbit, Hare]},
-                          [Rabbit, Hare]).
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
 
-force_reset_test_with() -> start_abc.
-force_reset_test(Config) ->
+    %% If we use an invalid node name, the node fails to start.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {["Mike's computer"], disc}]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    %% If we use an invalid node type, the node fails to start.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, {[Rabbit], blue}]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    %% If we use an invalid cluster_nodes conf, the node fails to start.
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, true]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit),
+
+    ok = stop_app(Hare),
+    ok = reset(Hare),
+    ok = rpc:call(Hare, application, set_env,
+                  [rabbit, cluster_nodes, "Yes, please"]),
+    assert_failure(fun () -> start_app(Hare) end),
+    assert_not_clustered(Rabbit).
+
+force_reset_node_with() -> start_abc.
+force_reset_node(Config) ->
     [Rabbit, Hare, _Bunny] = cluster_members(Config),
 
     stop_join_start(Rabbit, Hare),
