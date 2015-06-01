@@ -205,10 +205,10 @@ ram_duration_test() ->
     Q = Q0#amqqueue{arguments = [{<<"x-max-priority">>, long, 5}]},
     PQ = rabbit_priority_queue,
     BQS1 = PQ:init(Q, new, fun(_, _) -> ok end),
-    {Duration1, BQS2} = PQ:ram_duration(BQS1),
+    {_Duration1, BQS2} = PQ:ram_duration(BQS1),
     BQS3 = PQ:set_ram_duration_target(infinity, BQS2),
     BQS4 = PQ:set_ram_duration_target(1, BQS3),
-    {Duration2, BQS5} = PQ:ram_duration(BQS4),
+    {_Duration2, BQS5} = PQ:ram_duration(BQS4),
     PQ:delete_and_terminate(a_whim, BQS5),
     passed.
 
