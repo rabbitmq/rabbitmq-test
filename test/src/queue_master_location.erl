@@ -53,7 +53,7 @@ declare_args(Cfgs) ->
     setup_test_environment(Cfgs),
     unset_location_config(Cfgs),
     QueueName = rabbit_misc:r(<<"/">>, queue, Q= <<"qm.test">>),
-    Args      = [{<<"queue-master-location">>, <<"min-masters">>}],
+    Args      = [{<<"x-queue-master-locator">>, <<"min-masters">>}],
     Queue     = declare(Cfgs, QueueName, false, false, Args, none),
     verify_min_master(Cfgs, Q),
     delete_queue(Cfgs,Queue),
@@ -92,7 +92,7 @@ calculate_min_master_with() -> ?CLUSTER.
 calculate_min_master(Cfgs) ->
     setup_test_environment(Cfgs),
     QueueName = rabbit_misc:r(<<"/">>, queue, Q= <<"qm.test">>),
-    Args      = [{<<"queue-master-location">>, <<"min-masters">>}],
+    Args      = [{<<"x-queue-master-locator">>, <<"min-masters">>}],
     Queue     = declare(Cfgs, QueueName, false, false, Args, none),
     verify_min_master(Cfgs, Q),
     delete_queue(Cfgs,Queue),
@@ -103,7 +103,7 @@ calculate_random_with() -> ?CLUSTER.
 calculate_random(Cfgs) ->
     setup_test_environment(Cfgs),
     QueueName = rabbit_misc:r(<<"/">>, queue, Q= <<"qm.test">>),
-    Args      = [{<<"queue-master-location">>, <<"random">>}],
+    Args      = [{<<"x-queue-master-locator">>, <<"random">>}],
     Queue     = declare(Cfgs, QueueName, false, false, Args, none),
     verify_random(Cfgs, Q),
     delete_queue(Cfgs,Queue),
@@ -114,7 +114,7 @@ calculate_client_local_with() -> ?CLUSTER.
 calculate_client_local(Cfgs) ->
     setup_test_environment(Cfgs),
     QueueName = rabbit_misc:r(<<"/">>, queue, Q= <<"qm.test">>),
-    Args      = [{<<"queue-master-location">>, <<"client-local">>}],
+    Args      = [{<<"x-queue-master-locator">>, <<"client-local">>}],
     Queue     = declare(Cfgs, QueueName, false, false, Args, none),
     verify_client_local(Cfgs, Q),
     delete_queue(Cfgs,Queue),
@@ -174,12 +174,12 @@ cluster_members(Nodes) -> [pget(node,Cfg) || Cfg <- Nodes].
 
 set_location_config(Cfgs, Strategy) ->
     [ok = rpc:call(pget(node, Cfg), application, set_env,
-                   [rabbit, queue_master_location, Strategy]) || Cfg <- Cfgs],
+                   [rabbit, queue_master_locator, Strategy]) || Cfg <- Cfgs],
     Cfgs.
 
 unset_location_config(Cfgs) ->
     [ok = rpc:call(pget(node, Cfg), application, unset_env,
-                   [rabbit, queue_master_location]) || Cfg <- Cfgs],
+                   [rabbit, queue_master_locator]) || Cfg <- Cfgs],
     Cfgs.
 
 declare([Cfg|_], QueueName, Durable, AutoDelete, Args, Owner) ->
@@ -210,6 +210,6 @@ stop_all(Cfgs) ->
 
 set_location_policy([Cfg|_], Name, Strategy) ->
     ok = set_policy(Cfg, Name, <<".*">>, <<"queues">>,
-                    [{<<"queue-master-location">>, Strategy}]).
+                    [{<<"x-queue-master-locator">>, Strategy}]).
 
 clear_location_policy([Cfg|_], Name) -> ok = clear_policy(Cfg, Name).
