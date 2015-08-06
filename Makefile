@@ -175,5 +175,18 @@ cleanup:
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 
 create_ssl_certs:
-	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
-
+	# Skip SSL certs if Erlang is older than R16B01 (ssl 5.3).
+	minimum_ssl_version='5.3'; \
+	ssl_version=$$(erl -noshell -eval ' \
+	    ok = application:load(ssl), \
+	    {ok, VSN} = application:get_key(ssl, vsn), \
+	    io:format("~s~n", [VSN]), \
+	    halt(0).'); \
+	if [ "$$(printf "$$ssl_version\n$$minimum_ssl_version\n" | sort -V | head -n 1)" = "$$minimum_ssl_version" ]; then \
+	    target=all; \
+	else \
+	    echo "Skip SSL certs creation; Erlang's SSL application is too" \
+		 "old ($$ssl_version < $$minimum_ssl_version) and SSL support" \
+		 "is disabled in RabbitMQ"; \
+	fi; \
+	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean $$target
