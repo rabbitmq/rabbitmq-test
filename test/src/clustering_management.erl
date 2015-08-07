@@ -505,10 +505,10 @@ wait_for_cluster_status(Status, AllNodes, Nodes) ->
     wait_for_cluster_status(0, Max, Status, AllNodes, Nodes).
 
 wait_for_cluster_status(N, Max, Status, _AllNodes, Nodes) when N >= Max ->
-    error({cluster_status_max_tries_failed,
-           [{nodes, Nodes},
-            {expected_status, Status},
-            {max_tried, Max}]});
+    erlang:error({cluster_status_max_tries_failed,
+                  [{nodes, Nodes},
+                   {expected_status, Status},
+                   {max_tried, Max}]});
 wait_for_cluster_status(N, Max, Status, AllNodes, Nodes) ->
     case lists:all(fun (Node) ->
                             verify_status_equal(Node, Status, AllNodes)
