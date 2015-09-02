@@ -53,7 +53,7 @@ TESTS_FAILED := echo '\n============'\
 CODEGEN_DIR = $(DEPS_DIR)/rabbitmq_codegen
 PYTHONPATH = $(CODEGEN_DIR)
 ANT ?= ant
-ANT_FLAGS += -Dsibling.codegen.dir=$(CODEGEN_DIR)
+ANT_FLAGS += -Dsibling.codegen.dir=$(CODEGEN_DIR) -DUMBRELLA_AVAILABLE=true
 RABBITMQCTL = $(DEPS_DIR)/rabbit/scripts/rabbitmqctl
 RABBITMQ_TEST_DIR = $(CURDIR)
 export PYTHONPATH ANT_FLAGS RABBITMQCTL RABBITMQ_TEST_DIR
