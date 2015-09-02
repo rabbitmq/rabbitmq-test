@@ -1,7 +1,8 @@
 {application, rabbitmq_test,
  [
   {description, ""},
-  {vsn, "1"},
+  {vsn, ""},
+  {modules, []},
   {registered, []},
   {applications, [
                   kernel,

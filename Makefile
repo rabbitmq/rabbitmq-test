@@ -1,28 +1,39 @@
-.PHONY: all full lite conformance16 update-qpid-testsuite run-qpid-testsuite \
-	prepare restart-app stop-app start-app \
-	start-secondary-app stop-secondary-app \
-	restart-secondary-node cleanup force-snapshot \
-	enable-ha disable-ha
+PROJECT = rabbitmq_test
 
-include ../umbrella.mk
+DEPS = amqp_client
+dep_amqp_client = git https://github.com/rabbitmq/rabbitmq-erlang-client.git erlang.mk
 
-BROKER_DIR=../rabbitmq-server
-TEST_DIR=../rabbitmq-java-client
+TEST_DEPS = rabbit
+dep_rabbit = git https://github.com/rabbitmq/rabbitmq-server.git erlang.mk
+
+DEP_PLUGINS = rabbit_common/mk/rabbitmq-tests.mk
+ERLANG_MK_DISABLE_PLUGINS = eunit
+
+include erlang.mk
 
 TEST_RABBIT_PORT=5672
 TEST_HARE_PORT=5673
 TEST_RABBIT_SSL_PORT=5671
 TEST_HARE_SSL_PORT=5670
 
-COVER=true
+FILTER ?= all
+COVER ?= true
 
 ifeq ($(COVER), true)
-COVER_START=start-cover
-COVER_STOP=stop-cover
-else
-COVER_START=
-COVER_STOP=
+COVER_START = start-cover
+COVER_STOP = stop-cover
 endif
+
+WITH_BROKER_TEST_COMMANDS := rabbit_test_runner:run_in_broker(\"$(CURDIR)/test\",\"$(FILTER)\")
+
+# This requires Erlang R15B+.
+STANDALONE_TEST_COMMANDS := rabbit_test_runner:run_multi(\"$(DEPS_DIR)/rabbit\",\"$(CURDIR)/test\",\"$(FILTER)\",$(COVER),none)
+RMQ_ERLC_OPTS := -Derlang_r15b_or_later
+
+RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include -I $(DEPS_DIR)/rabbit/include
+
+ERLC_OPTS += $(RMQ_ERLC_OPTS)
+TEST_ERLC_OPTS += $(RMQ_ERLC_OPTS)
 
 # This requires Erlang R13B+.
 SSL_VERIFY_OPTION :={verify,verify_peer},{fail_if_no_peer_cert,false}
@@ -35,136 +46,130 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
-all: full test
+BROKER_DIR = $(DEPS_DIR)/rabbit
+TEST_EBIN_DIR = $(CURDIR)/test
+JAVA_CLIENT_DIR = ../rabbitmq-java-client
+
+tests:: full
 
 full:
-	OK=true && \
+	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
-	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
+	{ $(MAKE) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
-	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
-unit:
-	OK=true && \
+unit: test-dist
+	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
-	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
+	{ $(MAKE) run-tests || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 lite:
-	OK=true && \
+	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
-	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
-	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
+	{ $(MAKE) run-tests || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 conformance16:
-	OK=true && \
+	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
-	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
-	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
+	{ $(MAKE) run-tests || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 qpid_testsuite:
-	$(MAKE) update-qpid-testsuite
+	$(verbose) $(MAKE) update-qpid-testsuite
 
 update-qpid-testsuite:
-	svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
+	$(verbose) svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
 	# hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
-	- patch -N -r - -p0 -d qpid_testsuite/ < qpid_patch
+	-$(verbose) patch -N -r - -p0 -d qpid_testsuite/ < qpid_patch
 
 prepare-qpid-patch:
-	cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
+	$(verbose) cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
 
 run-qpid-testsuite: qpid_testsuite
-	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
-	AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
+	$(test_verbose) AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
+	$(verbose) AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
-clean:
-	rm -rf qpid_testsuite
+clean:: clean-qpid-testsuite
+
+clean-qpid-testsuite:
+	$(gen_verbose) rm -rf qpid_testsuite
 
 prepare: create_ssl_certs
-	$(MAKE) -C $(BROKER_DIR) \
+	$(verbose) $(MAKE) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
-		stop-node cleandb start-background-node
-	$(MAKE) -C $(BROKER_DIR) \
+		stop-node clean-node-db start-background-node
+	$(verbose) $(MAKE) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
-		stop-node cleandb start-background-node ${COVER_START} start-rabbit-on-node
-	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
+		stop-node clean-node-db start-background-node ${COVER_START} start-rabbit-on-node
+	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
 start-app:
-	$(MAKE) -C $(BROKER_DIR) \
+	$(exec_verbose) $(MAKE) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		start-rabbit-on-node
 
 stop-app:
-	$(MAKE) -C $(BROKER_DIR) stop-rabbit-on-node
+	$(exec_verbose) $(MAKE) stop-rabbit-on-node
 
 restart-app: stop-app start-app
 
 start-secondary-app:
-	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
+	$(exec_verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
 stop-secondary-app:
-	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare stop-rabbit-on-node
+	$(exec_verbose) $(MAKE) RABBITMQ_NODENAME=hare stop-rabbit-on-node
 
 restart-secondary-node:
-	$(MAKE) -C $(BROKER_DIR) \
+	$(exec_verbose) $(MAKE) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-node start-background-node
-	$(MAKE) -C $(BROKER_DIR) RABBITMQ_NODENAME=hare start-rabbit-on-node
+	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node
 
 force-snapshot:
-	$(MAKE) -C $(BROKER_DIR) force-snapshot
-
-set-resource-alarm:
-	$(MAKE) -C $(BROKER_DIR) set-resource-alarm SOURCE=$(SOURCE)
-
-clear-resource-alarm:
-	$(MAKE) -C $(BROKER_DIR) clear-resource-alarm SOURCE=$(SOURCE)
+	$(exec_verbose) $(MAKE) force-snapshot
 
 enable-ha:
-	$(BROKER_DIR)/scripts/rabbitmqctl set_policy HA \
+	$(exec_verbose) $(BROKER_DIR)/scripts/rabbitmqctl set_policy HA \
 		".*" '{"ha-mode": "all"}'
 
 disable-ha:
-	$(BROKER_DIR)/scripts/rabbitmqctl clear_policy HA
+	$(exec_verbose) $(BROKER_DIR)/scripts/rabbitmqctl clear_policy HA
 
 cleanup:
-	-$(MAKE) -C $(BROKER_DIR) \
+	-$(exec_verbose) $(MAKE) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-rabbit-on-node stop-node
-	-$(MAKE) -C $(BROKER_DIR) \
+	-$(verbose) $(MAKE) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 
 # This requires Erlang R16B01+.
 create_ssl_certs:
-	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
+	$(gen_verbose) $(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all

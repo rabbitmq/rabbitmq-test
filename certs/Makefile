@@ -15,18 +15,15 @@ endif
 
 all: client server
 
-client: p12pass
-	echo $(DIR)
-	$(MAKE) target DIR=$(DIR) TARGET=client EXTENSIONS=client_ca_extensions
-
-server: p12pass
-	$(MAKE) target DIR=$(DIR) TARGET=server EXTENSIONS=server_ca_extensions
+client server: p12pass
+	@echo $(DIR)
+	$(MAKE) target DIR=$(DIR) TARGET=$@ EXTENSIONS=$@_ca_extensions
 
 p12pass:
 	$(P12PASS)
 
 target: $(DIR)/testca
-	mkdir $(DIR)/$(TARGET)
+	mkdir -p $(DIR)/$(TARGET)
 	{ ( cd $(DIR)/$(TARGET) && \
 	    openssl genrsa -out key.pem 2048 &&\
 	    openssl req -new -key key.pem -out req.pem -outform PEM\
@@ -40,10 +37,10 @@ target: $(DIR)/testca
 	      -passout pass:$(PASSWORD) ) || (rm -rf $(DIR)/$(TARGET) && false); }
 
 $(DIR)/testca:
-	mkdir $(DIR)/testca
+	mkdir -p $(DIR)/testca
 	cp openssl.cnf $(DIR)/testca/openssl.cnf
 	{ ( cd $(DIR)/testca && \
-	    mkdir certs private && \
+	    mkdir -p certs private && \
 	    chmod 700 private && \
 	    echo 01 > serial && \
 	    touch index.txt && \

@@ -38,7 +38,8 @@ run_multi(ServerDir, Dir, Filter, Cover, PluginsDir) ->
     case Cover of
         true  -> io:format("Cover compiling..."),
                  cover:start(),
-                 ok = rabbit_misc:enable_cover(["../rabbitmq-server/"]),
+                 BrokerPath = filename:join(os:getenv("DEPS_DIR"), "rabbit"),
+                 ok = rabbit_misc:enable_cover([BrokerPath]),
                  io:format(" done.~n~n");
         false -> ok
     end,
@@ -226,5 +227,5 @@ add_server_test_ebin_dir() ->
     %% by default.
     {file, Path} = code:is_loaded(rabbit),
     Ebin = filename:dirname(Path),
-    TestEbin = filename:join([Ebin, "..", "test", "ebin"]),
+    TestEbin = filename:join([Ebin, "..", "test"]),
     code:add_path(TestEbin).
