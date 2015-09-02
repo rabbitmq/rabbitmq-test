@@ -13,3 +13,6 @@
 /certs/client/
 /certs/server/
 /certs/testca/
+
+# Downloaded sources.
+/qpid_testsuite/
