@@ -3,8 +3,10 @@ PROJECT = rabbitmq_test
 DEPS = amqp_client
 dep_amqp_client = git https://github.com/rabbitmq/rabbitmq-erlang-client.git erlang.mk
 
-TEST_DEPS = rabbit
+TEST_DEPS = rabbit rabbitmq_codegen java_client
 dep_rabbit = git https://github.com/rabbitmq/rabbitmq-server.git erlang.mk
+dep_rabbitmq_codegen = git https://github.com/rabbitmq/rabbitmq-codegen.git erlang.mk
+dep_java_client = git https://github.com/rabbitmq/rabbitmq-java-client.git master
 
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-tests.mk
 ERLANG_MK_DISABLE_PLUGINS = eunit
@@ -46,9 +48,17 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
+# We need to pass the location of codegen to the Java client ant
+# process.
+CODEGEN_DIR = $(DEPS_DIR)/rabbitmq_codegen
+PYTHONPATH = $(CODEGEN_DIR)
+ANT ?= ant
+ANT_FLAGS += -Dsibling.codegen.dir=$(CODEGEN_DIR)
+export PYTHONPATH ANT_FLAGS
+
 BROKER_DIR = $(DEPS_DIR)/rabbit
 TEST_EBIN_DIR = $(CURDIR)/test
-JAVA_CLIENT_DIR = ../rabbitmq-java-client
+JAVA_CLIENT_DIR = $(DEPS_DIR)/java_client
 
 tests:: full
 
@@ -57,7 +67,7 @@ full:
 	$(MAKE) prepare && \
 	{ $(MAKE) run-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
-	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
 
 unit: test-dist
@@ -66,18 +76,18 @@ unit: test-dist
 	{ $(MAKE) run-tests || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
-lite:
+lite: test-dist
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) run-tests || OK=false; } && \
-	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 conformance16:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) run-tests || OK=false; } && \
-	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) ant test-suite ) || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 qpid_testsuite:
