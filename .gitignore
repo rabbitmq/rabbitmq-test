@@ -9,6 +9,8 @@
 /ebin/
 /logs/
 
+/rabbitmq_test.d
+
 # Generated certificates.
 /certs/client/
 /certs/server/

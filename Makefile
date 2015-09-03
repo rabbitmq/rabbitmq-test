@@ -9,7 +9,6 @@ dep_rabbitmq_codegen = git https://github.com/rabbitmq/rabbitmq-codegen.git erla
 dep_java_client = git https://github.com/rabbitmq/rabbitmq-java-client.git master
 
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-tests.mk
-ERLANG_MK_DISABLE_PLUGINS = eunit
 
 include erlang.mk
 
