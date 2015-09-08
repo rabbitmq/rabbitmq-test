@@ -11,6 +11,12 @@ dep_java_client = git https://github.com/rabbitmq/rabbitmq-java-client.git maste
 
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-tests.mk
 
+# FIXME: Use erlang.mk patched for RabbitMQ, while waiting for PRs to be
+# reviewed and merged.
+
+ERLANG_MK_GIT_REPOSITORY = https://github.com/rabbitmq/erlang.mk.git
+ERLANG_MK_GIT_REF = rabbitmq-tmp
+
 include erlang.mk
 
 TEST_RABBIT_PORT=5672
