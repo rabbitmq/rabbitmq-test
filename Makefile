@@ -1,6 +1,7 @@
 PROJECT = rabbitmq_test
 
-DEPS = amqp_client
+DEPS = rabbit_common amqp_client
+dep_rabbit_common = git https://github.com/rabbitmq/rabbitmq-common.git master
 dep_amqp_client = git https://github.com/rabbitmq/rabbitmq-erlang-client.git erlang.mk
 
 TEST_DEPS = rabbit rabbitmq_codegen java_client
@@ -63,7 +64,7 @@ JAVA_CLIENT_DIR = $(DEPS_DIR)/java_client
 
 tests:: full
 
-full:
+full: test-dist
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) run-tests || { OK=false; $(TESTS_FAILED); } } && \
