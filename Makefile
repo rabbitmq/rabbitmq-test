@@ -24,17 +24,8 @@ COVER_START=
 COVER_STOP=
 endif
 
-# we actually want to test for ssl above 3.9 (eg >= 3.10), but this
-# comparison is buggy because it doesn't believe 10 > 9, so it doesn't
-# believe 3.10 > 3.9. As a result, we cheat, and use the erts version
-# instead. SSL 3.10 came out with R13B, which included erts 5.7.1, so
-# we require > 5.7.0.
-SSL_VERIFY=$(shell if [ $$(erl -noshell -eval 'io:format(erlang:system_info(version)), halt().') \> "5.7.0" ]; then echo "true"; else echo "false"; fi)
-ifeq (true,$(SSL_VERIFY))
+# This requires Erlang R13B+.
 SSL_VERIFY_OPTION :={verify,verify_peer},{fail_if_no_peer_cert,false}
-else
-SSL_VERIFY_OPTION :={verify_code,1}
-endif
 export SSL_CERTS_DIR := $(realpath certs)
 export PASSWORD := test
 RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
@@ -174,37 +165,6 @@ cleanup:
 		RABBITMQ_ENABLED_PLUGINS_FILE=/does-not-exist \
 		stop-rabbit-on-node ${COVER_STOP} stop-node
 
-define compare_version
-$(shell awk 'BEGIN {
-	split("$(1)", v1, "\.");
-	version1 = v1[1] * 1000000 + v1[2] * 10000 + v1[3] * 100 + v1[4];
-
-	split("$(2)", v2, "\.");
-	version2 = v2[1] * 1000000 + v2[2] * 10000 + v2[3] * 100 + v2[4];
-
-	if (version1 $(3) version2) {
-		print "true";
-	} else {
-		print "false";
-	}
-}')
-endef
-
-ERLANG_SSL_VER = $(shell erl -noshell -eval '\
-	ok = application:load(ssl), \
-	{ok, VSN} = application:get_key(ssl, vsn), \
-	io:format("~s~n", [VSN]), \
-	halt(0).')
-MINIMUM_ERLANG_SSL_VER = 5.3
-
-ifeq ($(call compare_version,$(ERLANG_SSL_VER),$(MINIMUM_ERLANG_SSL_VER),>=),true)
+# This requires Erlang R16B01+.
 create_ssl_certs:
 	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean all
-else
-create_ssl_certs:
-	@# Skip SSL certs if Erlang is older than R16B01 (ssl 5.3).
-	$(MAKE) -C certs DIR=$(SSL_CERTS_DIR) clean
-	@echo "WARNING: Skip SSL certs creation; Erlang's SSL application is too" \
-	    "old ($(ERLANG_SSL_VER) < $(MINIMUM_ERLANG_SSL_VER)) and SSL support" \
-	    "is disabled in RabbitMQ"
-endif
