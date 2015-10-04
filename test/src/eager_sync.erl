@@ -26,7 +26,8 @@
 -import(rabbit_test_util, [a2b/1, publish/3, consume/3, fetch/3]).
 -import(rabbit_misc, [pget/2]).
 
--define(CONFIG, [cluster_abc, ha_policy_two_pos]).
+-define(CONFIG, [cluster_abc, ha_policy_two_pos,
+                 ha_policy_two_pos_batch_sync]).
 
 eager_sync_with() -> ?CONFIG.
 eager_sync([A, B, C]) ->

@@ -24,7 +24,8 @@
 
 -define(LOOP_RECURSION_DELAY, 100).
 
-slave_synchronization_with() -> [cluster_ab, ha_policy_two_pos].
+slave_synchronization_with() -> [cluster_ab, ha_policy_two_pos,
+                                 ha_policy_two_pos_batch_sync].
 slave_synchronization([Master, Slave]) ->
     Channel = pget(channel, Master),
     Queue = <<"ha.two.test">>,
@@ -79,7 +80,8 @@ slave_synchronization([Master, Slave]) ->
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag4}),      % 0 - 0
     slave_synced(Master, Queue).
 
-slave_synchronization_ttl_with() -> [cluster_abc, ha_policy_two_pos].
+slave_synchronization_ttl_with() -> [cluster_abc, ha_policy_two_pos,
+                                     ha_policy_two_pos_batch_sync].
 slave_synchronization_ttl([Master, Slave, DLX]) ->
     Channel = pget(channel, Master),
     DLXChannel = pget(channel, DLX),
