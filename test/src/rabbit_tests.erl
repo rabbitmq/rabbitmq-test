@@ -55,6 +55,8 @@ all_tests0() ->
     passed = test_priority_queue(),
     passed = test_pg_local(),
     passed = test_unfold(),
+    passed = test_pmerge(),
+    passed = test_plmerge(),
     passed = test_supervisor_delayed_restart(),
     passed = test_table_codec(),
     passed = test_content_framing(),
@@ -90,6 +92,9 @@ all_tests0() ->
     passed = vm_memory_monitor_tests:all_tests(),
     passed = credit_flow_test:test_credit_flow_settings(),
     passed = on_disk_store_tunable_parameter_validation_test:test_msg_store_parameter_validation(),
+    passed = password_hashing_tests:test_password_hashing(),
+    passed = credit_flow_test:test_credit_flow_settings(),
+
     passed.
 
 do_if_secondary_node(Up, Down) ->
@@ -423,6 +428,18 @@ test_unfold() ->
                                    end, 10),
     passed.
 
+test_pmerge() ->
+    P = [{a, 1}, {b, 2}],
+    P = rabbit_misc:pmerge(a, 3, P),
+    [{c, 3} | P] = rabbit_misc:pmerge(c, 3, P),
+    passed.
+
+test_plmerge() ->
+    P1 = [{a, 1}, {b, 2}, {c, 3}],
+    P2 = [{a, 2}, {d, 4}],
+    [{a, 1}, {b, 2}, {c, 3}, {d, 4}] = rabbit_misc:plmerge(P1, P2),
+    passed.
+
 test_table_codec() ->
     %% FIXME this does not test inexact numbers (double and float) yet,
     %% because they won't pass the equality assertions
@@ -682,9 +699,7 @@ test_topic_expect_match(X, List) ->
       end, List).
 
 test_app_management() ->
-    io:format(standard_error, "Wait on PID ~s~n", [rabbit_mnesia:dir() ++ ".pid"]),
-    control_action(wait, [os:getenv("RABBITMQ_PID_FILE")]),
-    io:format(standard_error, "Wait over!~n", []),
+    control_action(wait, [rabbit_mnesia:dir() ++ ".pid"]),
     %% Starting, stopping and diagnostics.  Note that we don't try
     %% 'report' when the rabbit app is stopped and that we enable
     %% tracing for the duration of this function.
@@ -1899,9 +1914,19 @@ add_log_handlers(Handlers) ->
         {Handler, Args} <- Handlers],
     ok.
 
+%% sasl_report_file_h returns [] during terminate
+%% see: https://github.com/erlang/otp/blob/maint/lib/stdlib/src/error_logger_file_h.erl#L98
+%%
+%% error_logger_file_h returns ok since OTP 18.1
+%% see: https://github.com/erlang/otp/blob/maint/lib/stdlib/src/error_logger_file_h.erl#L98
 delete_log_handlers(Handlers) ->
-    [[] = error_logger:delete_report_handler(Handler) ||
-        Handler <- Handlers],
+    [ok_or_empty_list(error_logger:delete_report_handler(Handler))
+     || Handler <- Handlers],
+    ok.
+
+ok_or_empty_list([]) ->
+    [];
+ok_or_empty_list(ok) ->
     ok.
 
 test_supervisor_delayed_restart() ->
