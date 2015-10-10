@@ -72,6 +72,10 @@ eager_sync_cancel([A, B, C]) ->
     ACh = pget(channel, A),
     Ch = pget(channel, C),
 
+    set_app_sync_batch_size(A),
+    set_app_sync_batch_size(B),
+    set_app_sync_batch_size(C),
+
     amqp_channel:call(ACh, #'queue.declare'{queue   = ?QNAME,
                                             durable = true}),
     {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
@@ -81,6 +85,7 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
     %% Sync then cancel
     publish(Ch, ?QNAME, ?MESSAGE_COUNT),
     restart(A),
+    set_app_sync_batch_size(A),
     spawn_link(fun() -> ok = sync_nowait(C, ?QNAME) end),
     case wait_for_syncing(C, ?QNAME, 1) of
         ok ->
@@ -88,6 +93,7 @@ eager_sync_cancel_test2(A, B, C, Ch) ->
                 ok ->
                     wait_for_running(C, ?QNAME),
                     restart(B),
+                    set_app_sync_batch_size(B),
                     consume(Ch, ?QNAME, 0),
 
                     {ok, not_syncing} = sync_cancel(C, ?QNAME), %% Idempotence
@@ -204,3 +210,11 @@ state(Cfg, QName) ->
         rpc:call(pget(node, Cfg), rabbit_amqqueue, info,
                  [queue(Cfg, QName), [state, synchronised_slave_pids]]),
     {State, length(Pids)}.
+
+%% eager_sync_cancel_test needs a batch size that's < ?MESSAGE_COUNT
+%% in order to pass, because a SyncBatchSize >= ?MESSAGE_COUNT will
+%% always finish before the test is able to cancel the sync.
+set_app_sync_batch_size(Cfg) ->
+    rabbit_test_util:control_action(
+      eval, Cfg,
+      ["application:set_env(rabbit, mirroring_sync_batch_size, 1)."]).
