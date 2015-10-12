@@ -20,7 +20,7 @@
 -export([enable_plugins/1]).
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
 -export([start_connections/1, build_cluster/1]).
--export([ha_policy_all/1, ha_policy_two_pos/1]).
+-export([ha_policy_all/1, ha_policy_two_pos/1, ha_policy_two_pos_batch_sync/1]).
 -export([start_nodes/2, start_nodes/3, add_to_cluster/2,
          rabbitmqctl/2, rabbitmqctl_fail/2]).
 -export([stop_nodes/1, start_node/1, stop_node/1, kill_node/1, restart_node/1,
@@ -143,6 +143,17 @@ ha_policy_two_pos([Cfg | _] = Cfgs) ->
                   [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
     set_ha_policy(Cfg, <<"^ha.auto.">>, {<<"nodes">>, TwoNodes},
                   [{<<"ha-sync-mode">>,           <<"automatic">>},
+                   {<<"ha-promote-on-shutdown">>, <<"always">>}]),
+    Cfgs.
+
+ha_policy_two_pos_batch_sync([Cfg | _] = Cfgs) ->
+    Members = [a2b(pget(node, C)) || C <- Cfgs],
+    TwoNodes = [M || M <- lists:sublist(Members, 2)],
+    set_ha_policy(Cfg, <<"^ha.two.">>, {<<"nodes">>, TwoNodes},
+                  [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
+    set_ha_policy(Cfg, <<"^ha.auto.">>, {<<"nodes">>, TwoNodes},
+                  [{<<"ha-sync-mode">>,           <<"automatic">>},
+                   {<<"ha-sync-batch-size">>,     200},
                    {<<"ha-promote-on-shutdown">>, <<"always">>}]),
     Cfgs.
 
@@ -276,4 +287,3 @@ execute_bg(Cfg, Cmd) ->
 
 fmt({Fmt, Args}) -> rabbit_misc:format(Fmt, Args);
 fmt(Str)         -> Str.
-
