@@ -31,7 +31,8 @@
 -import(rabbit_misc, [pget/2, pget/3]).
 
 -define(INITIAL_KEYS, [cover, base, server, test_framework, plugins]).
--define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port, mnesia_dir]).
+-define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, initial_nodename,
+                                            port, mnesia_dir]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
 cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
@@ -54,6 +55,7 @@ start_nodes(InitialCfg0, NodeNames, FirstPort) ->
                       _          -> InitialCfg0
                   end,
     Nodes = [[{nodename, N}, {port, P},
+              {initial_nodename, N},
               {mnesia_dir, "mnesia"} |
               strip_non_initial(Cfg)]
              || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
@@ -231,8 +233,10 @@ environment(Cfg) ->
         _         ->
             Port = pget(port, Cfg),
             Base = pget(base, Cfg),
+            InitialNodename = pget(initial_nodename, Cfg),
             TestFramework = pget(test_framework, Cfg),
-            [{"MNESIA_DIR",         {"~s/~s/~s", [Base, Nodename, pget(mnesia_dir, Cfg)]}},
+            [{"MNESIA_DIR",         {"~s/~s/~s", [Base, InitialNodename,
+                                                  pget(mnesia_dir, Cfg)]}},
              {"PLUGINS_EXPAND_DIR", {"~s/~s/plugins", [Base, Nodename]}},
              {"LOG_BASE",           {"~s/~s/log", [Base, Nodename]}},
              {"NODENAME",           {"~s", [Nodename]}},
