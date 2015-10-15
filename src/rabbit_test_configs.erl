@@ -30,7 +30,7 @@
 -import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2, pget/3]).
 
--define(INITIAL_KEYS, [cover, base, server, plugins]).
+-define(INITIAL_KEYS, [cover, base, server, test_framework, plugins]).
 -define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port, mnesia_dir]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
@@ -54,7 +54,7 @@ start_nodes(InitialCfg0, NodeNames, FirstPort) ->
                       _          -> InitialCfg0
                   end,
     Nodes = [[{nodename, N}, {port, P},
-              {mnesia_dir, rabbit_misc:format("rabbitmq-~s-mnesia", [N])} |
+              {mnesia_dir, "mnesia"} |
               strip_non_initial(Cfg)]
              || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
     [start_node(Node) || Node <- Nodes].
@@ -215,7 +215,7 @@ execute(Cfg, Cmd) ->
 execute(Env0, Cmd0, AcceptableExitCodes) ->
     Env = [{"RABBITMQ_" ++ K, fmt(V)} || {K, V} <- Env0],
     Cmd = fmt(Cmd0),
-    error_logger:info_msg("Invoking '~s'~n", [Cmd]),
+    error_logger:info_msg("Invoking '~s' with env:~n~p~n", [Cmd, Env]),
     Port = erlang:open_port(
              {spawn, "/usr/bin/env sh -c \"" ++ Cmd ++ "\""},
              [{env, Env}, exit_status,
@@ -231,10 +231,10 @@ environment(Cfg) ->
         _         ->
             Port = pget(port, Cfg),
             Base = pget(base, Cfg),
-            Server = pget(server, Cfg),
-            [{"MNESIA_DIR",         {"~s/~s", [Base, pget(mnesia_dir, Cfg)]}},
-             {"PLUGINS_EXPAND_DIR", {"~s/~s-plugins-expand", [Base, Nodename]}},
-             {"LOG_BASE",           {"~s", [Base]}},
+            TestFramework = pget(test_framework, Cfg),
+            [{"MNESIA_DIR",         {"~s/~s/~s", [Base, Nodename, pget(mnesia_dir, Cfg)]}},
+             {"PLUGINS_EXPAND_DIR", {"~s/~s/plugins", [Base, Nodename]}},
+             {"LOG_BASE",           {"~s/~s/log", [Base, Nodename]}},
              {"NODENAME",           {"~s", [Nodename]}},
              {"NODE_PORT",          {"~B", [Port]}},
              {"PID_FILE",           pid_file(Cfg)},
@@ -248,8 +248,8 @@ environment(Cfg) ->
               {"+K true +A30 +P 1048576 "
                "-kernel inet_default_connect_options [{nodelay,true}] "
                %% Some tests need to be able to make distribution unhappy
-               "-pa ~s/../rabbitmq-test/ebin "
-               "-proto_dist inet_proxy", [Server]}}
+               "-pa ~s/ebin "
+               "-proto_dist inet_proxy", [TestFramework]}}
              | plugins_env(Plugins)]
     end.
 
@@ -261,7 +261,8 @@ plugins_env(Dir) ->
      {"ENABLED_PLUGINS_FILE", {"~s/enabled_plugins", [Dir]}}].
 
 pid_file(Cfg) ->
-    rabbit_misc:format("~s/~s.pid", [pget(base, Cfg), pget(nodename, Cfg)]).
+    Nodename = pget(nodename, Cfg),
+    rabbit_misc:format("~s/~s/~s.pid", [pget(base, Cfg), Nodename, Nodename]).
 
 port_receive_loop(Port, Stdout, AcceptableExitCodes) ->
     receive

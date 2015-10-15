@@ -25,11 +25,10 @@
 -export([run_in_broker/2, run_multi/5]).
 
 run_in_broker(Dir, Filter) ->
-    add_server_test_ebin_dir(),
     io:format("~nIn-broker tests~n================~n~n", []),
     eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).
 
-run_multi(ServerDir, Dir, Filter, Cover, PluginsDir) ->
+run_multi(DepsDir, Dir, Filter, Cover, PluginsDir) ->
     io:format("~nMulti-node tests~n================~n~n", []),
     %% Umbrella does not give us -sname
     net_kernel:start([?MODULE, shortnames]),
@@ -44,7 +43,7 @@ run_multi(ServerDir, Dir, Filter, Cover, PluginsDir) ->
         false -> ok
     end,
     R = eunit:test(make_tests_multi(
-                     ServerDir, Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
+                     DepsDir, Dir, Filter, Cover, PluginsDir, ?TIMEOUT), []),
     case Cover of
         true  -> io:format("~nCover reporting..."),
                  ok = rabbit_misc:report_cover(),
@@ -60,14 +59,15 @@ make_tests_single(Dir, Filter, Timeout) ->
     [make_test_single(M, FWith, F, ShowHeading, Timeout, Width)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
 
-make_tests_multi(ServerDir, Dir, Filter, Cover, PluginsDir, Timeout) ->
+make_tests_multi(DepsDir, Dir, Filter, Cover, PluginsDir, Timeout) ->
     {Filtered, AllCount, Width} = find_tests(Dir, Filter, "_with"),
     io:format("Running ~B of ~B tests; FILTER=~s; COVER=~s~n~n",
               [length(Filtered), AllCount, Filter, Cover]),
-    Cfg = [{cover,   Cover},
-           {base,    basedir() ++ "/nodes"},
-           {server,  ServerDir},
-           {plugins, PluginsDir}],
+    Cfg = [{cover,          Cover},
+           {base,           basedir()},
+           {server,         filename:join(DepsDir, "rabbit")},
+           {test_framework, filename:join(DepsDir, "rabbitmq_test")},
+           {plugins,        PluginsDir}],
     rabbit_test_configs:enable_plugins(Cfg),
     [make_test_multi(M, FWith, F, ShowHeading, Timeout, Width, Cfg)
      || {M, FWith, F, ShowHeading} <- annotate_show_heading(Filtered)].
@@ -202,7 +202,7 @@ modules(RelDir) ->
                end].
 
 recursive_delete(Dir) ->
-    rabbit_test_configs:execute({"rm -rf ~s", [Dir]}).
+    rabbit_test_configs:execute({"rm -rf ~s/*/", [Dir]}).
 
 name(F, Width) ->
     R = atom_to_list(F),
@@ -210,7 +210,7 @@ name(F, Width) ->
 
 atom_length(A) -> length(atom_to_list(A)).
 
-basedir() -> "/tmp/rabbitmq-multi-node".
+basedir() -> filename:join(os:getenv("TEST_TMPDIR"), "nodes").
 
 %% reimplement error_logger:logfile(filename) only using
 %% gen_event:call/4 instead of gen_event:call/3 with our old friend
@@ -221,11 +221,3 @@ error_logger_logfile_filename() ->
 	{error,_} -> {error, no_log_file};
 	Val       -> Val
     end.
-
-add_server_test_ebin_dir() ->
-    %% Some tests need modules from this dir, but it's not on the path
-    %% by default.
-    {file, Path} = code:is_loaded(rabbit),
-    Ebin = filename:dirname(Path),
-    TestEbin = filename:join([Ebin, "..", "test"]),
-    code:add_path(TestEbin).

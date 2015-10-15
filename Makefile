@@ -30,7 +30,7 @@ endif
 WITH_BROKER_TEST_COMMANDS := rabbit_test_runner:run_in_broker(\"$(CURDIR)/test\",\"$(FILTER)\")
 
 # This requires Erlang R15B+.
-STANDALONE_TEST_COMMANDS := rabbit_test_runner:run_multi(\"$(DEPS_DIR)/rabbit\",\"$(CURDIR)/test\",\"$(FILTER)\",$(COVER),none)
+STANDALONE_TEST_COMMANDS := rabbit_test_runner:run_multi(\"$(DEPS_DIR)\",\"$(CURDIR)/test\",\"$(FILTER)\",$(COVER),none)
 RMQ_ERLC_OPTS := -Derlang_r15b_or_later
 
 RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include -I $(DEPS_DIR)/rabbit/include
