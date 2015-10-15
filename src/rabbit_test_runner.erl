@@ -171,7 +171,7 @@ setup_error_logger(M, F, Base) ->
         {error, no_log_file} -> ok;
         _                    -> ok = error_logger:logfile(close)
     end,
-    FN = rabbit_misc:format("~s/~s:~s.log", [basedir(), M, F]),
+    FN = rabbit_misc:format("~s/~s:~s.log", [os:getenv("TEST_TMPDIR"), M, F]),
     ensure_dir(Base),
     ok = error_logger:logfile({open, FN}).
 
@@ -202,7 +202,7 @@ modules(RelDir) ->
                end].
 
 recursive_delete(Dir) ->
-    rabbit_test_configs:execute({"rm -rf ~s/*/", [Dir]}).
+    rabbit_test_configs:execute({"rm -rf ~s", [Dir]}).
 
 name(F, Width) ->
     R = atom_to_list(F),
