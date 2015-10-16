@@ -64,7 +64,7 @@ export PYTHONPATH ANT_FLAGS RABBITMQCTL RABBITMQ_TEST_DIR
 
 BROKER_DIR = $(DEPS_DIR)/rabbit
 TEST_EBIN_DIR = $(CURDIR)/test
-JAVA_CLIENT_DIR = $(DEPS_DIR)/java_client
+JAVA_CLIENT_DIR = $(DEPS_DIR)/rabbitmq_java_client
 
 tests:: full
 
