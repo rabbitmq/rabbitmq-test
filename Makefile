@@ -52,16 +52,6 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
-# We need to pass the location of codegen to the Java client ant
-# process.
-CODEGEN_DIR = $(DEPS_DIR)/rabbitmq_codegen
-PYTHONPATH = $(CODEGEN_DIR)
-ANT ?= ant
-ANT_FLAGS += -Dsibling.codegen.dir=$(CODEGEN_DIR)
-RABBITMQCTL = $(DEPS_DIR)/rabbit/scripts/rabbitmqctl
-RABBITMQ_TEST_DIR = $(CURDIR)
-export PYTHONPATH ANT_FLAGS RABBITMQCTL RABBITMQ_TEST_DIR
-
 BROKER_DIR = $(DEPS_DIR)/rabbit
 TEST_EBIN_DIR = $(CURDIR)/test
 JAVA_CLIENT_DIR = $(DEPS_DIR)/rabbitmq_java_client
