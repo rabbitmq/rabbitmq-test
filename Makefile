@@ -41,6 +41,7 @@ full:
 	OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || { OK=false; $(TESTS_FAILED); } } && \
+	{ $(MAKE) -C $(BROKER_DIR) run-lazy-vq-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
 	{ ( cd $(TEST_DIR) && MAKE=$(MAKE) ant test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
@@ -49,6 +50,18 @@ unit:
 	OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) -C $(BROKER_DIR) run-tests || OK=false; } && \
+	$(MAKE) cleanup && $$OK
+
+vq-tests:
+	OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) -C $(BROKER_DIR) run-vq-tests || OK=false; } && \
+	$(MAKE) cleanup && $$OK
+
+lazy-vq-tests:
+	OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) -C $(BROKER_DIR) run-lazy-vq-tests || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 lite:
