@@ -55,6 +55,8 @@ TESTS_FAILED := echo '\n============'\
 BROKER_DIR = $(DEPS_DIR)/rabbit
 TEST_EBIN_DIR = $(CURDIR)/test
 JAVA_CLIENT_DIR = $(DEPS_DIR)/rabbitmq_java_client
+RABBITMQ_TEST_DIR = $(CURDIR)
+export RABBITMQ_TEST_DIR
 
 tests:: full
 
