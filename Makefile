@@ -55,6 +55,7 @@ TESTS_FAILED := echo '\n============'\
 TEST_EBIN_DIR = $(CURDIR)/test
 JAVA_CLIENT_DIR = $(DEPS_DIR)/rabbitmq_java_client
 RABBITMQ_TEST_DIR = $(CURDIR)
+RABBITMQ_UMBRELLA_DIR = $(CURDIR)/../..
 export RABBITMQ_TEST_DIR
 
 tests:: full
@@ -99,8 +100,14 @@ prepare-qpid-patch:
 	$(verbose) cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
 
 run-qpid-testsuite: qpid_testsuite
-	$(test_verbose) AMQP_SPEC=../rabbitmq-docs/specs/amqp0-8.xml qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
-	$(verbose) AMQP_SPEC=../rabbitmq-docs/specs/amqp0-9-1.xml qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
+	$(test_verbose) ! test -f $(RABBITMQ_UMBRELLA_DIR)/UMBRELLA.md || \
+		AMQP_SPEC_DIR=$(RABBITMQ_UMBRELLA_DIR)/rabbitmq-docs/specs \
+		AMQP_SPEC=$(RABBITMQ_UMBRELLA_DIR)/rabbitmq-docs/specs/amqp0-8.xml \
+		qpid_testsuite/qpid-python-test -m tests_0-8 -I rabbit_failing.txt
+	$(verbose) ! test -f $(RABBITMQ_UMBRELLA_DIR)/UMBRELLA.md || \
+		AMQP_SPEC_DIR=$(RABBITMQ_UMBRELLA_DIR)/rabbitmq-docs/specs \
+		AMQP_SPEC=$(RABBITMQ_UMBRELLA_DIR)/rabbitmq-docs/specs/amqp0-9-1.xml \
+		qpid_testsuite/qpid-python-test -m tests_0-9 -I rabbit_failing.txt
 
 clean:: clean-qpid-testsuite
 

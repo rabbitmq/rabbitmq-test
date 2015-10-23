@@ -1,3 +1,68 @@
+Index: qpid/codec.py
+===================================================================
+--- qpid/codec.py	(revision 906960)
++++ qpid/codec.py	(working copy)
+@@ -76,6 +76,7 @@
+     if not self.types:
+       self.typecode(ord('S'), "longstr")
+       self.typecode(ord('I'), "long")
++      self.typecode(ord('t'), "bool")
+ 
+   def typecode(self, code, type):
+     self.types[code] = type
+@@ -206,6 +207,22 @@
+     """
+     return self.unpack("!B")
+ 
++  def encode_bool(self, b):
++    """
++    encodes bool (8 bits) data 't' in network byte order
++    """
++
++    if ((b is not True) and (b is not False)):
++        raise ValueError('Valid range of bool is True or False')
++
++    self.pack("!B", int(b))
++
++  def decode_bool(self):
++    """
++    decodes a bool (8 bits) encoded in network byte order
++    """
++    return bool(self.unpack("!B"))
++
+   def encode_short(self, o):
+     """
+     encodes short (16 bits) data 'o' in network byte order
+Index: qpid/testlib.py
+===================================================================
+--- qpid/testlib.py	(revision 906960)
++++ qpid/testlib.py	(working copy)
+@@ -67,8 +67,7 @@
+ 
+         if not self.client.closed:
+             self.client.channel(0).connection_close(reply_code=200)
+-        else:
+-            self.client.close()
++        self.client.close()
+ 
+     def connect(self, host=None, port=None, user=None, password=None, tune_params=None):
+         """Create a new connction, return the Client object"""
+Index: qpid_config.py
+===================================================================
+--- qpid_config.py	(revision 906960)
++++ qpid_config.py	(working copy)
+@@ -19,7 +19,8 @@
+ 
+ import os
+ 
+-AMQP_SPEC_DIR=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "specs")
++AMQP_SPEC_DIR=os.environ['AMQP_SPEC_DIR']
+ amqp_spec = os.path.join(AMQP_SPEC_DIR, "amqp.0-10-qpid-errata.xml")
+-amqp_spec_0_8 = os.path.join(AMQP_SPEC_DIR, "amqp.0-8.xml")
+-amqp_spec_0_9 = os.path.join(AMQP_SPEC_DIR, "amqp.0-9.xml")
++amqp_spec_0_8 = os.path.join(AMQP_SPEC_DIR, "amqp0-8.xml")
++amqp_spec_0_9 = os.path.join(AMQP_SPEC_DIR, "amqp0-9.xml")
++amqp_spec = 'file://'+os.path.join(AMQP_SPEC_DIR, 'amqp.0-10.xml')
 Index: tests_0-8/basic.py
 ===================================================================
 --- tests_0-8/basic.py	(revision 906960)
@@ -75,68 +140,3 @@ Index: tests_0-8/queue.py
  
          
  
-Index: qpid/codec.py
-===================================================================
---- qpid/codec.py	(revision 906960)
-+++ qpid/codec.py	(working copy)
-@@ -76,6 +76,7 @@
-     if not self.types:
-       self.typecode(ord('S'), "longstr")
-       self.typecode(ord('I'), "long")
-+      self.typecode(ord('t'), "bool")
- 
-   def typecode(self, code, type):
-     self.types[code] = type
-@@ -206,6 +207,22 @@
-     """
-     return self.unpack("!B")
- 
-+  def encode_bool(self, b):
-+    """
-+    encodes bool (8 bits) data 't' in network byte order
-+    """
-+
-+    if ((b is not True) and (b is not False)):
-+        raise ValueError('Valid range of bool is True or False')
-+
-+    self.pack("!B", int(b))
-+
-+  def decode_bool(self):
-+    """
-+    decodes a bool (8 bits) encoded in network byte order
-+    """
-+    return bool(self.unpack("!B"))
-+
-   def encode_short(self, o):
-     """
-     encodes short (16 bits) data 'o' in network byte order
-Index: qpid/testlib.py
-===================================================================
---- qpid/testlib.py	(revision 906960)
-+++ qpid/testlib.py	(working copy)
-@@ -67,8 +67,7 @@
- 
-         if not self.client.closed:
-             self.client.channel(0).connection_close(reply_code=200)
--        else:
--            self.client.close()
-+        self.client.close()
- 
-     def connect(self, host=None, port=None, user=None, password=None, tune_params=None):
-         """Create a new connction, return the Client object"""
-Index: qpid_config.py
-===================================================================
---- qpid_config.py	(revision 906960)
-+++ qpid_config.py	(working copy)
-@@ -19,7 +19,8 @@
- 
- import os
- 
--AMQP_SPEC_DIR=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "specs")
-+AMQP_SPEC_DIR=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "../rabbitmq-docs/specs")
- amqp_spec = os.path.join(AMQP_SPEC_DIR, "amqp.0-10-qpid-errata.xml")
--amqp_spec_0_8 = os.path.join(AMQP_SPEC_DIR, "amqp.0-8.xml")
--amqp_spec_0_9 = os.path.join(AMQP_SPEC_DIR, "amqp.0-9.xml")
-+amqp_spec_0_8 = os.path.join(AMQP_SPEC_DIR, "amqp0-8.xml")
-+amqp_spec_0_9 = os.path.join(AMQP_SPEC_DIR, "amqp0-9.xml")
-+amqp_spec = 'file://'+os.path.join(AMQP_SPEC_DIR, 'amqp.0-10.xml')
