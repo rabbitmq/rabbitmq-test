@@ -52,8 +52,6 @@ TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
 		     '\n============\n'
 
-BROKER_DIR = $(DEPS_DIR)/rabbit
-TEST_EBIN_DIR = $(CURDIR)/test
 JAVA_CLIENT_DIR = $(DEPS_DIR)/rabbitmq_java_client
 RABBITMQ_TEST_DIR = $(CURDIR)
 export RABBITMQ_TEST_DIR
@@ -159,11 +157,11 @@ force-snapshot:
 	$(exec_verbose) $(MAKE) force-snapshot
 
 enable-ha:
-	$(exec_verbose) $(BROKER_DIR)/scripts/rabbitmqctl set_policy HA \
+	$(exec_verbose) $(RABBITMQCTL) set_policy HA \
 		".*" '{"ha-mode": "all"}'
 
 disable-ha:
-	$(exec_verbose) $(BROKER_DIR)/scripts/rabbitmqctl clear_policy HA
+	$(exec_verbose) $(RABBITMQCTL) clear_policy HA
 
 cleanup:
 	-$(exec_verbose) $(MAKE) \
