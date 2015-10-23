@@ -94,12 +94,13 @@ qpid_testsuite:
 update-qpid-testsuite:
 	$(verbose) svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
 	# hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
-	-$(verbose) patch -N -r - -p0 -d qpid_testsuite/ < qpid_patch
 
 prepare-qpid-patch:
 	$(verbose) cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
 
 run-qpid-testsuite: qpid_testsuite
+	$(verbose) cd qpid_testsuite && svn revert -R .
+	$(verbose) patch -N -r - -p0 -d qpid_testsuite/ < qpid_patch
 	$(test_verbose) ! test -f $(RABBITMQ_UMBRELLA_DIR)/UMBRELLA.md || \
 		AMQP_SPEC_DIR=$(RABBITMQ_UMBRELLA_DIR)/rabbitmq-docs/specs \
 		AMQP_SPEC=$(RABBITMQ_UMBRELLA_DIR)/rabbitmq-docs/specs/amqp0-8.xml \
