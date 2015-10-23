@@ -91,6 +91,7 @@ all_tests0() ->
     passed = test_configurable_server_properties(),
     passed = vm_memory_monitor_tests:all_tests(),
     passed = credit_flow_test:test_credit_flow_settings(),
+    passed = test_memory_high_watermark(),
     passed = on_disk_store_tunable_parameter_validation_test:test_msg_store_parameter_validation(),
     passed = password_hashing_tests:test_password_hashing(),
     passed = credit_flow_test:test_credit_flow_settings(),
@@ -1192,16 +1193,22 @@ test_queue_master_location_policy_validation() ->
 test_server_status() ->
     %% create a few things so there is some useful information to list
     {_Writer, Limiter, Ch} = test_channel(),
-    [Q, Q2] = [Queue || Name <- [<<"foo">>, <<"bar">>],
+    [Q, Q2] = [Queue || {Name, Owner} <- [{<<"foo">>, none}, {<<"bar">>, self()}],
                         {new, Queue = #amqqueue{}} <-
                             [rabbit_amqqueue:declare(
                                rabbit_misc:r(<<"/">>, queue, Name),
-                               false, false, [], none)]],
+                               false, false, [], Owner)]],
     ok = rabbit_amqqueue:basic_consume(
            Q, true, Ch, Limiter, false, 0, <<"ctag">>, true, [], undefined),
 
     %% list queues
     ok = info_action(list_queues, rabbit_amqqueue:info_keys(), true),
+
+    %% as we have no way to collect output of info_action/3 call, the only way
+    %% we can test individual queueinfoitems is by directly calling
+    %% rabbit_amqqueue:info/2
+    [{exclusive, false}] = rabbit_amqqueue:info(Q, [exclusive]),
+    [{exclusive, true}] = rabbit_amqqueue:info(Q2, [exclusive]),
 
     %% list exchanges
     ok = info_action(list_exchanges, rabbit_exchange:info_keys(), true),
@@ -3212,3 +3219,14 @@ test_configurable_server_properties() ->
 
 nop(_) -> ok.
 nop(_, _) -> ok.
+
+test_memory_high_watermark() ->
+    %% set vm memory high watermark
+    HWM = vm_memory_monitor:get_vm_memory_high_watermark(),
+    %% this will trigger an alarm (memory unit is MB)
+    ok = control_action(set_vm_memory_high_watermark, ["absolute", "2"]),
+    [{{resource_limit,memory,_},[]}] = rabbit_alarm:get_alarms(),
+    %% reset
+    ok = control_action(set_vm_memory_high_watermark, [float_to_list(HWM)]),
+
+    passed.
