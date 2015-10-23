@@ -56,8 +56,6 @@ JAVA_CLIENT_DIR = $(DEPS_DIR)/rabbitmq_java_client
 RABBITMQ_TEST_DIR = $(CURDIR)
 export RABBITMQ_TEST_DIR
 
-ANT_FLAGS += -DUMBRELLA_AVAILABLE=true
-
 tests:: full
 
 full: test-dist
