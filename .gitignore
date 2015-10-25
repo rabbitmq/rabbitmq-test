@@ -1,14 +1,20 @@
-*~
 .sw?
 .*.sw?
 *.beam
-erl_crash.dump
-/build/
-/certs/
+/.erlang.mk/
 /cover/
-/dist/
+/deps/
+/doc/
 /ebin/
-/multi-node/
+/logs/
+/plugins/
+
+/rabbitmq_test.d
+
+# Generated certificates.
+/certs/client/
+/certs/server/
+/certs/testca/
+
+# Downloaded sources.
 /qpid_testsuite/
-/test/ebin/
-/tmp/
