@@ -210,6 +210,6 @@ stop_all(Cfgs) ->
 
 set_location_policy([Cfg|_], Name, Strategy) ->
     ok = set_policy(Cfg, Name, <<".*">>, <<"queues">>,
-                    [{<<"x-queue-master-locator">>, Strategy}]).
+                    [{<<"queue-master-locator">>, Strategy}]).
 
 clear_location_policy([Cfg|_], Name) -> ok = clear_policy(Cfg, Name).
