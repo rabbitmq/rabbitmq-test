@@ -3230,3 +3230,13 @@ test_memory_high_watermark() ->
     ok = control_action(set_vm_memory_high_watermark, [float_to_list(HWM)]),
 
     passed.
+
+disk_monitor_test() ->
+    %% Issue: rabbitmq-server #91
+    %% os module could be mocked using 'unstick', however it may have undesired
+    %% side effects in following tests. Thus, we mock at rabbit_misc level
+    ok = meck:new(rabbit_misc, [passthrough]),
+    ok = meck:expect(rabbit_misc, os_cmd, fun(_) -> "\n" end),
+    ok = rabbit_sup:stop_child(rabbit_disk_monitor_sup),
+    ok = rabbit_sup:start_delayed_restartable_child(rabbit_disk_monitor, [1000]),
+    meck:unload(rabbit_misc).
