@@ -199,6 +199,55 @@ purge_test() ->
     amqp_connection:close(Conn),
     passed.
 
+info_head_message_timestamp_test() ->
+    QName = rabbit_misc:r(<<"/">>, queue, <<"pseudo">>),
+    Q0 = rabbit_amqqueue:pseudo_queue(QName, self()),
+    Q = Q0#amqqueue{arguments = [{<<"x-max-priority">>, long, 2}]},
+    PQ = rabbit_priority_queue,
+    BQS1 = PQ:init(Q, new, fun(_, _) -> ok end),
+    %% The queue is empty: no timestamp.
+    true = PQ:is_empty(BQS1),
+    '' = PQ:info(head_message_timestamp, BQS1),
+    %% Publish one message with timestamp 1000.
+    Msg1 = #basic_message{
+      id = msg1,
+      content = #content{
+        properties = #'P_basic'{
+          priority = 1,
+          timestamp = 1000
+        }},
+      is_persistent = false
+    },
+    BQS2 = PQ:publish(Msg1, #message_properties{size = 0}, false, self(),
+      noflow, BQS1),
+    1000 = PQ:info(head_message_timestamp, BQS2),
+    %% Publish a higher priority message with no timestamp.
+    Msg2 = #basic_message{
+      id = msg2,
+      content = #content{
+        properties = #'P_basic'{
+          priority = 2
+        }},
+      is_persistent = false
+    },
+    BQS3 = PQ:publish(Msg2, #message_properties{size = 0}, false, self(),
+      noflow, BQS2),
+    '' = PQ:info(head_message_timestamp, BQS3),
+    %% Consume message with no timestamp.
+    {{Msg2, _, _}, BQS4} = PQ:fetch(false, BQS3),
+    1000 = PQ:info(head_message_timestamp, BQS4),
+    %% Consume message with timestamp 1000, but do not acknowledge it
+    %% yet. The goal is to verify that the unacknowledged message's
+    %% timestamp is returned.
+    {{Msg1, _, AckTag}, BQS5} = PQ:fetch(true, BQS4),
+    1000 = PQ:info(head_message_timestamp, BQS5),
+    %% Ack message. The queue is empty now.
+    {[msg1], BQS6} = PQ:ack([AckTag], BQS5),
+    true = PQ:is_empty(BQS6),
+    '' = PQ:info(head_message_timestamp, BQS6),
+    PQ:delete_and_terminate(a_whim, BQS6),
+    passed.
+
 ram_duration_test() ->
     QName = rabbit_misc:r(<<"/">>, queue, <<"pseudo">>),
     Q0 = rabbit_amqqueue:pseudo_queue(QName, self()),

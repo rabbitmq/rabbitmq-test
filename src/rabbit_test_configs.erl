@@ -20,7 +20,7 @@
 -export([enable_plugins/1]).
 -export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
 -export([start_connections/1, build_cluster/1]).
--export([ha_policy_all/1, ha_policy_two_pos/1]).
+-export([ha_policy_all/1, ha_policy_two_pos/1, ha_policy_two_pos_batch_sync/1]).
 -export([start_nodes/2, start_nodes/3, add_to_cluster/2,
          rabbitmqctl/2, rabbitmqctl_fail/2]).
 -export([stop_nodes/1, start_node/1, stop_node/1, kill_node/1, restart_node/1,
@@ -30,8 +30,9 @@
 -import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2, pget/3]).
 
--define(INITIAL_KEYS, [cover, base, server, plugins]).
--define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, port, mnesia_dir]).
+-define(INITIAL_KEYS, [cover, base, server, test_framework, plugins]).
+-define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, initial_nodename,
+                                            port, mnesia_dir]).
 
 cluster_ab(InitialCfg)  -> cluster(InitialCfg, [a, b]).
 cluster_abc(InitialCfg) -> cluster(InitialCfg, [a, b, c]).
@@ -54,7 +55,8 @@ start_nodes(InitialCfg0, NodeNames, FirstPort) ->
                       _          -> InitialCfg0
                   end,
     Nodes = [[{nodename, N}, {port, P},
-              {mnesia_dir, rabbit_misc:format("rabbitmq-~s-mnesia", [N])} |
+              {initial_nodename, N},
+              {mnesia_dir, "mnesia"} |
               strip_non_initial(Cfg)]
              || {N, P, Cfg} <- lists:zip3(NodeNames, Ports, InitialCfgs)],
     [start_node(Node) || Node <- Nodes].
@@ -146,6 +148,17 @@ ha_policy_two_pos([Cfg | _] = Cfgs) ->
                    {<<"ha-promote-on-shutdown">>, <<"always">>}]),
     Cfgs.
 
+ha_policy_two_pos_batch_sync([Cfg | _] = Cfgs) ->
+    Members = [a2b(pget(node, C)) || C <- Cfgs],
+    TwoNodes = [M || M <- lists:sublist(Members, 2)],
+    set_ha_policy(Cfg, <<"^ha.two.">>, {<<"nodes">>, TwoNodes},
+                  [{<<"ha-promote-on-shutdown">>, <<"always">>}]),
+    set_ha_policy(Cfg, <<"^ha.auto.">>, {<<"nodes">>, TwoNodes},
+                  [{<<"ha-sync-mode">>,           <<"automatic">>},
+                   {<<"ha-sync-batch-size">>,     200},
+                   {<<"ha-promote-on-shutdown">>, <<"always">>}]),
+    Cfgs.
+
 start_connections(Nodes) -> [start_connection(Node) || Node <- Nodes].
 
 start_connection(Cfg) ->
@@ -204,7 +217,7 @@ execute(Cfg, Cmd) ->
 execute(Env0, Cmd0, AcceptableExitCodes) ->
     Env = [{"RABBITMQ_" ++ K, fmt(V)} || {K, V} <- Env0],
     Cmd = fmt(Cmd0),
-    error_logger:info_msg("Invoking '~s'~n", [Cmd]),
+    error_logger:info_msg("Invoking '~s' with env:~n~p~n", [Cmd, Env]),
     Port = erlang:open_port(
              {spawn, "/usr/bin/env sh -c \"" ++ Cmd ++ "\""},
              [{env, Env}, exit_status,
@@ -220,10 +233,12 @@ environment(Cfg) ->
         _         ->
             Port = pget(port, Cfg),
             Base = pget(base, Cfg),
-            Server = pget(server, Cfg),
-            [{"MNESIA_DIR",         {"~s/~s", [Base, pget(mnesia_dir, Cfg)]}},
-             {"PLUGINS_EXPAND_DIR", {"~s/~s-plugins-expand", [Base, Nodename]}},
-             {"LOG_BASE",           {"~s", [Base]}},
+            InitialNodename = pget(initial_nodename, Cfg),
+            TestFramework = pget(test_framework, Cfg),
+            [{"MNESIA_DIR",         {"~s/~s/~s", [Base, InitialNodename,
+                                                  pget(mnesia_dir, Cfg)]}},
+             {"PLUGINS_EXPAND_DIR", {"~s/~s/plugins", [Base, Nodename]}},
+             {"LOG_BASE",           {"~s/~s/log", [Base, Nodename]}},
              {"NODENAME",           {"~s", [Nodename]}},
              {"NODE_PORT",          {"~B", [Port]}},
              {"PID_FILE",           pid_file(Cfg)},
@@ -237,8 +252,8 @@ environment(Cfg) ->
               {"+K true +A30 +P 1048576 "
                "-kernel inet_default_connect_options [{nodelay,true}] "
                %% Some tests need to be able to make distribution unhappy
-               "-pa ~s/../rabbitmq-test/ebin "
-               "-proto_dist inet_proxy", [Server]}}
+               "-pa ~s/ebin "
+               "-proto_dist inet_proxy", [TestFramework]}}
              | plugins_env(Plugins)]
     end.
 
@@ -250,7 +265,8 @@ plugins_env(Dir) ->
      {"ENABLED_PLUGINS_FILE", {"~s/enabled_plugins", [Dir]}}].
 
 pid_file(Cfg) ->
-    rabbit_misc:format("~s/~s.pid", [pget(base, Cfg), pget(nodename, Cfg)]).
+    Nodename = pget(nodename, Cfg),
+    rabbit_misc:format("~s/~s/~s.pid", [pget(base, Cfg), Nodename, Nodename]).
 
 port_receive_loop(Port, Stdout, AcceptableExitCodes) ->
     receive
@@ -276,4 +292,3 @@ execute_bg(Cfg, Cmd) ->
 
 fmt({Fmt, Args}) -> rabbit_misc:format(Fmt, Args);
 fmt(Str)         -> Str.
-
