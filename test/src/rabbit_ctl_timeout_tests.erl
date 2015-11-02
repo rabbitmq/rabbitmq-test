@@ -19,9 +19,10 @@
 
 -export([all_tests/0]).
 
--import(rabbit_tests,[control_action/2, control_action/3, control_action/4,
-                      control_action/5, control_action_opts/1, test_channel/0,
-                      find_listener/0, info_action/4]).
+-import(rabbit_tests,[control_action/2, control_action/3,
+                      control_action_t/3, control_action_t/4,
+                      control_action_t/5, control_action_opts/1, test_channel/0,
+                      find_listener/0, info_action_t/4]).
 
 -include("rabbit.hrl").
 
@@ -46,12 +47,12 @@ test_list_operations_timeout_pass() ->
     ok = control_action(add_user, ["foo", "bar"]),
     {error, {user_already_exists, _}} =
         control_action(add_user, ["foo", "bar"]),
-    ok = control_action(list_users, [], ?TIMEOUT_LIST_OPS_PASS),
-    
+    ok = control_action_t(list_users, [], ?TIMEOUT_LIST_OPS_PASS),
+
     %% list parameters
     ok = rabbit_runtime_parameters_test:register(),
     ok = control_action(set_parameter, ["test", "good", "123"]),
-    ok = control_action(list_parameters, [], ?TIMEOUT_LIST_OPS_PASS),
+    ok = control_action_t(list_parameters, [], ?TIMEOUT_LIST_OPS_PASS),
     ok = control_action(clear_parameter, ["test", "good"]),
     rabbit_runtime_parameters_test:unregister(),
 
@@ -59,53 +60,53 @@ test_list_operations_timeout_pass() ->
     ok = control_action(add_vhost, ["/testhost"]),
     {error, {vhost_already_exists, _}} =
         control_action(add_vhost, ["/testhost"]),
-    ok = control_action(list_vhosts, [], ?TIMEOUT_LIST_OPS_PASS),
+    ok = control_action_t(list_vhosts, [], ?TIMEOUT_LIST_OPS_PASS),
 
     %% list permissions
     ok = control_action(set_permissions, ["foo", ".*", ".*", ".*"],
                         [{"-p", "/testhost"}]),
-    ok = control_action(list_permissions, [], [{"-p", "/testhost"}],
-                        ?TIMEOUT_LIST_OPS_PASS),
+    ok = control_action_t(list_permissions, [], [{"-p", "/testhost"}],
+                          ?TIMEOUT_LIST_OPS_PASS),
 
     %% list user permissions
-    ok = control_action(list_user_permissions, ["foo"],
-                        ?TIMEOUT_LIST_OPS_PASS),
+    ok = control_action_t(list_user_permissions, ["foo"],
+                          ?TIMEOUT_LIST_OPS_PASS),
 
     %% list policies
     ok = control_action_opts(["set_policy", "name", ".*",
                               "{\"ha-mode\":\"all\"}"]),
-    ok = control_action(list_policies, [], ?TIMEOUT_LIST_OPS_PASS),
+    ok = control_action_t(list_policies, [], ?TIMEOUT_LIST_OPS_PASS),
     ok = control_action(clear_policy, ["name"]),
 
     %% list queues
-    ok = info_action(list_queues, rabbit_amqqueue:info_keys(), false,
-                     ?TIMEOUT_LIST_OPS_PASS),
+    ok = info_action_t(list_queues, rabbit_amqqueue:info_keys(), false,
+                       ?TIMEOUT_LIST_OPS_PASS),
 
     %% list exchanges
-    ok = info_action(list_exchanges, rabbit_exchange:info_keys(), true,
-                     ?TIMEOUT_LIST_OPS_PASS),
+    ok = info_action_t(list_exchanges, rabbit_exchange:info_keys(), true,
+                       ?TIMEOUT_LIST_OPS_PASS),
 
     %% list bindings
-    ok = info_action(list_bindings, rabbit_binding:info_keys(), true,
-                     ?TIMEOUT_LIST_OPS_PASS),
+    ok = info_action_t(list_bindings, rabbit_binding:info_keys(), true,
+                       ?TIMEOUT_LIST_OPS_PASS),
 
     %% list connections
     {H, P} = find_listener(),
     {ok, C} = gen_tcp:connect(H, P, [binary, {active, false}]),
     gen_tcp:send(C, <<"AMQP", 0, 0, 9, 1>>),
     {ok, <<1,0,0>>} = gen_tcp:recv(C, 3, 100),
-    ok = info_action(list_connections,
-                     rabbit_networking:connection_info_keys(),
-		     false,
-                     ?TIMEOUT_LIST_OPS_PASS),
+    ok = info_action_t(list_connections,
+                       rabbit_networking:connection_info_keys(),
+                       false,
+                       ?TIMEOUT_LIST_OPS_PASS),
 
     %% list consumers
-    ok = info_action(list_consumers, rabbit_amqqueue:consumer_info_keys(),
-                     false, ?TIMEOUT_LIST_OPS_PASS),
+    ok = info_action_t(list_consumers, rabbit_amqqueue:consumer_info_keys(),
+                       false, ?TIMEOUT_LIST_OPS_PASS),
 
     %% list channels
-    ok = info_action(list_channels, rabbit_channel:info_keys(), false,
-                     ?TIMEOUT_LIST_OPS_PASS),
+    ok = info_action_t(list_channels, rabbit_channel:info_keys(), false,
+                       ?TIMEOUT_LIST_OPS_PASS),
 
     %% do some cleaning up
     ok = control_action(delete_user, ["foo"]),

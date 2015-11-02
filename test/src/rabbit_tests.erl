@@ -1820,10 +1820,10 @@ control_action(Command, Node, Args, Opts) ->
     end.
 
 control_action_t(Command, Args, Timeout) when is_number(Timeout) ->
-    control_action(Command, node(), Args, default_options(), Timeout).
+    control_action_t(Command, node(), Args, default_options(), Timeout).
 
 control_action_t(Command, Args, NewOpts, Timeout) when is_number(Timeout) ->
-    control_action(Command, node(), Args,
+    control_action_t(Command, node(), Args,
                    expand_options(default_options(), NewOpts),
                    Timeout).
 
@@ -1863,10 +1863,10 @@ info_action(Command, Args, CheckVHost) ->
     ok.
 
 info_action_t(Command, Args, CheckVHost, Timeout) when is_number(Timeout) ->
-    if CheckVHost -> ok = control_action(Command, [], ["-p", "/"], Timeout);
+    if CheckVHost -> ok = control_action_t(Command, [], ["-p", "/"], Timeout);
        true       -> ok
     end,
-    ok = control_action(Command, lists:map(fun atom_to_list/1, Args), Timeout),
+    ok = control_action_t(Command, lists:map(fun atom_to_list/1, Args), Timeout),
     ok.
 
 default_options() -> [{"-p", "/"}, {"-q", "false"}].
