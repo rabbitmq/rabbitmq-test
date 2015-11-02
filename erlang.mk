@@ -4026,6 +4026,8 @@ ifdef OTP_DEPS
 $(warning The variable OTP_DEPS is deprecated in favor of LOCAL_DEPS.)
 endif
 
+DEPS += meck
+
 IGNORE_DEPS ?=
 export IGNORE_DEPS
 
@@ -4253,7 +4255,7 @@ define dep_autopatch_rebar.erl
 	Escape = fun (Text) ->
 		re:replace(Text, "\\\\$$$$", "\$$$$$$$$", [global, {return, list}])
 	end,
-	Write("IGNORE_DEPS += edown eper eunit_formatters meck node_package "
+	Write("IGNORE_DEPS += edown eper eunit_formatters node_package "
 		"rebar_lock_deps_plugin rebar_vsn_plugin reltool_util\n"),
 	Write("C_SRC_DIR = /path/do/not/exist\n"),
 	Write("C_SRC_TYPE = rebar\n"),
