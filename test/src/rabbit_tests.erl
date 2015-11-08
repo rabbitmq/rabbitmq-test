@@ -1824,8 +1824,8 @@ control_action_t(Command, Args, Timeout) when is_number(Timeout) ->
 
 control_action_t(Command, Args, NewOpts, Timeout) when is_number(Timeout) ->
     control_action_t(Command, node(), Args,
-                   expand_options(default_options(), NewOpts),
-                   Timeout).
+                     expand_options(default_options(), NewOpts),
+                     Timeout).
 
 control_action_t(Command, Node, Args, Opts, Timeout) when is_number(Timeout) ->
     case catch rabbit_control_main:action(
