@@ -34,14 +34,19 @@ all_tests() ->
 
 test_list_operations_timeout_pass() ->
     %% create a few things so there is some useful information to list
-    {_Writer, Limiter, Ch} = test_channel(),
+    {_Writer1, Limiter1, Ch1} = test_channel(),
+    {_Writer2, Limiter2, Ch2} = test_channel(),
+
     [Q, Q2] = [Queue || Name <- [<<"foo">>, <<"bar">>],
                         {new, Queue = #amqqueue{}} <-
                             [rabbit_amqqueue:declare(
                                rabbit_misc:r(<<"/">>, queue, Name),
                                false, false, [], none)]],
+
     ok = rabbit_amqqueue:basic_consume(
-           Q, true, Ch, Limiter, false, 0, <<"ctag">>, true, [], undefined),
+           Q, true, Ch1, Limiter1, false, 0, <<"ctag1">>, true, [], undefined),
+    ok = rabbit_amqqueue:basic_consume(
+           Q2, true, Ch2, Limiter2, false, 0, <<"ctag2">>, true, [], undefined),
 
     %% list users
     ok = control_action(add_user, ["foo", "bar"]),
@@ -92,9 +97,14 @@ test_list_operations_timeout_pass() ->
 
     %% list connections
     {H, P} = find_listener(),
-    {ok, C} = gen_tcp:connect(H, P, [binary, {active, false}]),
-    gen_tcp:send(C, <<"AMQP", 0, 0, 9, 1>>),
-    {ok, <<1,0,0>>} = gen_tcp:recv(C, 3, 100),
+    {ok, C1} = gen_tcp:connect(H, P, [binary, {active, false}]),
+    gen_tcp:send(C1, <<"AMQP", 0, 0, 9, 1>>),
+    {ok, <<1,0,0>>} = gen_tcp:recv(C1, 3, 100),
+
+    {ok, C2} = gen_tcp:connect(H, P, [binary, {active, false}]),
+    gen_tcp:send(C2, <<"AMQP", 0, 0, 9, 1>>),
+    {ok, <<1,0,0>>} = gen_tcp:recv(C2, 3, 100),
+
     ok = info_action_t(list_connections,
                        rabbit_networking:connection_info_keys(),
                        false,
@@ -118,14 +128,16 @@ test_list_operations_timeout_pass() ->
         control_action(delete_vhost, ["/testhost"]),
 
     %% close_connection
-    [ConnPid] = rabbit_networking:connections(),
-    ok = control_action(close_connection, [rabbit_misc:pid_to_string(ConnPid),
-                                           "go away"]),
+    Conns = rabbit_networking:connections(),
+    [ok = control_action(close_connection, [rabbit_misc:pid_to_string(ConnPid),
+                                           "go away"]) || ConnPid <- Conns],
 
     %% cleanup queues
     [{ok, _} = rabbit_amqqueue:delete(QR, false, false) || QR <- [Q, Q2]],
 
-    unlink(Ch),
-    ok = rabbit_channel:shutdown(Ch),
+    [begin
+         unlink(Chan),
+         ok = rabbit_channel:shutdown(Chan)
+     end || Chan <- [Ch1, Ch2]],
 
     passed.
