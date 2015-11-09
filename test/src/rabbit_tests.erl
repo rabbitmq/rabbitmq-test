@@ -76,6 +76,7 @@ all_tests0() ->
     passed = test_ha_policy_validation(),
     passed = test_queue_master_location_policy_validation(),
     passed = test_server_status(),
+    passed = rabbit_ctl_timeout_tests:all_tests(),
     passed = test_amqp_connection_refusal(),
     passed = test_confirms(),
     passed = test_with_state(),
@@ -1838,6 +1839,28 @@ control_action(Command, Node, Args, Opts) ->
             Other
     end.
 
+control_action_t(Command, Args, Timeout) when is_number(Timeout) ->
+    control_action_t(Command, node(), Args, default_options(), Timeout).
+
+control_action_t(Command, Args, NewOpts, Timeout) when is_number(Timeout) ->
+    control_action_t(Command, node(), Args,
+                     expand_options(default_options(), NewOpts),
+                     Timeout).
+
+control_action_t(Command, Node, Args, Opts, Timeout) when is_number(Timeout) ->
+    case catch rabbit_control_main:action(
+                 Command, Node, Args, Opts,
+                 fun (Format, Args1) ->
+                         io:format(Format ++ " ...~n", Args1)
+                 end, Timeout) of
+        ok ->
+            io:format("done.~n"),
+            ok;
+        Other ->
+            io:format("failed.~n"),
+            Other
+    end.
+
 control_action_opts(Raw) ->
     NodeStr = atom_to_list(node()),
     case rabbit_control_main:parse_arguments(Raw, NodeStr) of
@@ -1857,6 +1880,13 @@ info_action(Command, Args, CheckVHost) ->
     end,
     ok = control_action(Command, lists:map(fun atom_to_list/1, Args)),
     {bad_argument, dummy} = control_action(Command, ["dummy"]),
+    ok.
+
+info_action_t(Command, Args, CheckVHost, Timeout) when is_number(Timeout) ->
+    if CheckVHost -> ok = control_action_t(Command, [], ["-p", "/"], Timeout);
+       true       -> ok
+    end,
+    ok = control_action_t(Command, lists:map(fun atom_to_list/1, Args), Timeout),
     ok.
 
 default_options() -> [{"-p", "/"}, {"-q", "false"}].
