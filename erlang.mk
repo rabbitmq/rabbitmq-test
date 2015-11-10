@@ -16,7 +16,7 @@
 
 ERLANG_MK_FILENAME := $(realpath $(lastword $(MAKEFILE_LIST)))
 
-ERLANG_MK_VERSION = 1.2.0-845-g2c9e05d-dirty
+ERLANG_MK_VERSION = 1.2.0-845-gd330ec4-dirty
 
 # Core configuration.
 
@@ -4026,8 +4026,6 @@ ifdef OTP_DEPS
 $(warning The variable OTP_DEPS is deprecated in favor of LOCAL_DEPS.)
 endif
 
-DEPS += meck
-
 IGNORE_DEPS ?=
 export IGNORE_DEPS
 
@@ -4255,7 +4253,7 @@ define dep_autopatch_rebar.erl
 	Escape = fun (Text) ->
 		re:replace(Text, "\\\\$$$$", "\$$$$$$$$", [global, {return, list}])
 	end,
-	Write("IGNORE_DEPS += edown eper eunit_formatters node_package "
+	Write("IGNORE_DEPS += edown eper eunit_formatters meck node_package "
 		"rebar_lock_deps_plugin rebar_vsn_plugin reltool_util\n"),
 	Write("C_SRC_DIR = /path/do/not/exist\n"),
 	Write("C_SRC_TYPE = rebar\n"),
@@ -4937,6 +4935,7 @@ endif
 ifneq ($(words $(ERL_FILES) $(CORE_FILES) $(ASN1_FILES) $(MIB_FILES) $(XRL_FILES) $(YRL_FILES)),0)
 # Rebuild everything when the Makefile changes.
 $(ERLANG_MK_TMP)/last-makefile-change: $(MAKEFILE_LIST)
+	@mkdir -p $(ERLANG_MK_TMP)
 	@if test -f $@; then \
 		touch $(ERL_FILES) $(CORE_FILES) $(ASN1_FILES) $(MIB_FILES) $(XRL_FILES) $(YRL_FILES); \
 		touch -c $(PROJECT).d; \
@@ -6095,6 +6094,7 @@ endif
 ifneq ($(words $(DTL_FILES)),0)
 # Rebuild everything when the Makefile changes.
 $(ERLANG_MK_TMP)/last-makefile-change-erlydtl: $(MAKEFILE_LIST)
+	@mkdir -p $(ERLANG_MK_TMP)
 	@if test -f $@; then \
 		touch $(DTL_FILES); \
 	fi
