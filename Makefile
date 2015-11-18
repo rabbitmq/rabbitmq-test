@@ -64,6 +64,7 @@ full: test-dist
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	{ $(MAKE) run-tests || { OK=false; $(TESTS_FAILED); } } && \
+	{ $(MAKE) run-lazy-vq-tests || { OK=false; $(TESTS_FAILED); } } && \
 	{ $(MAKE) run-qpid-testsuite || { OK=false; $(TESTS_FAILED); } } && \
 	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	$(MAKE) cleanup && { $$OK || $(TESTS_FAILED); } && $$OK
@@ -86,6 +87,12 @@ conformance16:
 	$(MAKE) prepare && \
 	{ $(MAKE) run-tests || OK=false; } && \
 	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
+	$(MAKE) cleanup && $$OK
+
+lazy-vq-tests: test-dist
+	$(test_verbose) OK=true && \
+	$(MAKE) prepare && \
+	{ $(MAKE) run-lazy-vq-tests || OK=false; } && \
 	$(MAKE) cleanup && $$OK
 
 qpid_testsuite:
