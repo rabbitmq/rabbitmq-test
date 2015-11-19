@@ -1,7 +1,7 @@
 PROJECT = rabbitmq_test
 
 DEPS = amqp_client
-TEST_DEPS = rabbit rabbitmq_codegen rabbitmq_java_client
+TEST_DEPS = rabbit rabbitmq_codegen rabbitmq_java_client meck
 
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-tests.mk
 
