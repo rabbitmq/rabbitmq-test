@@ -3,7 +3,8 @@ PROJECT = rabbitmq_test
 DEPS = amqp_client
 TEST_DEPS = rabbit rabbitmq_codegen rabbitmq_java_client meck
 
-DEP_PLUGINS = rabbit_common/mk/rabbitmq-tests.mk
+DEP_PLUGINS = rabbit_common/mk/rabbitmq-run.mk \
+	      rabbit_common/mk/rabbitmq-tests.mk
 
 # FIXME: Use erlang.mk patched for RabbitMQ, while waiting for PRs to be
 # reviewed and merged.
@@ -36,7 +37,7 @@ pre-standalone-tests:: test-tmpdir
 
 RMQ_ERLC_OPTS := -Derlang_r15b_or_later
 
-RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include -I $(DEPS_DIR)/rabbit/include
+RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include -I $(RABBITMQ_BROKER_DIR)/include
 
 ERLC_OPTS += $(RMQ_ERLC_OPTS)
 TEST_ERLC_OPTS += $(RMQ_ERLC_OPTS)
