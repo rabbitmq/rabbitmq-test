@@ -1847,7 +1847,7 @@ control_action(Command, Node, Args, Opts) ->
             io:format("done.~n"),
             ok;
         {ok, Result} ->
-            rabbit_ctl_misc:print_cmd_result(Command, Result),
+            rabbit_control_misc:print_cmd_result(Command, Result),
             ok;
         Other ->
             io:format("failed.~n"),
