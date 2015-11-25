@@ -86,7 +86,7 @@ lite: test-dist
 	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
 	$$OK
 
-conformance16:
+conformance16: test-dist
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
