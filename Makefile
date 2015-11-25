@@ -155,7 +155,7 @@ prepare: test-dist create_ssl_certs
 		|| ($(MAKE) cleanup; false)
 	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare stop-rabbit-on-node \
 		|| ($(MAKE) cleanup; false)
-	$(verbose) set -x; $(RABBITMQCTL) -n hare join_cluster \
+	$(verbose) $(RABBITMQCTL) -n hare join_cluster \
 		$$(. $(RABBITMQ_SCRIPTS_DIR)/rabbitmq-env && echo $$RABBITMQ_NODENAME) \
 		|| ($(MAKE) cleanup; false)
 	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node \
