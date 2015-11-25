@@ -1,7 +1,14 @@
 PROJECT = rabbitmq_test
 
 DEPS = amqp_client
-TEST_DEPS = rabbit rabbitmq_codegen rabbitmq_java_client meck
+TEST_DEPS = rabbitmq_codegen rabbitmq_java_client meck
+
+ifneq ($(IS_DEP),1)
+# Include rabbit as a dependency when the testsuite is started from this
+# project. However, do not include it when the testsuite is started from
+# rabbit itself.
+TEST_DEPS += rabbit
+endif
 
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-run.mk \
 	      rabbit_common/mk/rabbitmq-tests.mk
