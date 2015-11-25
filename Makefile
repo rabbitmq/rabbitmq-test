@@ -137,21 +137,29 @@ clean:: clean-qpid-testsuite
 clean-qpid-testsuite:
 	$(gen_verbose) rm -rf qpid_testsuite
 
-prepare: create_ssl_certs
+prepare: test-dist create_ssl_certs
 	$(verbose) $(MAKE) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		stop-node clean-node-db start-background-node
+		stop-node clean-node-db start-background-node start-rabbit-on-node \
+		|| ($(MAKE) cleanup; false)
 	$(verbose) $(MAKE) \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_RABBIT_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(RABBIT_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
-		stop-node clean-node-db start-background-node ${COVER_START} start-rabbit-on-node
-	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node
+		stop-node clean-node-db start-background-node ${COVER_START} start-rabbit-on-node \
+		|| ($(MAKE) cleanup; false)
+	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare stop-rabbit-on-node \
+		|| ($(MAKE) cleanup; false)
+	$(verbose) set -x; $(RABBITMQCTL) -n hare join_cluster \
+		$$(. $(RABBITMQ_SCRIPTS_DIR)/rabbitmq-env && echo $$RABBITMQ_NODENAME) \
+		|| ($(MAKE) cleanup; false)
+	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node \
+		|| ($(MAKE) cleanup; false)
 
 start-app:
 	$(exec_verbose) $(MAKE) \

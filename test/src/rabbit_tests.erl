@@ -41,7 +41,6 @@ all_tests() ->
     end.
 
 all_tests0() ->
-    ok = setup_cluster(),
     ok = truncate:test(),
     ok = supervisor2_tests:test_all(),
     passed = gm_tests:all_tests(),
@@ -119,17 +118,6 @@ do_if_meck_enabled(Enabled, Disabled) ->
         non_existing -> Disabled();
         _ -> Enabled()
     end.
-
-setup_cluster() ->
-    do_if_secondary_node(
-      fun (SecondaryNode) ->
-              ok = control_action(stop_app, []),
-              ok = control_action(join_cluster,
-                                  [atom_to_list(SecondaryNode)]),
-              ok = control_action(start_app, []),
-              ok = control_action(start_app, SecondaryNode, [], [])
-      end,
-      fun (_) -> ok end).
 
 maybe_run_cluster_dependent_tests() ->
     do_if_secondary_node(
