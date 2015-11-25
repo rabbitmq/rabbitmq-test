@@ -70,7 +70,7 @@ export RABBITMQ_TEST_DIR
 
 tests:: full
 
-full: test-dist
+full:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
@@ -80,22 +80,14 @@ full: test-dist
 	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || { OK=false; $(TESTS_FAILED); } } && \
 	{ $$OK || $(TESTS_FAILED); } && $$OK
 
-unit: test-dist
+unit:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
 	{ $(MAKE) run-tests || OK=false; } && \
 	$$OK
 
-lite: test-dist
-	$(test_verbose) OK=true && \
-	$(MAKE) prepare && \
-	trap '$(MAKE) cleanup' EXIT INT && \
-	{ $(MAKE) run-tests || OK=false; } && \
-	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
-	$$OK
-
-conformance16: test-dist
+lite:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
@@ -103,7 +95,15 @@ conformance16: test-dist
 	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
 	$$OK
 
-lazy-vq-tests: test-dist
+conformance16:
+	$(test_verbose) OK=true && \
+	$(MAKE) prepare && \
+	trap '$(MAKE) cleanup' EXIT INT && \
+	{ $(MAKE) run-tests || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
+	$$OK
+
+lazy-vq-tests:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
