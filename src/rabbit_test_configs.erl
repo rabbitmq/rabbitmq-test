@@ -78,17 +78,17 @@ enable_plugins(Cfg) ->
 
 enable_plugins(none, _Server, _Cfg) -> ok;
 enable_plugins(_Dir, Server, Cfg) ->
-    R = execute(Cfg, Server ++ "/scripts/rabbitmq-plugins list -m"),
+    RabbitmqPluginsCmd = rabbitmq_plugins_cmd(Server),
+    R = execute(Cfg, RabbitmqPluginsCmd ++ " list -m"),
     Plugins = string:join(string:tokens(R, "\n"), " "),
-    execute(Cfg, {Server ++ "/scripts/rabbitmq-plugins set --offline ~s",
-                  [Plugins]}),
+    execute(Cfg, {RabbitmqPluginsCmd ++ " set --offline ~s", [Plugins]}),
     ok.
 
 start_node(Cfg0) ->
     Node = rabbit_nodes:make(pget(nodename, Cfg0)),
     Cfg = [{node, Node} | Cfg0],
     Server = pget(server, Cfg),
-    Linked = execute_bg(Cfg, Server ++ "/scripts/rabbitmq-server"),
+    Linked = execute_bg(Cfg, rabbitmq_server_cmd(Server)),
     rabbitmqctl(Cfg, {"wait ~s", [pid_file(Cfg)]}),
     OSPid = rpc:call(Node, os, getpid, []),
     %% The cover system thinks all nodes with the same name are the
@@ -106,7 +106,7 @@ start_node_fail(Cfg0) ->
     Node = rabbit_nodes:make(pget(nodename, Cfg0)),
     Cfg = [{node, Node}, {acceptable_exit_codes, lists:seq(1, 255)} | Cfg0],
     Server = pget(server, Cfg),
-    execute(Cfg, Server ++ "/scripts/rabbitmq-server"),
+    execute(Cfg, rabbitmq_server_cmd(Server)),
     ok.
 
 build_cluster([First | Rest]) ->
@@ -129,7 +129,7 @@ rabbitmqctl(Cfg, Str) ->
               undefined -> {"~s", [fmt(Str)]};
               _         -> {"-n ~s ~s", [Node, fmt(Str)]}
           end,
-    execute(Cfg, {Server ++ "/scripts/rabbitmqctl ~s", [fmt(Cmd)]}).
+    execute(Cfg, {rabbitmqctl_cmd(Server) ++ " ~s", [fmt(Cmd)]}).
 
 rabbitmqctl_fail(Cfg, Str) ->
     rabbitmqctl([{acceptable_exit_codes, lists:seq(1, 255)} | Cfg], Str).
@@ -206,6 +206,24 @@ cover_work_factor(Without, Cfg) ->
     end.
 
 %%----------------------------------------------------------------------------
+
+rabbitmqctl_cmd(Server) ->
+    case os:getenv("RABBITMQCTL") of
+        false -> Server ++ "/scripts/rabbitmqctl";
+        Path  -> Path
+    end.
+
+rabbitmq_plugins_cmd(Server) ->
+    case os:getenv("RABBITMQ_PLUGINS") of
+        false -> Server ++ "/scripts/rabbitmq-plugins";
+        Path  -> Path
+    end.
+
+rabbitmq_server_cmd(Server) ->
+    case os:getenv("RABBITMQ_SERVER") of
+        false -> Server ++ "/scripts/rabbitmq-server";
+        Path  -> Path
+    end.
 
 execute(Cmd) ->
     execute([], Cmd, [0]).
