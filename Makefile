@@ -10,7 +10,8 @@ TEST_DEPS += rabbit
 endif
 
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-run.mk \
-	      rabbit_common/mk/rabbitmq-tests.mk
+	      rabbit_common/mk/rabbitmq-tests.mk \
+	      rabbit_common/mk/rabbitmq-tools.mk
 
 # FIXME: Use erlang.mk patched for RabbitMQ, while waiting for PRs to be
 # reviewed and merged.
@@ -90,8 +91,8 @@ lite:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
-	{ $(MAKE) run-tests || OK=false; } && \
-	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
+	{ : $(MAKE) run-tests || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-functional-and-server-with-ha ) || OK=false; } && \
 	$$OK
 
 conformance16:
