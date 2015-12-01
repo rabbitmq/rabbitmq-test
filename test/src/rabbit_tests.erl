@@ -21,8 +21,7 @@
 
 -import(rabbit_misc, [pget/2]).
 
--include("rabbit.hrl").
--include("rabbit_framing.hrl").
+-include_lib("amqp_client/include/amqp_client.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(PERSISTENT_MSG_STORE, msg_store_persistent).
@@ -3351,4 +3350,58 @@ disk_monitor_test() ->
     ok = rabbit_sup:stop_child(rabbit_disk_monitor_sup),
     ok = rabbit_sup:start_delayed_restartable_child(rabbit_disk_monitor, [1000]),
     meck:unload(rabbit_misc),
+    passed.
+
+%%% While this test uses only a single node, it's started using
+%%% multi-node test framework. The reason for this is that resource
+%%% alarm is being set as a part of the test, and dropping node is
+%%% easier than recovering standalone-tests node to healthy state.
+%%% Initialization is done as separate fun's so they later can be
+%%% moved to rabbit_test_configs if such need arises.
+disconnect_detected_during_alarm_with() ->
+    [fun(Cfg) -> rabbit_test_configs:start_nodes(Cfg, [a]) end
+    ,fun([ACfg]) ->
+             rabbit_test_configs:rabbitmqctl(ACfg, "set_vm_memory_high_watermark 0.000000001"),
+             [ACfg]
+     end
+    ,fun([ACfg]) ->
+             Port = pget(port, ACfg),
+             Heartbeat = 1,
+             {ok, Conn} = amqp_connection:start(#amqp_params_network{port = Port,
+                                                                     heartbeat = Heartbeat}),
+             {ok, Channel} = amqp_connection:open_channel(Conn),
+             [[{heartbeat, Heartbeat}, {connection, Conn}, {channel, Channel} | ACfg]]
+     end
+    ].
+
+disconnect_detected_during_alarm([ACfg]) ->
+    Conn = pget(connection, ACfg),
+    amqp_connection:register_blocked_handler(Conn, self()),
+    Ch = pget(channel, ACfg),
+    Publish = #'basic.publish'{routing_key = <<"nowhere-to-go">>},
+    amqp_channel:cast(Ch, Publish, #amqp_msg{payload = <<"foobar">>}),
+
+    % Check that connection was indeed blocked
+    receive
+        #'connection.blocked'{} -> ok
+    after
+        1000 -> exit(connection_was_not_blocked)
+    end,
+
+    %% Connection is blocked, now we should forcefully kill it
+    {'EXIT', _} = (catch amqp_connection:close(Conn, 10)),
+
+    ListConnections =
+        fun() ->
+                rpc:call(pget(node, ACfg), rabbit_networking, connection_info_all, [])
+        end,
+
+    %% We've already disconnected, but blocked connection still should still linger on.
+    [SingleConn] = ListConnections(),
+    blocked = pget(state, SingleConn),
+
+    %% It should definitely go away after 2 heartbeat intervals.
+    timer:sleep(round(2.5 * 1000 * pget(heartbeat, ACfg))),
+    [] = ListConnections(),
+
     passed.
