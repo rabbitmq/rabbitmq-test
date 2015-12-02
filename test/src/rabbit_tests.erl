@@ -3380,9 +3380,8 @@ disconnect_detected_during_alarm([ACfg]) ->
     Ch = pget(channel, ACfg),
     Publish = #'basic.publish'{routing_key = <<"nowhere-to-go">>},
     amqp_channel:cast(Ch, Publish, #amqp_msg{payload = <<"foobar">>}),
-
-                                                % Check that connection was indeed blocked
     receive
+        % Check that connection was indeed blocked
         #'connection.blocked'{} -> ok
     after
         1000 -> exit(connection_was_not_blocked)
