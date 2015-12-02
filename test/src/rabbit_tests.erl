@@ -21,8 +21,7 @@
 
 -import(rabbit_misc, [pget/2]).
 
--include("rabbit.hrl").
--include("rabbit_framing.hrl").
+-include_lib("amqp_client/include/amqp_client.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(PERSISTENT_MSG_STORE, msg_store_persistent).
@@ -232,7 +231,7 @@ invalid_same_header_entry_accumulation_test() ->
 
 prepend_check(HeaderKey, HeaderTable, Headers) ->
     Headers1 = rabbit_basic:prepend_table_header(
-                HeaderKey, HeaderTable, Headers),
+                 HeaderKey, HeaderTable, Headers),
     {table, Invalid} =
         rabbit_misc:table_lookup(Headers1, ?INVALID_HEADERS_KEY),
     {Type, Value} = rabbit_misc:table_lookup(Headers, HeaderKey),
@@ -836,7 +835,7 @@ test_log_management_during_startup() ->
              ok -> exit({got_success_but_expected_failure,
                          log_rotation_no_write_permission_dir_test});
              {badrpc, {'EXIT',
-                {error, {cannot_log_to_file, _, _}}}} -> ok
+                       {error, {cannot_log_to_file, _, _}}}} -> ok
          end,
 
     %% start application with logging to a subdirectory which
@@ -907,7 +906,7 @@ test_arguments_parser() ->
       GetOptions, ["-o1", "first", "command1", "-o1", "second"]),
     %% If the flag "eats" the command, the command won't be recognised
     check_parse_arguments(no_command, GetOptions,
-                      ["-o1", "command1", "quux"]),
+                          ["-o1", "command1", "quux"]),
     %% If a flag eats another flag, the eaten flag won't be recognised
     check_parse_arguments(
       {ok, {command1, [{"-f1", false}, {"-o1", "-f1"}], []}},
@@ -1363,9 +1362,9 @@ test_confirms() ->
                 rabbit_channel:do(Ch, #'queue.declare'{durable = true}),
                 receive #'queue.declare_ok'{queue = Q0} ->
                         rabbit_channel:do(Ch, #'queue.bind'{
-                                            queue = Q0,
-                                            exchange = <<"amq.direct">>,
-                                            routing_key = "magic" }),
+                                                 queue = Q0,
+                                                 exchange = <<"amq.direct">>,
+                                                 routing_key = "magic" }),
                         receive #'queue.bind_ok'{} -> Q0
                         after ?TIMEOUT -> throw(failed_to_bind_queue)
                         end
@@ -2512,12 +2511,12 @@ test_queue_index() ->
     with_empty_test_queue(
       fun (Qi0) ->
               {Qi1, _SeqIdsMsgIdsC} = queue_index_publish(SeqIdsC,
-                                                         false, Qi0),
+                                                          false, Qi0),
               Qi2 = rabbit_queue_index:deliver(SeqIdsC, Qi1),
               Qi3 = rabbit_queue_index:ack(SeqIdsC, Qi2),
               Qi4 = rabbit_queue_index:flush(Qi3),
               {Qi5, _SeqIdsMsgIdsC1} = queue_index_publish([SegmentSize],
-                                                          false, Qi4),
+                                                           false, Qi4),
               Qi5
       end),
 
@@ -2525,10 +2524,10 @@ test_queue_index() ->
     with_empty_test_queue(
       fun (Qi0) ->
               {Qi1, _SeqIdsMsgIdsC2} = queue_index_publish(SeqIdsC,
-                                                          false, Qi0),
+                                                           false, Qi0),
               Qi2 = rabbit_queue_index:deliver(SeqIdsC, Qi1),
               {Qi3, _SeqIdsMsgIdsC3} = queue_index_publish([SegmentSize],
-                                                          false, Qi2),
+                                                           false, Qi2),
               Qi4 = rabbit_queue_index:ack(SeqIdsC, Qi3),
               rabbit_queue_index:flush(Qi4)
       end),
@@ -2537,7 +2536,7 @@ test_queue_index() ->
     with_empty_test_queue(
       fun (Qi0) ->
               {Qi1, _SeqIdsMsgIdsD} = queue_index_publish(SeqIdsD,
-                                                         false, Qi0),
+                                                          false, Qi0),
               Qi2 = rabbit_queue_index:deliver(SeqIdsD, Qi1),
               Qi3 = rabbit_queue_index:ack(SeqIdsD, Qi2),
               rabbit_queue_index:flush(Qi3)
@@ -2571,7 +2570,7 @@ test_queue_index() ->
     with_empty_test_queue(
       fun (Qi0) ->
               {Qi1, _SeqIdsMsgIdsE} = queue_index_publish([0,1,2,4,5,7],
-                                                         true, Qi0),
+                                                          true, Qi0),
               Qi2 = rabbit_queue_index:deliver([0,1,4], Qi1),
               Qi3 = rabbit_queue_index:ack([0], Qi2),
               {5, 50, Qi4} = restart_test_queue(Qi3),
@@ -2750,7 +2749,7 @@ publish_and_confirm(Q, Payload, Count) ->
          Delivery = #delivery{mandatory = false, sender = self(),
                               confirm = true, message = Msg, msg_seq_no = Seq,
                               flow = noflow},
-          _QPids = rabbit_amqqueue:deliver([Q], Delivery)
+         _QPids = rabbit_amqqueue:deliver([Q], Delivery)
      end || Seq <- Seqs],
     wait_for_confirms(gb_sets:from_list(Seqs)).
 
@@ -3351,4 +3350,57 @@ disk_monitor_test() ->
     ok = rabbit_sup:stop_child(rabbit_disk_monitor_sup),
     ok = rabbit_sup:start_delayed_restartable_child(rabbit_disk_monitor, [1000]),
     meck:unload(rabbit_misc),
+    passed.
+
+%%% While this test uses only a single node, it's started using
+%%% the multi-node test framework. The reason for this is that resource
+%%% alarm is being set as a part of the test, and stopping a node is
+%%% easier than bringing the standalone-tests node into a healthy state.
+%%% Initialization is done in a group functions so they later can be
+%%% moved to rabbit_test_configs if needed.
+disconnect_detected_during_alarm_with() ->
+    [fun(Cfg) -> rabbit_test_configs:start_nodes(Cfg, [a]) end
+    , fun([ACfg]) ->
+              rabbit_test_configs:rabbitmqctl(ACfg, "set_vm_memory_high_watermark 0.000000001"),
+              [ACfg]
+      end
+    , fun([ACfg]) ->
+              Port = pget(port, ACfg),
+              Heartbeat = 1,
+              {ok, Conn} = amqp_connection:start(#amqp_params_network{port = Port,
+                                                                      heartbeat = Heartbeat}),
+              {ok, Channel} = amqp_connection:open_channel(Conn),
+              [[{heartbeat, Heartbeat}, {connection, Conn}, {channel, Channel} | ACfg]]
+      end
+    ].
+
+disconnect_detected_during_alarm([ACfg]) ->
+    Conn = pget(connection, ACfg),
+    amqp_connection:register_blocked_handler(Conn, self()),
+    Ch = pget(channel, ACfg),
+    Publish = #'basic.publish'{routing_key = <<"nowhere-to-go">>},
+    amqp_channel:cast(Ch, Publish, #amqp_msg{payload = <<"foobar">>}),
+    receive
+        % Check that connection was indeed blocked
+        #'connection.blocked'{} -> ok
+    after
+        1000 -> exit(connection_was_not_blocked)
+    end,
+
+    %% Connection is blocked, now we should forcefully kill it
+    {'EXIT', _} = (catch amqp_connection:close(Conn, 10)),
+
+    ListConnections =
+        fun() ->
+                rpc:call(pget(node, ACfg), rabbit_networking, connection_info_all, [])
+        end,
+
+    %% We've already disconnected, but blocked connection still should still linger on.
+    [SingleConn] = ListConnections(),
+    blocked = pget(state, SingleConn),
+
+    %% It should definitely go away after 2 heartbeat intervals.
+    timer:sleep(round(2.5 * 1000 * pget(heartbeat, ACfg))),
+    [] = ListConnections(),
+
     passed.
