@@ -24,6 +24,18 @@
 
 -export([run_in_broker/2, run_multi/5]).
 
+-ifdef(use_specs).
+
+-type fun_initializer() :: fun((rabbitmq_test_configs:config()) -> rabbitmq_test_configs:config()).
+-type predefined_initializer() :: atom().
+-type single_initializer() :: fun_initializer() | predefined_initializer().
+-type initializers() :: single_initializer() | [single_initializer()].
+-export_type([initializers/0]).
+
+-spec apply_config(initializers(), rabbitmq_test_configs:config()) -> rabbitmq_test_configs:config().
+
+-endif.
+
 run_in_broker(Dir, Filter) ->
     io:format("~nIn-broker tests~n================~n~n", []),
     eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).

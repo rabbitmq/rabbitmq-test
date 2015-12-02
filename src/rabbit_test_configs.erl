@@ -30,6 +30,45 @@
 -import(rabbit_test_util, [set_ha_policy/3, set_ha_policy/4, a2b/1]).
 -import(rabbit_misc, [pget/2, pget/3]).
 
+-ifdef(use_specs).
+
+-type initial_config() :: [{atom(), term()}].
+-type nodes_config() :: [initial_config()].
+-type config() :: initial_config() | nodes_config().
+-type maybe_formatted_string() :: string() | {string(), [term()]}.
+-export_type([config/0]).
+
+-spec cluster(config(), NodeNames :: [atom()]) -> nodes_config().
+-spec cluster_ab(config()) -> nodes_config().
+-spec cluster_abc(config()) -> nodes_config().
+-spec start_ab(config()) -> nodes_config().
+-spec start_abc(config()) -> nodes_config().
+
+-spec start_connections(nodes_config()) -> nodes_config().
+-spec build_cluster(nodes_config()) -> nodes_config().
+
+-spec ha_policy_all(nodes_config()) -> nodes_config().
+-spec ha_policy_two_pos(nodes_config()) -> nodes_config().
+-spec ha_policy_two_pos_batch_sync(nodes_config()) -> nodes_config().
+
+-spec start_nodes(config(), NodeNames ::[atom()]) -> nodes_config().
+-spec start_nodes(config(), NodeNames ::[atom()], FirstPort :: non_neg_integer()) -> nodes_config().
+-spec add_to_cluster(nodes_config(), nodes_config()) -> nodes_config().
+-spec rabbitmqctl(initial_config(), maybe_formatted_string()) -> string().
+-spec rabbitmqctl_fail(initial_config(), maybe_formatted_string()) -> string().
+
+-spec stop_nodes(config()) -> config().
+-spec start_node(initial_config()) -> initial_config().
+-spec stop_node(initial_config()) -> initial_config().
+-spec kill_node(initial_config()) -> initial_config().
+-spec restart_node(initial_config()) -> initial_config().
+-spec start_node_fail(initial_config()) -> ok.
+-spec execute(maybe_formatted_string()) -> string().
+
+-spec cover_work_factor(number(), initial_config()) -> number().
+
+-endif.
+
 -define(INITIAL_KEYS, [cover, base, server, test_framework, plugins]).
 -define(NON_RUNNING_KEYS, ?INITIAL_KEYS ++ [nodename, initial_nodename,
                                             port, mnesia_dir]).
