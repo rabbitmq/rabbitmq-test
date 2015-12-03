@@ -41,13 +41,14 @@ test_parse_information_unit() ->
                    {"10M", {ok, 10485760}},
                    {"10G", {ok, 10737418240}},
 
-                   {"0MB", {ok, 0}},
+                   {"10KB", {ok, 10000}},
+                   {"10K",  {ok, 10240}},
+                   {"10m",  {ok, 10485760}},
+                   {"10Mb", {ok, 10000000}},
+
+                   {"0MB",  {ok, 0}},
 
                    {"10 k", {error, parse_error}},
-                   {"10KB", {error, parse_error}},
-                   {"10K", {error, parse_error}},
-                   {"10m", {error, parse_error}},
-                   {"10Mb", {error, parse_error}},
                    {"MB", {error, parse_error}},
                    {"", {error, parse_error}},
                    {"0.5GB", {error, parse_error}},
