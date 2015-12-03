@@ -91,8 +91,8 @@ lite:
 	$(test_verbose) OK=true && \
 	$(MAKE) prepare && \
 	trap '$(MAKE) cleanup' EXIT INT && \
-	{ : $(MAKE) run-tests || OK=false; } && \
-	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-functional-and-server-with-ha ) || OK=false; } && \
+	{ $(MAKE) run-tests || OK=false; } && \
+	{ ( cd $(JAVA_CLIENT_DIR) && MAKE=$(MAKE) $(ANT) $(ANT_FLAGS) test-suite ) || OK=false; } && \
 	$$OK
 
 conformance16:
