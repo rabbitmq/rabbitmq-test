@@ -14,16 +14,15 @@
 %% Copyright (c) 2007-2015 Pivotal Software, Inc.  All rights reserved.
 %%
 
--module(rabbit_resource_monitor_misc_tests).
+-module(rabbit_resource_monitor_misc_test).
 
 -compile(export_all).
--include_lib("eunit/include/eunit.hrl").
 
 %% ---------------------------------------------------------------------------
 %% Tests
 %% ---------------------------------------------------------------------------
 
-parse_information_unit_test() ->
+test_parse_information_unit() ->
     lists:foreach(fun ({S, V}) ->
                           V = rabbit_resource_monitor_misc:parse_information_unit(S)
                   end,
@@ -54,4 +53,4 @@ parse_information_unit_test() ->
                    {"0.5GB", {error, parse_error}},
                    {"10TB", {error, parse_error}}
                   ]),
-    ok.
+    passed.
