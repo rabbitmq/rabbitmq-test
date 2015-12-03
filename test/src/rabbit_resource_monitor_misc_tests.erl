@@ -16,13 +16,14 @@
 
 -module(rabbit_resource_monitor_misc_tests).
 
--export([all_tests/0]).
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
 
 %% ---------------------------------------------------------------------------
 %% Tests
 %% ---------------------------------------------------------------------------
 
-all_tests() ->
+parse_information_unit_test() ->
     lists:foreach(fun ({S, V}) ->
                           V = rabbit_resource_monitor_misc:parse_information_unit(S)
                   end,
@@ -53,4 +54,4 @@ all_tests() ->
                    {"0.5GB", {error, parse_error}},
                    {"10TB", {error, parse_error}}
                   ]),
-    passed.
+    ok.
