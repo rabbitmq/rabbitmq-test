@@ -102,6 +102,7 @@ all_tests0() ->
                   io:format("Skipping meck dependent tests ~n"),
                   passed
           end),
+    passed = rabbit_resource_monitor_misc_test:test_parse_information_unit(),
     passed.
 
 do_if_secondary_node(Up, Down) ->
