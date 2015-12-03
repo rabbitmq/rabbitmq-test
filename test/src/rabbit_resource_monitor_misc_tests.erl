@@ -23,35 +23,34 @@
 %% ---------------------------------------------------------------------------
 
 all_tests() ->
-	lists:foreach(fun ({S, V}) ->
-                  		V = rabbit_resource_monitor_misc:parse_information_unit(S)
+    lists:foreach(fun ({S, V}) ->
+                          V = rabbit_resource_monitor_misc:parse_information_unit(S)
                   end,
                   [
-                  	{"1000", {ok, 1000}},
+                   {"1000", {ok, 1000}},
 
-                  	{"10kB", {ok, 10000}},
-                  	{"10MB", {ok, 10000000}},
-                  	{"10GB", {ok, 10000000000}},
+                   {"10kB", {ok, 10000}},
+                   {"10MB", {ok, 10000000}},
+                   {"10GB", {ok, 10000000000}},
 
-                  	{"10kiB", {ok, 10240}},
-                  	{"10MiB", {ok, 10485760}},
-                  	{"10GiB", {ok, 10737418240}},
+                   {"10kiB", {ok, 10240}},
+                   {"10MiB", {ok, 10485760}},
+                   {"10GiB", {ok, 10737418240}},
 
-                  	{"10k", {ok, 10240}},
-                  	{"10M", {ok, 10485760}},
-                  	{"10G", {ok, 10737418240}},
+                   {"10k", {ok, 10240}},
+                   {"10M", {ok, 10485760}},
+                   {"10G", {ok, 10737418240}},
 
-					{"0MB", {ok, 0}},
-                  	
-                  	{"10 k", {error, parse_error}},
-                  	{"10KB", {error, parse_error}},
-                  	{"10K", {error, parse_error}},
-                  	{"10m", {error, parse_error}},
-                  	{"10Mb", {error, parse_error}},
-                  	{"MB", {error, parse_error}},
-                  	{"", {error, parse_error}},
-                  	{"0.5GB", {error, parse_error}},
-                  	{"10TB", {error, parse_error}}
+                   {"0MB", {ok, 0}},
+
+                   {"10 k", {error, parse_error}},
+                   {"10KB", {error, parse_error}},
+                   {"10K", {error, parse_error}},
+                   {"10m", {error, parse_error}},
+                   {"10Mb", {error, parse_error}},
+                   {"MB", {error, parse_error}},
+                   {"", {error, parse_error}},
+                   {"0.5GB", {error, parse_error}},
+                   {"10TB", {error, parse_error}}
                   ]),
     passed.
-
