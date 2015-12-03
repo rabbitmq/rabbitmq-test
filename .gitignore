@@ -18,3 +18,5 @@
 
 # Downloaded sources.
 /qpid_testsuite/
+
+ct.cover.spec
