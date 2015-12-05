@@ -95,6 +95,7 @@ all_tests0() ->
     passed = on_disk_store_tunable_parameter_validation_test:test_msg_store_parameter_validation(),
     passed = password_hashing_tests:test_password_hashing(),
     passed = credit_flow_test:test_credit_flow_settings(),
+    passed = set_disk_free_limit_command_test(),
     passed =
         do_if_meck_enabled(
           fun disk_monitor_test/0,
@@ -3346,6 +3347,17 @@ test_memory_high_watermark() ->
     %% reset
     ok = control_action(set_vm_memory_high_watermark, [float_to_list(HWM)]),
 
+    passed.
+
+set_disk_free_limit_command_test() ->
+    ok = control_action(set_disk_free_limit, ["2000kiB"]),
+    2048000 = rabbit_disk_monitor:get_disk_free_limit(),
+    ok = control_action(set_disk_free_limit, ["mem_relative", "0.2"]),
+    ExpectedLimit = 0.2 * vm_memory_monitor:get_total_memory(),
+    % Total memory is unstable, so checking order
+    true = ExpectedLimit/rabbit_disk_monitor:get_disk_free_limit() < 1.2,
+    true = ExpectedLimit/rabbit_disk_monitor:get_disk_free_limit() > 0.98,
+    ok = control_action(set_disk_free_limit, ["50MB"]),
     passed.
 
 disk_monitor_test() ->
