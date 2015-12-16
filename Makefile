@@ -155,8 +155,20 @@ prepare: test-dist create_ssl_certs
 		|| ($(MAKE) cleanup; false)
 	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare stop-rabbit-on-node \
 		|| ($(MAKE) cleanup; false)
+# To determine the name of the remote node to join:
+#   1. We use $(BASIC_SCRIPT_ENV_SETTINGS) to initialize the environment
+#      used by the testsuite.
+#   2. We source rabbitmq-env to get proper values for $RABBITMQ_NODENAME
+#      and $RABBITMQ_NODE_TYPE.
+#   3. We start a node with those informations to get the full node name
+#      as computed by Erlang.
 	$(verbose) $(RABBITMQCTL) -n hare join_cluster \
-		$$(. $(RABBITMQ_SCRIPTS_DIR)/rabbitmq-env && echo $$RABBITMQ_NODENAME) \
+		$$($(BASIC_SCRIPT_ENV_SETTINGS); \
+		. $(RABBITMQ_SCRIPTS_DIR)/rabbitmq-env && \
+		erl -A0 -noinput -boot start_clean -hidden \
+		 $$RABBITMQ_NAME_TYPE getname-$$$$-$$RABBITMQ_NODENAME \
+		 -eval 'io:format("~s~n", [node()]), halt(0).' \
+		 | sed s/^getname-$$$$-//) \
 		|| ($(MAKE) cleanup; false)
 	$(verbose) $(MAKE) RABBITMQ_NODENAME=hare start-rabbit-on-node \
 		|| ($(MAKE) cleanup; false)
