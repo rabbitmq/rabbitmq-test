@@ -34,7 +34,7 @@
 %%   needs_timeout/1, timeout/1, invoke/3, resume/1 [0]
 %%   - regular publishing and consuming, with confirms and acks and durability
 %%
-%% * publish_delivered/4    - publish with acks straight through
+%% * publish_delivered/5    - publish with acks straight through
 %% * discard/3              - publish without acks straight through
 %% * dropwhile/2            - expire messages without DLX
 %% * fetchwhile/4           - expire messages with DLX

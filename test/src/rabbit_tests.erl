@@ -2683,7 +2683,8 @@ make_publish_delivered(IsPersistent, PayloadFun, PropFun, N) ->
                                             false -> 1
                                         end},
        PayloadFun(N)),
-     PropFun(N, #message_properties{size = 10})}.
+     PropFun(N, #message_properties{size = 10}),
+     1}.
 
 variable_queue_fetch(Count, IsPersistent, IsDelivered, Len, VQ) ->
     lists:foldl(fun (N, {VQN, AckTagsAcc}) ->

@@ -125,7 +125,7 @@ qc_publish_multiple(#state{}) ->
 
 qc_publish_delivered(#state{bqstate = BQ}) ->
     {call, ?BQMOD, publish_delivered,
-     [qc_message(), #message_properties{size = 10}, self(), noflow, BQ]}.
+     [qc_message(), #message_properties{size = 10}, 1, self(), noflow, BQ]}.
 
 qc_fetch(#state{bqstate = BQ}) ->
     {call, ?BQMOD, fetch, [boolean(), BQ]}.
@@ -216,7 +216,7 @@ next_state(S, _BQ, {call, ?MODULE, publish_multiple, [PublishCount]}) ->
 
 next_state(S, Res,
            {call, ?BQMOD, publish_delivered,
-            [Msg, MsgProps, _Pid, _Flow, _BQ]}) ->
+            [Msg, MsgProps, 1, _Pid, _Flow, _BQ]}) ->
     #state{confirms = Confirms, acks = Acks, next_seq_id = NextSeq} = S,
     AckTag = {call, erlang, element, [1, Res]},
     BQ1    = {call, erlang, element, [2, Res]},
