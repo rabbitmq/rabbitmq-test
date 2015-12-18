@@ -2686,6 +2686,10 @@ make_publish_delivered(IsPersistent, PayloadFun, PropFun, N) ->
      PropFun(N, #message_properties{size = 10}),
      1}.
 
+variable_queue_fetch(Count, IsPersistent, false, Len, VQ) ->
+    variable_queue_fetch(Count, IsPersistent, 0, Len, VQ);
+variable_queue_fetch(Count, IsPersistent, true, Len, VQ) ->
+    variable_queue_fetch(Count, IsPersistent, 1, Len, VQ);
 variable_queue_fetch(Count, IsPersistent, IsDelivered, Len, VQ) ->
     lists:foldl(fun (N, {VQN, AckTagsAcc}) ->
                         Rem = Len - N,
@@ -3124,7 +3128,7 @@ publish_fetch_and_ack(0, _Len, VQ0) ->
     VQ0;
 publish_fetch_and_ack(N, Len, VQ0) ->
     VQ1 = variable_queue_publish(false, 1, VQ0),
-    {{_Msg, false, AckTag}, VQ2} = rabbit_variable_queue:fetch(true, VQ1),
+    {{_Msg, 0, AckTag}, VQ2} = rabbit_variable_queue:fetch(true, VQ1),
     Len = rabbit_variable_queue:len(VQ2),
     {_Guids, VQ3} = rabbit_variable_queue:ack([AckTag], VQ2),
     publish_fetch_and_ack(N-1, Len, VQ3).
