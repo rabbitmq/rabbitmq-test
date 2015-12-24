@@ -38,6 +38,7 @@
 
 run_in_broker(Dir, Filter) ->
     io:format("~nIn-broker tests~n================~n~n", []),
+    application:start(inets),
     eunit:test(make_tests_single(Dir, Filter, ?TIMEOUT), []).
 
 run_multi(DepsDir, Dir, Filter, Cover, PluginsDir) ->
