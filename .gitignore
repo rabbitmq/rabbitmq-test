@@ -1,22 +1,22 @@
 .sw?
 .*.sw?
 *.beam
-/.erlang.mk/
-/cover/
-/deps/
-/doc/
-/ebin/
-/logs/
-/plugins/
+.erlang.mk/
+cover/
+deps/
+doc/
+ebin/
+logs/
+plugins/
 
-/rabbitmq_test.d
+rabbitmq_test.d
 
 # Generated certificates.
-/certs/client/
-/certs/server/
-/certs/testca/
+certs/client/
+certs/server/
+certs/testca/
 
 # Downloaded sources.
-/qpid_testsuite/
+qpid_testsuite/
 
 ct.cover.spec
