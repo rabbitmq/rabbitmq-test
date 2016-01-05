@@ -138,6 +138,7 @@ distribute_queues(Cfg0) ->
 
     Channel = pget(channel, Cfg),
     ok = declare_queues(Channel, declare_fun(), pget(queue_count, Cfg)),
+    ok = create_e2e_binding(Channel, [<< "ex_1" >>, << "ex_2" >>]),
     ok = application:unset_env(rabbit, queue_master_location),
     {ok, Channel}.
 
@@ -149,11 +150,25 @@ declare_queues(Channel, DeclareFun, N) ->
     DeclareFun(Channel),
     declare_queues(Channel, DeclareFun, N-1).
 
+declare_exchange(Channel, Ex) ->
+    #'exchange.declare_ok'{} =
+        amqp_channel:call(Channel, #'exchange.declare'{exchange = Ex}),
+    {ok, Ex}.
+
+declare_binding(Channel, Binding) ->
+    #'exchange.bind_ok'{} = amqp_channel:call(Channel, Binding),
+    ok.
+
 declare_fun() ->
     fun(Channel) ->
             #'queue.declare_ok'{} = amqp_channel:call(Channel, get_random_queue_declare()),
             ok
     end.
+
+create_e2e_binding(Channel, ExNamesBin) ->
+    [{ok, Ex1}, {ok, Ex2}] = [declare_exchange(Channel, Ex) || Ex <- ExNamesBin],
+    Binding = #'exchange.bind'{source = Ex1, destination = Ex2},
+    ok = declare_binding(Channel, Binding).
 
 get_random_queue_declare() ->
     #'queue.declare'{passive     = false,
