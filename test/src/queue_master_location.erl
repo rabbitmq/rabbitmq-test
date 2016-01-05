@@ -138,7 +138,7 @@ distribute_queues(Cfg0) ->
 
     Channel = pget(channel, Cfg),
     ok = declare_queues(Channel, declare_fun(), pget(queue_count, Cfg)),
-    ok = create_exchange_type_binding(Channel, [<< "ex_1" >>, << "ex_2" >>]),
+    ok = create_e2e_binding(Channel, [<< "ex_1" >>, << "ex_2" >>]),
     ok = application:unset_env(rabbit, queue_master_location),
     {ok, Channel}.
 
@@ -165,7 +165,7 @@ declare_fun() ->
             ok
     end.
 
-create_exchange_type_binding(Channel, ExNamesBin) ->
+create_e2e_binding(Channel, ExNamesBin) ->
     [{ok, Ex1}, {ok, Ex2}] = [declare_exchange(Channel, Ex) || Ex <- ExNamesBin],
     Binding = #'exchange.bind'{source = Ex1, destination = Ex2},
     ok = declare_binding(Channel, Binding).
