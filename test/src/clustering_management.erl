@@ -499,9 +499,9 @@ status_with_alarm([Rabbit, Hare]) ->
     S = rabbit_test_configs:rabbitmqctl(Rabbit, cluster_status),
     R = rabbit_test_configs:rabbitmqctl(Hare,   cluster_status),
 
-    %% Then: alarms are nowhere to be seen.
-    0 = string:str(S, "alarms"),
-    0 = string:str(R, "alarms").
+    %% Then: both nodes have printed alarm information.
+    true = string:str(S, "alarms") > 0,
+    true = string:str(R, "alarms") > 0.
 
 
 %% ----------------------------------------------------------------------------
