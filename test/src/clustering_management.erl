@@ -491,6 +491,19 @@ force_reset_node(Config) ->
     start_app(Rabbit),
     assert_clustered([Rabbit, Hare]).
 
+%% Given: a cluster of two.
+status_with_alarm_with() -> cluster_ab.
+status_with_alarm([Rabbit, Hare]) ->
+
+    %% When: we ask for cluster status.
+    S = rabbit_test_configs:rabbitmqctl(Rabbit, cluster_status),
+    R = rabbit_test_configs:rabbitmqctl(Hare,   cluster_status),
+
+    %% Then: alarms are nowhere to be seen.
+    0 = string:str(S, "alarms"),
+    0 = string:str(R, "alarms").
+
+
 %% ----------------------------------------------------------------------------
 %% Internal utils
 
