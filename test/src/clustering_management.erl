@@ -498,13 +498,17 @@ status_with_alarm_with() ->
 
 status_with_alarm([Rabbit, Hare]) ->
 
+    %% Given: an alarm is raised each node.
+    rabbit_test_configs:rabbitmqctl(Rabbit, "set_vm_memory_high_watermark 0.000000001"),
+    rabbit_test_configs:rabbitmqctl(Hare,   "set_disk_free_limit 2048G"),
+
     %% When: we ask for cluster status.
     S = rabbit_test_configs:rabbitmqctl(Rabbit, cluster_status),
     R = rabbit_test_configs:rabbitmqctl(Hare,   cluster_status),
 
     %% Then: both nodes have printed alarm information for eachother.
-    ok = alarm_information_for_each_node(S),
-    ok = alarm_information_for_each_node(R).
+    ok = alarm_information_on_each_node(S),
+    ok = alarm_information_on_each_node(R).
 
 
 %% ----------------------------------------------------------------------------
@@ -626,8 +630,19 @@ declare(Ch, Name) ->
 names_rabbit_and_hare(Cfgs) ->
     rabbit_test_configs:cluster(Cfgs, [rabbit, hare]).
 
-alarm_information_for_each_node(Output) ->
-    true = string:str(Output, "alarms") > 0,
-    true = string:str(Output, "rabbit") > 0,
-    true = string:str(Output,   "hare") > 0,
+alarm_information_on_each_node(Output) ->
+
+    A = string:str(Output, "alarms"), true = A > 0,
+
+    %% Test that names are printed after `alarms': this counts on
+    %% output with a `{Name, Value}' kind of format, for listing
+    %% alarms, so that we can miss any node names in preamble text.
+    R = string:str(Output, "{rabbit@"), true = R > A,
+    H = string:str(Output,   "{hare@"), true = H > A,
+
+    %% Test that the kind of alarm is printed after the names of their
+    %% respective node.
+    M = string:str(Output, "memory"), true = M > R,
+    D = string:str(Output,   "disk"), true = D > H,
+
     ok.
