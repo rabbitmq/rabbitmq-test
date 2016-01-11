@@ -492,16 +492,19 @@ force_reset_node(Config) ->
     assert_clustered([Rabbit, Hare]).
 
 %% Given: a cluster of two.
-status_with_alarm_with() -> cluster_ab.
+status_with_alarm_with() ->
+    %% Somewhat more substancial names than "a" and "b".
+    fun names_rabbit_and_hare/1.
+
 status_with_alarm([Rabbit, Hare]) ->
 
     %% When: we ask for cluster status.
     S = rabbit_test_configs:rabbitmqctl(Rabbit, cluster_status),
     R = rabbit_test_configs:rabbitmqctl(Hare,   cluster_status),
 
-    %% Then: both nodes have printed alarm information.
-    true = string:str(S, "alarms") > 0,
-    true = string:str(R, "alarms") > 0.
+    %% Then: both nodes have printed alarm information for eachother.
+    ok = alarm_information_for_each_node(S),
+    ok = alarm_information_for_each_node(R).
 
 
 %% ----------------------------------------------------------------------------
@@ -619,3 +622,12 @@ declare(Ch, Name) ->
     amqp_channel:call(Ch, #'queue.bind'{queue    = Name,
                                         exchange = <<"amq.fanout">>}),
     Res.
+
+names_rabbit_and_hare(Cfgs) ->
+    rabbit_test_configs:cluster(Cfgs, [rabbit, hare]).
+
+alarm_information_for_each_node(Output) ->
+    true = string:str(Output, "alarms") > 0,
+    true = string:str(Output, "rabbit") > 0,
+    true = string:str(Output,   "hare") > 0,
+    ok.
