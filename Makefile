@@ -10,7 +10,8 @@ ifneq ($(IS_DEP),1)
 TEST_DEPS += rabbit
 endif
 
-DEP_PLUGINS = rabbit_common/mk/rabbitmq-run.mk \
+DEP_PLUGINS = rabbit_common/mk/rabbitmq-build.mk \
+	      rabbit_common/mk/rabbitmq-run.mk \
 	      rabbit_common/mk/rabbitmq-tests.mk \
 	      rabbit_common/mk/rabbitmq-tools.mk
 
@@ -48,9 +49,6 @@ RMQ_ERLC_OPTS := -Derlang_r15b_or_later
 RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include \
 		 -I $(RABBITMQ_BROKER_DIR)/include \
 		 -pa $(RABBITMQ_BROKER_DIR)/ebin
-
-ERLC_OPTS += $(RMQ_ERLC_OPTS)
-TEST_ERLC_OPTS += $(RMQ_ERLC_OPTS)
 
 # This requires Erlang R13B+.
 SSL_VERIFY_OPTION :={verify,verify_peer},{fail_if_no_peer_cert,false}
