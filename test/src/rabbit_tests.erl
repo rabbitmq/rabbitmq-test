@@ -728,6 +728,19 @@ test_app_management() ->
     ok = control_action(trace_off, []),
     passed.
 
+externally_rotated_logs_are_automatically_reopened_test() ->
+    [LogFile] = rabbit:log_locations(),
+
+    %% Make sure log file is opened
+    ok = test_logs_working([LogFile]),
+
+    %% Move it away - i.e. external log rotation happened
+    file:rename(LogFile, [LogFile, ".rotation_test"]),
+
+    %% New files should be created - test_logs_working/1 will check that LogFile is not empty after
+    %% doing some logging. And it's exactly what we need to check here.
+    ok = test_logs_working([LogFile]).
+
 test_log_management() ->
     [LogFile] = rabbit:log_locations(),
     Suffix = ".0",
