@@ -48,7 +48,13 @@ all_tests0() ->
     ok = file_handle_cache:set_limit(10),
     passed = test_version_equivalance(),
     passed = test_file_handle_cache(),
-    passed = test_backing_queue(),
+    %% these tests take a lot of time to run, make
+    %% this makes disabling them less error prone than commenting
+    %% the line out
+    case os:getenv("SKIP_BACKING_QUEUE_TESTS") of
+        false -> passed = test_backing_queue();
+        _Val  -> ok
+    end,
     passed = test_rabbit_basic_header_handling(),
     passed = test_priority_queue(),
     passed = test_pg_local(),
@@ -727,6 +733,19 @@ test_app_management() ->
     ok = control_action(environment, []),
     ok = control_action(trace_off, []),
     passed.
+
+externally_rotated_logs_are_automatically_reopened_test() ->
+    [LogFile] = rabbit:log_locations(),
+
+    %% Make sure log file is opened
+    ok = test_logs_working([LogFile]),
+
+    %% Move it away - i.e. external log rotation happened
+    file:rename(LogFile, [LogFile, ".rotation_test"]),
+
+    %% New files should be created - test_logs_working/1 will check that LogFile is not empty after
+    %% doing some logging. And it's exactly what we need to check here.
+    ok = test_logs_working([LogFile]).
 
 test_log_management() ->
     [LogFile] = rabbit:log_locations(),
