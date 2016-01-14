@@ -23,6 +23,7 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 -include_lib("kernel/include/file.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 -define(PERSISTENT_MSG_STORE, msg_store_persistent).
 -define(TRANSIENT_MSG_STORE,  msg_store_transient).
@@ -1996,7 +1997,7 @@ delete_file(File) ->
     end.
 
 make_files_non_writable(Files) ->
-    [ok = file:write_file_info(File, #file_info{mode=0}) ||
+    [ok = file:write_file_info(File, #file_info{mode=8#444}) ||
         File <- Files],
     ok.
 
