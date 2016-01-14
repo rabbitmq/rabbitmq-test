@@ -23,6 +23,7 @@
 
 -include_lib("amqp_client/include/amqp_client.hrl").
 -include_lib("kernel/include/file.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 -define(PERSISTENT_MSG_STORE, msg_store_persistent).
 -define(TRANSIENT_MSG_STORE,  msg_store_transient).
@@ -734,6 +735,43 @@ test_app_management() ->
     ok = control_action(trace_off, []),
     passed.
 
+
+
+%% "rabbitmqctl rotate_logs" without additional parameters
+%% shouldn't truncate files.
+rotate_logs_without_suffix_test() ->
+    MainLog = rabbit:log_location(kernel),
+    SaslLog = rabbit:log_location(sasl),
+    Suffix = ".1",
+    file:delete(MainLog),
+    file:delete(SaslLog),
+
+    %% Empty log-files should be created
+    ok = control_action(rotate_logs, []),
+    ?assertEqual([true, true], empty_files([MainLog, SaslLog])),
+
+    %% Write something to log files and simulate external log rotation
+    ok = test_logs_working(MainLog, SaslLog),
+    ok = file:rename(MainLog, [MainLog, Suffix]),
+    ok = file:rename(SaslLog, [SaslLog, Suffix]),
+
+    %% Create non-empty files
+    TestData = "test-data\n",
+    file:write_file(MainLog, TestData),
+    file:write_file(SaslLog, TestData),
+
+    %% Nothing should be truncated - neither moved files which are still opened by server, nor new
+    %% log files that should be just reopened.
+    ok = control_action(rotate_logs, []),
+    ?assertEqual([true, true, true, true],
+                 non_empty_files([MainLog, SaslLog, [MainLog, Suffix], [SaslLog, Suffix]])),
+
+    %% And log files should be re-opened - new log records should go to new files.
+    ok = test_logs_working(MainLog, SaslLog),
+    ?assert(rabbit_file:file_size(MainLog) > length(TestData)),
+    ?assert(rabbit_file:file_size(SaslLog) > length(TestData)),
+    ok.
+
 test_log_management() ->
     MainLog = rabbit:log_location(kernel),
     SaslLog = rabbit:log_location(sasl),
@@ -745,7 +783,6 @@ test_log_management() ->
 
     %% simple logs reopening
     ok = control_action(rotate_logs, []),
-    [true, true] = empty_files([MainLog, SaslLog]),
     ok = test_logs_working(MainLog, SaslLog),
 
     %% simple log rotation
@@ -774,10 +811,6 @@ test_log_management() ->
     ok = make_files_non_writable([[MainLog, Suffix], [SaslLog, Suffix]]),
     ok = control_action(rotate_logs, [Suffix]),
     ok = test_logs_working(MainLog, SaslLog),
-
-    %% rotate when original log files are not writable
-    ok = make_files_non_writable([MainLog, SaslLog]),
-    ok = control_action(rotate_logs, []),
 
     %% logging directed to tty (first, remove handlers)
     ok = delete_log_handlers([rabbit_sasl_report_file_h,
@@ -1978,7 +2011,7 @@ delete_file(File) ->
     end.
 
 make_files_non_writable(Files) ->
-    [ok = file:write_file_info(File, #file_info{mode=0}) ||
+    [ok = file:write_file_info(File, #file_info{mode=8#444}) ||
         File <- Files],
     ok.
 
