@@ -48,7 +48,13 @@ all_tests0() ->
     ok = file_handle_cache:set_limit(10),
     passed = test_version_equivalance(),
     passed = test_file_handle_cache(),
-    passed = test_backing_queue(),
+    %% these tests take a lot of time to run, make
+    %% this makes disabling them less error prone than commenting
+    %% the line out
+    case os:getenv("SKIP_BACKING_QUEUE_TESTS") of
+        false -> passed = test_backing_queue();
+        _Val  -> ok
+    end,
     passed = test_rabbit_basic_header_handling(),
     passed = test_priority_queue(),
     passed = test_pg_local(),
