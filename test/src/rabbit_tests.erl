@@ -111,6 +111,8 @@ all_tests0() ->
                   passed
           end),
     passed = rabbit_resource_monitor_misc_test:test_parse_information_unit(),
+
+    passed = channel_interceptor_test:register_interceptor_test(),
     passed.
 
 do_if_secondary_node(Up, Down) ->
