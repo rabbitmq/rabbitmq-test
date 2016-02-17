@@ -18,7 +18,7 @@
 
 -include("rabbit.hrl").
 
--export([test_password_hashing/0]).
+-export([test_password_hashing/0, test_change_password/0]).
 
 test_password_hashing() ->
     rabbit_password_hashing_sha256 = rabbit_password:hashing_mod(),
@@ -51,4 +51,28 @@ test_password_hashing() ->
              hashing_algorithm = rabbit_password_hashing_sha256
             }),
 
+    passed.
+
+test_change_password() ->
+    UserName = <<"test_user">>,
+    Password = <<"test_password">>,
+    case rabbit_auth_backend_internal:lookup_user(UserName) of
+        {ok, _} -> rabbit_auth_backend_internal:delete_user(UserName);
+        _       -> ok
+    end,
+    ok = application:set_env(rabbit, password_hashing_module, rabbit_password_hashing_md5),
+    ok = rabbit_auth_backend_internal:add_user(UserName, Password),
+    {ok, #auth_user{username = UserName}} = 
+        rabbit_auth_backend_internal:user_login_authentication(
+            UserName, [{password, Password}]),
+    ok = application:set_env(rabbit, password_hashing_module, rabbit_password_hashing_sha256),
+    {ok, #auth_user{username = UserName}} = 
+        rabbit_auth_backend_internal:user_login_authentication(
+            UserName, [{password, Password}]),
+
+    NewPassword = <<"test_password1">>,
+    ok = rabbit_auth_backend_internal:change_password(UserName, NewPassword),
+    {ok, #auth_user{username = UserName}} = 
+        rabbit_auth_backend_internal:user_login_authentication(
+            UserName, [{password, NewPassword}]),
     passed.
