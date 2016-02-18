@@ -101,6 +101,7 @@ all_tests0() ->
     passed = test_memory_high_watermark(),
     passed = on_disk_store_tunable_parameter_validation_test:test_msg_store_parameter_validation(),
     passed = password_hashing_tests:test_password_hashing(),
+    passed = password_hashing_tests:test_change_password(),
     passed = credit_flow_test:test_credit_flow_settings(),
     passed = set_disk_free_limit_command_test(),
     passed =
