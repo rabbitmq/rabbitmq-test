@@ -75,4 +75,8 @@ test_change_password() ->
     {ok, #auth_user{username = UserName}} =
         rabbit_auth_backend_internal:user_login_authentication(
             UserName, [{password, NewPassword}]),
+
+    {refused, _, [UserName]} =
+        rabbit_auth_backend_internal:user_login_authentication(
+            UserName, [{password, Password}]),
     passed.
