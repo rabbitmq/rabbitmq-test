@@ -62,17 +62,17 @@ test_change_password() ->
     end,
     ok = application:set_env(rabbit, password_hashing_module, rabbit_password_hashing_md5),
     ok = rabbit_auth_backend_internal:add_user(UserName, Password),
-    {ok, #auth_user{username = UserName}} = 
+    {ok, #auth_user{username = UserName}} =
         rabbit_auth_backend_internal:user_login_authentication(
             UserName, [{password, Password}]),
     ok = application:set_env(rabbit, password_hashing_module, rabbit_password_hashing_sha256),
-    {ok, #auth_user{username = UserName}} = 
+    {ok, #auth_user{username = UserName}} =
         rabbit_auth_backend_internal:user_login_authentication(
             UserName, [{password, Password}]),
 
     NewPassword = <<"test_password1">>,
     ok = rabbit_auth_backend_internal:change_password(UserName, NewPassword),
-    {ok, #auth_user{username = UserName}} = 
+    {ok, #auth_user{username = UserName}} =
         rabbit_auth_backend_internal:user_login_authentication(
             UserName, [{password, NewPassword}]),
     passed.
