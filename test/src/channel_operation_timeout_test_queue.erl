@@ -2397,6 +2397,11 @@ ui(#vqstate{index_state      = IndexState,
 maybe_delay(QPA) ->
   case is_timeout_test(gb_trees:values(QPA)) of
     true -> receive
+              %% The queue received an EXIT message, it's probably the
+              %% node being stopped with "rabbitmqctl stop". Thus, abort
+              %% the wait and requeue the EXIT message.
+              {'EXIT', _, shutdown} = ExitMsg -> self() ! ExitMsg,
+                                                 void
             after infinity -> void
             end;
     _ -> void
