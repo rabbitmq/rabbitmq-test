@@ -4,17 +4,17 @@
 
 test_version_support() ->
     Examples = [
-     {[], "any version", ok} % any version
-    ,{[], "0.0.0", ok}       % any version
-    ,{[], "3.5.6", ok}       % any version
-    ,{["something"], "something", ok}            % Equal always match 
-    ,{["3.5.4"], "something", err}               % No matches found
-    ,{["something", "3.5.6"], "3.5.7", ok}       % Any version branch can match
-    ,{["3.4.0", "3.5.6"], "3.6.1", err}          % Version branch should present
-    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.2", ok}  % Equal version match
-    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.1", err} % Lesser version don't match
-    ,{["3.5.2", "3.6.1", "3.7.1"], "3.6.2", ok}  % Greated version match
-    ,{["3.5.2", "3.6.1", "3.7.1"], "0.0.0", err} % Default version don't match!
+     {[], "any version", ok} %% anything goes
+    ,{[], "0.0.0", ok}       %% ditto
+    ,{[], "3.5.6", ok}       %% ditto
+    ,{["something"], "something", ok}            %% equal values match 
+    ,{["3.5.4"], "something", err}
+    ,{["something", "3.5.6"], "3.5.7", ok}       %% 3.5.7 matches ~> 3.5.6
+    ,{["3.4.0", "3.5.6"], "3.6.1", err}          %% 3.6.x isn't supported
+    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.2", ok}  %% 3.5.2 matches ~> 3.5.2
+    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.1", err} %% lesser than the lower boundary
+    ,{["3.5.2", "3.6.1", "3.7.1"], "3.6.2", ok}  %% 3.6.2 matches ~> 3.6.1
+    ,{["3.5.2", "3.6.1", "3.7.1"], "0.0.0", err}
     ,{["3.5", "3.6", "3.7"], "3.5.1", err}       %% x.y values are not supported
     ,{["3"], "3.5.1", err}                       %% x values are not supported
     ],
