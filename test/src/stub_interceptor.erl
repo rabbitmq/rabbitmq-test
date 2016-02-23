@@ -16,7 +16,6 @@ description() ->
       <<"Empties payload on publish">>}].
 
 intercept(#'basic.publish'{} = Method, Content, _IState) ->
-    DecodedContent = rabbit_binary_parser:ensure_content_decoded(Content),
     Content2 = Content#content{payload_fragments_rev = []},
     {Method, Content2};
 
