@@ -560,6 +560,7 @@ assert_not_clustered(Node) ->
 assert_failure(Fun) ->
     case catch Fun() of
         {error, Reason}                -> Reason;
+        {error_string, Reason}         -> Reason;
         {badrpc, {'EXIT', Reason}}     -> Reason;
         {badrpc_multi, Reason, _Nodes} -> Reason;
         Other                          -> exit({expected_failure, Other})
