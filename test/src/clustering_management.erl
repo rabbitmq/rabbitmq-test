@@ -638,12 +638,8 @@ alarm_information_on_each_node(Output) ->
     %% Test that names are printed after `alarms': this counts on
     %% output with a `{Name, Value}' kind of format, for listing
     %% alarms, so that we can miss any node names in preamble text.
-    R = string:str(Output, "{rabbit@"), true = R > A,
-    H = string:str(Output,   "{hare@"), true = H > A,
-
-    %% Test that the kind of alarm is printed after the names of their
-    %% respective node.
-    M = string:str(Output, "memory"), true = M > R,
-    D = string:str(Output,   "disk"), true = D > H,
+    Alarms = string:substr(Output, A),
+    match = re:run(Alarms, "\\{'?rabbit@[^,]+,\\[memory\\]\\}", [{capture, none}]),
+    match = re:run(Alarms, "\\{'?hare@[^,]+,\\[disk\\]\\}", [{capture, none}]),
 
     ok.
