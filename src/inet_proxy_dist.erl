@@ -113,7 +113,7 @@ do_setup(Kernel, Node, Type, MyNode, LongOrShortNames,SetupTime) ->
 				   protocol = tcp,
 				   family = inet}
 			      end,
-			      mf_tick = fun inet_tcp_dist:tick/1,
+			      mf_tick = fun tick/1,
 			      mf_getstat = fun inet_tcp_dist:getstat/1,
 			      request_type = Type
 			     },
@@ -186,6 +186,15 @@ nodelay() ->
 	    {nodelay, false};
 	_ ->
 	    {nodelay, true}
+    end.
+
+tick(Socket) ->
+    case inet_tcp:send(Socket, [], [force]) of
+        {error, closed} ->
+            self() ! {tcp_closed, Socket},
+            {error, closed};
+        R ->
+            R
     end.
 
 -else.
