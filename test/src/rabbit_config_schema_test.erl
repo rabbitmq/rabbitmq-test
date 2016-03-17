@@ -80,7 +80,7 @@ prepare_plugin_schemas(SchemaDir) ->
 deepsort(List) ->
     case is_proplist(List) of
         true ->
-            lists:keysort(1, lists:map(fun({K,V}) -> {K, deepsort(V)};
+            lists:keysort(1, lists:map(fun({K, V}) -> {K, deepsort(V)};
                                           (V) -> V end,
                                        List));
         false -> 
@@ -90,5 +90,5 @@ deepsort(List) ->
             end
     end.
 
-is_proplist([{_K,_V}|_] = List) -> lists:all(fun({_K,_V}) -> true; (_) -> false end, List);
+is_proplist([{_K, _V}|_] = List) -> lists:all(fun({_K, _V}) -> true; (_) -> false end, List);
 is_proplist(_) -> false.
