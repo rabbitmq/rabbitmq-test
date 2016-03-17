@@ -1,6 +1,5 @@
 -module(rabbit_config_schema_test).
 
-% -export([test_snippet/3]).
 -compile(export_all).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -11,7 +10,7 @@ run_snippets_test() ->
     cleanup().
 
 setup(SchemaDir) ->
-    % Create directories and files to make snippets pass validations
+    %% Create directories and files so that the snippets can pass validation
     file:make_dir("example_files"),
     file:make_dir("example_files/tmp"),
     file:make_dir("example_files/tmp/rabbit-mgmt"),
@@ -29,8 +28,8 @@ cleanup() ->
 run_snippets(FileName, SchemaDir) ->
     {ok, [Snippets]} = file:consult(FileName),
     lists:map(
-        fun({N,S,C,P})   -> ok = test_snippet({integer_to_list(N),S,[]},C,P, SchemaDir);
-           ({N,S,A,C,P}) -> ok = test_snippet({integer_to_list(N),S,A},C,P, SchemaDir)
+        fun({N, S, C, P})    -> ok = test_snippet({integer_to_list(N), S, []}, C, P, SchemaDir);
+           ({N, S, A, C, P}) -> ok = test_snippet({integer_to_list(N), S, A},  C, P, SchemaDir)
         end,
         Snippets),
     ok.
@@ -38,8 +37,6 @@ run_snippets(FileName, SchemaDir) ->
 test_snippet(Snippet, Expected, Plugins, SchemaDir) ->
     {Conf, Advanced} = write_snippet(Snippet),
     rabbit_file:recursive_delete("generated"),
-    % prepare_schemas(Plugins),
-    % SchemaDir = rabbit_config:schema_dir(),
     {ok, GeneratedFile} = generate_config(Conf, Advanced, SchemaDir),
     {ok, [Generated]} = file:consult(GeneratedFile),
     Gen = deepsort(Generated),
@@ -76,7 +73,6 @@ prepare_schemas(Plugins) ->
 
 prepare_plugin_schemas(SchemaDir) ->
     Files = filelib:wildcard("../*/priv/schema/*.schema"),
-    io:format("Schemas ~p~n", [Files]),
     [ file:copy(File, filename:join([SchemaDir, filename:basename(File)])) 
         || File <- Files ].
 
