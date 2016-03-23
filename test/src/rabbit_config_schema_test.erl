@@ -34,7 +34,7 @@ run_snippets(FileName, SchemaDir) ->
         Snippets),
     ok.
 
-test_snippet(Snippet, Expected, Plugins, SchemaDir) ->
+test_snippet(Snippet, Expected, _Plugins, SchemaDir) ->
     {Conf, Advanced} = write_snippet(Snippet),
     rabbit_file:recursive_delete("generated"),
     {ok, GeneratedFile} = generate_config(Conf, Advanced, SchemaDir),
@@ -90,5 +90,5 @@ deepsort(List) ->
             end
     end.
 
-is_proplist([{_K, _V}|_] = List) -> lists:all(fun({_K, _V}) -> true; (_) -> false end, List);
+is_proplist([{_Key, _Val}|_] = List) -> lists:all(fun({_K, _V}) -> true; (_) -> false end, List);
 is_proplist(_) -> false.
