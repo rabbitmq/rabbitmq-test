@@ -18,7 +18,7 @@
 -include_lib("amqp_client/include/amqp_client.hrl").
 
 -export([enable_plugins/1]).
--export([cluster/2, cluster_ab/1, cluster_abc/1, start_ab/1, start_abc/1]).
+-export([cluster/2, cluster_ab/1, cluster_abc/1, start_and_connect_a/1, start_ab/1, start_abc/1]).
 -export([start_connections/1, build_cluster/1]).
 -export([ha_policy_all/1, ha_policy_two_pos/1, ha_policy_two_pos_batch_sync/1]).
 -export([start_nodes/2, start_nodes/3, add_to_cluster/2,
@@ -43,6 +43,7 @@
 -spec cluster_abc(config()) -> nodes_config().
 -spec start_ab(config()) -> nodes_config().
 -spec start_abc(config()) -> nodes_config().
+-spec start_and_connect_a(config()) -> nodes_config().
 
 -spec start_connections(nodes_config()) -> nodes_config().
 -spec build_cluster(nodes_config()) -> nodes_config().
@@ -80,6 +81,10 @@ start_abc(InitialCfg)   -> start_nodes(InitialCfg, [a, b, c]).
 
 cluster(InitialCfg, NodeNames) ->
     start_connections(build_cluster(start_nodes(InitialCfg, NodeNames))).
+
+start_and_connect_a(InitialCfg) ->
+    start_connections(start_nodes(InitialCfg, [a])).
+
 
 start_nodes(InitialCfg, NodeNames) ->
     start_nodes(InitialCfg, NodeNames, 5672).
