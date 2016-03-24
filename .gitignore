@@ -6,8 +6,11 @@ cover/
 deps/
 doc/
 ebin/
+examples
+example_files
 logs/
 plugins/
+schema/
 
 rabbitmq_test.d
 
