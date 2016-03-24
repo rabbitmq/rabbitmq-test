@@ -3463,3 +3463,34 @@ disconnect_detected_during_alarm([ACfg]) ->
     [] = ListConnections(),
 
     passed.
+
+
+rabbitmqctl_list_consumers(Config) ->
+    StdOut = rabbit_test_configs:rabbitmqctl(Config, "list_consumers"),
+    [<<"Listing consumers", _/binary>> | ConsumerRows] = re:split(StdOut, <<"\n">>, [trim]),
+    CTags = [ lists:nth(3, re:split(Row, <<"\t">>)) || Row <- ConsumerRows ],
+    CTags.
+
+list_consumers_sanity_check_with() ->
+    start_and_connect_a.
+
+list_consumers_sanity_check([ACfg]) ->
+    Chan = pget(channel, ACfg),
+    #'queue.declare_ok'{} = amqp_channel:call(Chan, #'queue.declare'{queue = <<"abc">>}),
+
+    %% No consumers even if we have some queues
+    ?assertEqual([], rabbitmqctl_list_consumers(ACfg)),
+
+    %% Several consumers on single channel should be correctly reported
+    #'basic.consume_ok'{consumer_tag = CTag1} = amqp_channel:call(Chan, #'basic.consume'{queue = <<"abc">>}),
+    #'basic.consume_ok'{consumer_tag = CTag2} = amqp_channel:call(Chan, #'basic.consume'{queue = <<"abc">>}),
+    ?assertEqual(lists:sort([CTag1, CTag2]),
+                 lists:sort(rabbitmqctl_list_consumers(ACfg))),
+
+    %% `rabbitmqctl report` shares some code with `list_consumers`, so check that it also reports both channels
+    ReportStdOut = rabbit_test_configs:rabbitmqctl(ACfg, "list_consumers"),
+    ReportLines = re:split(ReportStdOut, <<"\n">>, [trim]),
+    ReportCTags = [lists:nth(3, re:split(Row, <<"\t">>)) || <<"abc", _/binary>> = Row <- ReportLines],
+    ?assertEqual(lists:sort([CTag1, CTag2]),
+                 lists:sort(ReportCTags)),
+    ok.
