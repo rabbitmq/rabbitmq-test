@@ -973,6 +973,22 @@ test_arguments_parser() ->
 
     passed.
 
+filtering_flags_parsing_test() ->
+    Cases = [{[], [], []}
+            ,{[{"--online", true}], ["--offline", "--online", "--third-option"], [false, true, false]}
+            ,{[{"--online", true}, {"--third-option", true}, {"--offline", true}], ["--offline", "--online", "--third-option"], [true, true, true]}
+            ,{[], ["--offline", "--online", "--third-option"], [true, true, true]}
+            ],
+    lists:foreach(fun({Vals, Opts, Expect}) ->
+                          case rabbit_cli:filter_opts(Vals, Opts) of
+                              Expect ->
+                                  ok;
+                              Got ->
+                                  exit({no_match, Got, Expect, {args, Vals, Opts}})
+                          end
+                  end,
+                  Cases).
+
 test_dynamic_mirroring() ->
     %% Just unit tests of the node selection logic, see multi node
     %% tests for the rest...
@@ -3464,7 +3480,6 @@ disconnect_detected_during_alarm([ACfg]) ->
 
     passed.
 
-
 rabbitmqctl_list_consumers(Config) ->
     StdOut = rabbit_test_configs:rabbitmqctl(Config, "list_consumers"),
     [<<"Listing consumers", _/binary>> | ConsumerRows] = re:split(StdOut, <<"\n">>, [trim]),
@@ -3496,4 +3511,31 @@ list_consumers_sanity_check([ACfg]) ->
     ReportCTags = [lists:nth(3, re:split(Row, <<"\t">>)) || <<"list_consumers_q", _/binary>> = Row <- ReportLines],
     ?assertEqual(lists:sort([CTag1, CTag2]),
                  lists:sort(ReportCTags)),
+
+list_queues_online_and_offline_with() ->
+    cluster_ab.
+
+list_queues_online_and_offline([ACfg, BCfg]) ->
+    ACh = pget(channel, ACfg),
+    %% Node B will be stopped
+    BCh = pget(channel, BCfg),
+    #'queue.declare_ok'{} = amqp_channel:call(ACh, #'queue.declare'{queue = <<"q_a_1">>, durable = true}),
+    #'queue.declare_ok'{} = amqp_channel:call(ACh, #'queue.declare'{queue = <<"q_a_2">>, durable = true}),
+    #'queue.declare_ok'{} = amqp_channel:call(BCh, #'queue.declare'{queue = <<"q_b_1">>, durable = true}),
+    #'queue.declare_ok'{} = amqp_channel:call(BCh, #'queue.declare'{queue = <<"q_b_2">>, durable = true}),
+
+    rabbit_test_configs:rabbitmqctl(BCfg, "stop"),
+
+    GotUp = lists:sort(rabbit_test_configs:rabbitmqctl_list(ACfg, "list_queues --online name")),
+    ExpectUp = [[<<"q_a_1">>], [<<"q_a_2">>]],
+    ?assertEqual(ExpectUp, GotUp),
+
+    GotDown = lists:sort(rabbit_test_configs:rabbitmqctl_list(ACfg, "list_queues --offline name")),
+    ExpectDown = [[<<"q_b_1">>], [<<"q_b_2">>]],
+    ?assertEqual(ExpectDown, GotDown),
+
+    GotAll = lists:sort(rabbit_test_configs:rabbitmqctl_list(ACfg, "list_queues name")),
+    ExpectAll = ExpectUp ++ ExpectDown,
+    ?assertEqual(ExpectAll, GotAll),
+
     ok.
