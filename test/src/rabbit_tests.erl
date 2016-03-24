@@ -3510,7 +3510,7 @@ list_consumers_sanity_check([ACfg]) ->
     ReportLines = re:split(ReportStdOut, <<"\n">>, [trim]),
     ReportCTags = [lists:nth(3, re:split(Row, <<"\t">>)) || <<"list_consumers_q", _/binary>> = Row <- ReportLines],
     ?assertEqual(lists:sort([CTag1, CTag2]),
-                 lists:sort(ReportCTags)),
+                 lists:sort(ReportCTags)).
 
 list_queues_online_and_offline_with() ->
     cluster_ab.
