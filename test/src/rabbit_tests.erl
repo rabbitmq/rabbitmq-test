@@ -3476,6 +3476,8 @@ list_consumers_sanity_check_with() ->
 
 list_consumers_sanity_check([ACfg]) ->
     Chan = pget(channel, ACfg),
+    %% this queue is not cleaned up because the entire node is
+    %% reset between tests
     #'queue.declare_ok'{} = amqp_channel:call(Chan, #'queue.declare'{queue = <<"abc">>}),
 
     %% No consumers even if we have some queues
