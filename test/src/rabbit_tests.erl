@@ -3478,21 +3478,22 @@ list_consumers_sanity_check([ACfg]) ->
     Chan = pget(channel, ACfg),
     %% this queue is not cleaned up because the entire node is
     %% reset between tests
-    #'queue.declare_ok'{} = amqp_channel:call(Chan, #'queue.declare'{queue = <<"abc">>}),
+    QName = <<"list_consumers_q">>,
+    #'queue.declare_ok'{} = amqp_channel:call(Chan, #'queue.declare'{queue = QName}),
 
     %% No consumers even if we have some queues
     ?assertEqual([], rabbitmqctl_list_consumers(ACfg)),
 
     %% Several consumers on single channel should be correctly reported
-    #'basic.consume_ok'{consumer_tag = CTag1} = amqp_channel:call(Chan, #'basic.consume'{queue = <<"abc">>}),
-    #'basic.consume_ok'{consumer_tag = CTag2} = amqp_channel:call(Chan, #'basic.consume'{queue = <<"abc">>}),
+    #'basic.consume_ok'{consumer_tag = CTag1} = amqp_channel:call(Chan, #'basic.consume'{queue = QName}),
+    #'basic.consume_ok'{consumer_tag = CTag2} = amqp_channel:call(Chan, #'basic.consume'{queue = QName}),
     ?assertEqual(lists:sort([CTag1, CTag2]),
                  lists:sort(rabbitmqctl_list_consumers(ACfg))),
 
     %% `rabbitmqctl report` shares some code with `list_consumers`, so check that it also reports both channels
     ReportStdOut = rabbit_test_configs:rabbitmqctl(ACfg, "list_consumers"),
     ReportLines = re:split(ReportStdOut, <<"\n">>, [trim]),
-    ReportCTags = [lists:nth(3, re:split(Row, <<"\t">>)) || <<"abc", _/binary>> = Row <- ReportLines],
+    ReportCTags = [lists:nth(3, re:split(Row, <<"\t">>)) || <<"list_consumers_q", _/binary>> = Row <- ReportLines],
     ?assertEqual(lists:sort([CTag1, CTag2]),
                  lists:sort(ReportCTags)),
     ok.
