@@ -22,7 +22,7 @@
 -export([start_connections/1, build_cluster/1]).
 -export([ha_policy_all/1, ha_policy_two_pos/1, ha_policy_two_pos_batch_sync/1]).
 -export([start_nodes/2, start_nodes/3, add_to_cluster/2,
-         rabbitmqctl/2, rabbitmqctl_fail/2]).
+         rabbitmqctl/2, rabbitmqctl_fail/2, rabbitmqctl_list/2]).
 -export([stop_nodes/1, start_node/1, stop_node/1, kill_node/1, restart_node/1,
          start_node_fail/1, execute/1]).
 -export([cover_work_factor/2]).
@@ -165,6 +165,11 @@ cluster_with(Cfg, NewCfg) ->
     rabbitmqctl(NewCfg, stop_app),
     rabbitmqctl(NewCfg, {"join_cluster ~s", [Node]}),
     rabbitmqctl(NewCfg, start_app).
+
+rabbitmqctl_list(Cfg, Str) ->
+    StdOut = rabbitmqctl(Cfg, Str),
+    [<<"Listing", _/binary>>|Rows] = re:split(StdOut, <<"\n">>, [trim]),
+    [re:split(Row, <<"\t">>) || Row <- Rows].
 
 rabbitmqctl(Cfg, Str) ->
     Node = pget(node, Cfg),
