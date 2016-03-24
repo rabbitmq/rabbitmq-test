@@ -39,23 +39,25 @@ crashing_mirrored([CfgA, CfgB]) ->
     A = pget(node, CfgA),
     ChA = pget(channel, CfgA),
     ConnB = pget(connection, CfgB),
+    QName = <<"test">>,
     amqp_channel:call(ChA, #'confirm.select'{}),
     test_queue_failure(A, ChA, ConnB, 2, 1,
-                       #'queue.declare'{queue = <<"test">>, durable = true}),
-    test_queue_failure(A, ChA, ConnB, 2, 1,
-                       #'queue.declare'{queue = <<"test">>, durable = false}),
+                       #'queue.declare'{queue = QName, durable = true}),
     ok.
 
 test_queue_failure(Node, Ch, RaceConn, MsgCount, SlaveCount, Decl) ->
     #'queue.declare_ok'{queue = QName} = amqp_channel:call(Ch, Decl),
-    publish(Ch, QName, transient),
-    publish(Ch, QName, durable),
-    Racer = spawn_declare_racer(RaceConn, Decl),
-    kill_queue(Node, QName),
-    assert_message_count(MsgCount, Ch, QName),
-    assert_slave_count(SlaveCount, Node, QName),
-    stop_declare_racer(Racer),
-    amqp_channel:call(Ch, #'queue.delete'{queue = QName}).
+    try
+        publish(Ch, QName, transient),
+        publish(Ch, QName, durable),
+        Racer = spawn_declare_racer(RaceConn, Decl),
+        kill_queue(Node, QName),
+        assert_message_count(MsgCount, Ch, QName),
+        assert_slave_count(SlaveCount, Node, QName),
+        stop_declare_racer(Racer)
+    after
+        amqp_channel:call(Ch, #'queue.delete'{queue = QName})
+    end.
 
 give_up_after_repeated_crashes_with() -> [cluster_ab].
 give_up_after_repeated_crashes([CfgA, CfgB]) ->
