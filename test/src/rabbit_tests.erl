@@ -3408,8 +3408,8 @@ test_memory_high_watermark() ->
 set_disk_free_limit_command_test() ->
     ok = control_action(set_disk_free_limit, ["2000kiB"]),
     2048000 = rabbit_disk_monitor:get_disk_free_limit(),
-    ok = control_action(set_disk_free_limit, ["mem_relative", "0.2"]),
-    ExpectedLimit = 0.2 * vm_memory_monitor:get_total_memory(),
+    ok = control_action(set_disk_free_limit, ["mem_relative", "1.1"]),
+    ExpectedLimit = 1.1 * vm_memory_monitor:get_total_memory(),
     % Total memory is unstable, so checking order
     true = ExpectedLimit/rabbit_disk_monitor:get_disk_free_limit() < 1.2,
     true = ExpectedLimit/rabbit_disk_monitor:get_disk_free_limit() > 0.98,
