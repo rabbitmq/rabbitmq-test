@@ -5,29 +5,25 @@
 
 test_version_support() ->
     Examples = [
-     {[], "any version", ok} %% anything goes
-    ,{[], "0.0.0", ok}       %% ditto
-    ,{[], "3.5.6", ok}       %% ditto
-    ,{["something"], "something", ok}            %% equal values match
-    ,{["3.5.4"], "something", err}
-    ,{["something", "3.5.6"], "3.5.7", ok}       %% 3.5.7 matches ~> 3.5.6
-    ,{["3.4.0", "3.5.6"], "3.6.1", err}          %% 3.6.x isn't supported
-    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.2", ok}  %% 3.5.2 matches ~> 3.5.2
-    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.1", err} %% lesser than the lower boundary
-    ,{["3.5.2", "3.6.1", "3.7.1"], "3.6.2", ok}  %% 3.6.2 matches ~> 3.6.1
-    ,{["3.5.2", "3.6.1", "3.7.1"], "0.0.0", err}
-    ,{["3.5", "3.6", "3.7"], "3.5.1", err}       %% x.y values are not supported
-    ,{["3"], "3.5.1", err}                       %% x values are not supported
+     {[], "any version", true} %% anything goes
+    ,{[], "0.0.0", true}       %% ditto
+    ,{[], "3.5.6", true}       %% ditto
+    ,{["something"], "something", true}            %% equal values match
+    ,{["3.5.4"], "something", false}
+    ,{["something", "3.5.6"], "3.5.7", true}       %% 3.5.7 matches ~> 3.5.6
+    ,{["3.4.0", "3.5.6"], "3.6.1", false}          %% 3.6.x isn't supported
+    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.2", true}  %% 3.5.2 matches ~> 3.5.2
+    ,{["3.5.2", "3.6.1", "3.7.1"], "3.5.1", false} %% lesser than the lower boundary
+    ,{["3.5.2", "3.6.1", "3.7.1"], "3.6.2", true}  %% 3.6.2 matches ~> 3.6.1
+    ,{["3.5.2", "3.6.1", "3.7.1"], "0.0.0", false}
+    ,{["3.5", "3.6", "3.7"], "3.5.1", false}       %% x.y values are not supported
+    ,{["3"], "3.5.1", false}                       %% x values are not supported
     ],
 
     lists:foreach(
         fun({Versions, RabbitVersion, Result}) ->
-            Expected = case Result of
-                ok  -> ok;
-                err -> {error, {version_mismatch, {RabbitVersion, Versions}}}
-            end,
             {Expected, RabbitVersion, Versions} =
-                {rabbit_plugins:version_support(RabbitVersion, Versions),
+                {rabbit_plugins:is_version_supported(RabbitVersion, Versions),
                  RabbitVersion, Versions}
         end,
         Examples),
@@ -51,7 +47,7 @@ test_plugin_validation() ->
           [{plugin_a, "3.7.1", ["3.7.6"], []},
            {plugin_b, "3.7.2", ["3.7.0"], [{plugin_a, ["3.6.3", "3.7.0"]}]}],
          errors =
-          [{plugin_a, [{version_mismatch, {"3.7.1", ["3.7.6"]}}]},
+          [{plugin_a, [{broker_version_mismatch, "3.7.1", ["3.7.6"]}]},
            {plugin_b, [{missing_dependency, plugin_a}]}],
          valid = []
         },
@@ -63,7 +59,7 @@ test_plugin_validation() ->
            {plugin_b, "3.7.2", ["3.7.0"], [{plugin_a, ["3.7.0"]}]},
            {plugin_c, "3.7.2", ["3.7.0"], [{plugin_b, ["3.7.3"]}]}],
          errors =
-          [{plugin_a, [{version_mismatch, {"3.7.1", ["3.7.6"]}}]},
+          [{plugin_a, [{broker_version_mismatch, "3.7.1", ["3.7.6"]}]},
            {plugin_b, [{missing_dependency, plugin_a}]},
            {plugin_c, [{missing_dependency, plugin_b}]}],
          valid = []
@@ -76,7 +72,7 @@ test_plugin_validation() ->
            {plugin_b, "3.7.2", ["3.7.0"], [{plugin_a, ["3.7.3"]}]},
            {plugin_d, "3.7.2", ["3.7.0"], [{plugin_c, ["3.7.3"]}]}],
          errors =
-          [{plugin_b, [{{version_mismatch, {"3.7.1", ["3.7.3"]}}, plugin_a}]},
+          [{plugin_b, [{{version_mismatch, "3.7.1", ["3.7.3"]}, plugin_a}]},
            {plugin_d, [{missing_dependency, plugin_c}]}],
          valid = [plugin_a]
         }],
@@ -104,7 +100,7 @@ make_plugins(Plugins) ->
             #plugin{name = Name,
                     version = Version,
                     dependencies = Deps,
-                    rabbitmq_versions = RabbitVersions,
-                    plugins_versions = PluginsVersions}
+                    broker_version_requirements = RabbitVersions,
+                    dependency_version_requirements = PluginsVersions}
         end,
         Plugins).
