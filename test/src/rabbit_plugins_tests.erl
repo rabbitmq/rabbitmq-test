@@ -21,8 +21,8 @@ test_version_support() ->
     ],
 
     lists:foreach(
-        fun({Versions, RabbitVersion, Result}) ->
-            {Expected, RabbitVersion, Versions} =
+        fun({Versions, RabbitVersion, _Result}) ->
+            {_Expected, RabbitVersion, Versions} =
                 {rabbit_plugins:is_version_supported(RabbitVersion, Versions),
                  RabbitVersion, Versions}
         end,
