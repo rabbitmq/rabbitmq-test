@@ -1,4 +1,4 @@
--module(rabbit_plugins_tests).
+-module(rabbit_plugin_versioning_tests).
 -include("rabbit.hrl").
 
 -compile(export_all).

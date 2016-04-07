@@ -43,8 +43,8 @@ all_tests() ->
 all_tests0() ->
     ok = truncate:test(),
     ok = supervisor2_tests:test_all(),
-    passed = rabbit_plugins_tests:test_version_support(),
-    passed = rabbit_plugins_tests:test_plugin_validation(),
+    passed = rabbit_plugin_versioning_tests:test_version_support(),
+    passed = rabbit_plugin_versioning_tests:test_plugin_validation(),
     passed = gm_tests:all_tests(),
     passed = mirrored_supervisor_tests:all_tests(),
     application:set_env(rabbit, file_handles_high_watermark, 10),
