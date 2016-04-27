@@ -10,6 +10,19 @@ ifneq ($(IS_DEP),1)
 TEST_DEPS += rabbit
 endif
 
+# We need many plugins for their Cuttlefish schemas.
+TEST_DEPS += rabbitmq_amqp1_0 \
+	     rabbitmq_auth_backend_amqp \
+	     rabbitmq_auth_backend_http \
+	     rabbitmq_auth_backend_ldap \
+	     rabbitmq_clusterer \
+	     rabbitmq_management \
+	     rabbitmq_metronome \
+	     rabbitmq_mqtt \
+	     rabbitmq_stomp \
+	     rabbitmq_web_mqtt \
+	     rabbitmq_web_stomp
+
 DEP_PLUGINS = rabbit_common/mk/rabbitmq-build.mk \
 	      rabbit_common/mk/rabbitmq-run.mk \
 	      rabbit_common/mk/rabbitmq-tests.mk \
