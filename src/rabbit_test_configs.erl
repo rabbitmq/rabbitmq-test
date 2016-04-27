@@ -304,6 +304,7 @@ environment(Cfg) ->
             TestFramework = pget(test_framework, Cfg),
             [{"MNESIA_DIR",         {"~s/~s/~s", [Base, InitialNodename,
                                                   pget(mnesia_dir, Cfg)]}},
+             {"SCHEMA_DIR",         {"~s/~s/schema", [Base, Nodename]}},
              {"PLUGINS_EXPAND_DIR", {"~s/~s/plugins", [Base, Nodename]}},
              {"LOG_BASE",           {"~s/~s/log", [Base, Nodename]}},
              {"NODENAME",           {"~s", [Nodename]}},
