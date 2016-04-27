@@ -11,6 +11,7 @@ run_snippets_test() ->
 
 setup(SchemaDir) ->
     %% Create directories and files so that the snippets can pass validation
+    %% FIXME: Write files in the source directory /!\
     file:make_dir("example_files"),
     file:make_dir("example_files/tmp"),
     file:make_dir("example_files/tmp/rabbit-mgmt"),
@@ -43,7 +44,7 @@ test_snippet(Snippet, Expected, _Plugins, SchemaDir) ->
     Exp = deepsort(Expected),
     case Exp of
         Gen -> ok;
-        _         -> 
+        _         ->
             error({config_mismatch, Snippet, Exp, Gen})
     end.
 
@@ -57,14 +58,12 @@ write_snippet({Name, Config, Advanced}) ->
     file:write_file(ConfFile, Config),
     rabbit_file:write_term_file(AdvancedFile, [Advanced]),
     {ConfFile, AdvancedFile}.
-    
+
 
 generate_config(Conf, Advanced, SchemaDir) ->
-    ScriptDir = case init:get_argument(conf_script_dir) of
-        {ok, D} -> D;
-        _       -> "../rabbit/scripts"
-    end,
-    rabbit_config:generate_config_file([Conf], ".", ScriptDir, 
+    Rabbitmqctl = os:getenv("RABBITMQCTL"),
+    ScriptDir = filename:dirname(Rabbitmqctl),
+    rabbit_config:generate_config_file([Conf], ".", ScriptDir,
                                        SchemaDir, Advanced).
 
 prepare_schemas(Plugins) ->
@@ -72,8 +71,10 @@ prepare_schemas(Plugins) ->
     rabbit_file:write_term_file(EnabledFile, [Plugins]).
 
 prepare_plugin_schemas(SchemaDir) ->
-    Files = filelib:wildcard("../*/priv/schema/*.schema"),
-    [ file:copy(File, filename:join([SchemaDir, filename:basename(File)])) 
+    DepsDir = os:getenv("DEPS_DIR"),
+    Files = filelib:wildcard(
+      filename:join(DepsDir, "*/priv/schema/*.schema")),
+    [ file:copy(File, filename:join([SchemaDir, filename:basename(File)]))
         || File <- Files ].
 
 
@@ -83,7 +84,7 @@ deepsort(List) ->
             lists:keysort(1, lists:map(fun({K, V}) -> {K, deepsort(V)};
                                           (V) -> V end,
                                        List));
-        false -> 
+        false ->
             case is_list(List) of
                 true  -> lists:sort(List);
                 false -> List
