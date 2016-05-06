@@ -173,9 +173,10 @@ test_version_equivalance() ->
     true = rabbit_misc:version_minor_equivalent("3.0.0", "3.0.0"),
     true = rabbit_misc:version_minor_equivalent("3.0.0", "3.0.1"),
     true = rabbit_misc:version_minor_equivalent("%%VSN%%", "%%VSN%%"),
+    % Support for 4-number versions
+    true = rabbit_misc:version_minor_equivalent("3.0.0", "3.0.0.1"),
     false = rabbit_misc:version_minor_equivalent("3.0.0", "3.1.0"),
     false = rabbit_misc:version_minor_equivalent("3.0.0", "3.0"),
-    false = rabbit_misc:version_minor_equivalent("3.0.0", "3.0.0.1"),
     false = rabbit_misc:version_minor_equivalent("3.0.0", "3.0.foo"),
     passed.
 
@@ -3269,12 +3270,13 @@ test_variable_queue_fold_msg_on_disk(VQ0) ->
     VQ3.
 
 test_queue_recover() ->
+    OldQueues = supervisor:which_children(rabbit_amqqueue_sup_sup),
     Count = 2 * rabbit_queue_index:next_segment_boundary(0),
     {new, #amqqueue { pid = QPid, name = QName } = Q} =
         rabbit_amqqueue:declare(test_queue(), true, false, [], none),
     publish_and_confirm(Q, <<>>, Count),
 
-    [{_, SupPid, _, _}] = supervisor:which_children(rabbit_amqqueue_sup_sup),
+    [{_, SupPid, _, _}] = supervisor:which_children(rabbit_amqqueue_sup_sup) -- OldQueues,
     exit(SupPid, kill),
     exit(QPid, kill),
     MRef = erlang:monitor(process, QPid),
