@@ -150,12 +150,15 @@ clean-qpid-testsuite:
 	$(gen_verbose) rm -rf qpid_testsuite
 
 prepare: test-dist create_ssl_certs
+	$(verbose) rm -rf plugins/rabbitmq_metronome*
+	$(verbose) rm -rf plugins/rabbitmq_amqp1_0*
 	$(verbose) $(MAKE) \
 		RABBITMQ_NODENAME=hare \
 		RABBITMQ_NODE_IP_ADDRESS=0.0.0.0 \
 		RABBITMQ_NODE_PORT=${TEST_HARE_PORT} \
 		RABBITMQ_SERVER_START_ARGS=$(HARE_BROKER_OPTIONS) \
 		RABBITMQ_CONFIG_FILE=/does-not-exist \
+		RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stomp tcp_listeners [61614] -rabbitmq_mqtt tcp_listeners [1884] -rabbitmq_web_mqtt tcp_config [{port,15676}] -rabbitmq_web_stomp port 15685 -rabbitmq_management listener [{port,15673}]" \
 		stop-node clean-node-db start-background-node start-rabbit-on-node \
 		|| ($(MAKE) cleanup; false)
 	$(verbose) $(MAKE) \
