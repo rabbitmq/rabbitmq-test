@@ -41,6 +41,15 @@ TEST_RABBIT_PORT=5672
 TEST_HARE_PORT=5673
 TEST_RABBIT_SSL_PORT=5671
 TEST_HARE_SSL_PORT=5670
+TEST_RABBIT_STOMP_PORT=61614
+TEST_HARE_STOMP_PORT=61615
+TEST_RABBIT_MGMT_PORT=15672
+TEST_HARE_MGMT_PORT=15673
+TEST_RABBIT_MQTT_PORT=1884
+TEST_HARE_MQTT_PORT=1885
+TEST_RABBIT_WEB_MQTT_PORT=1886
+TEST_HARE_WEB_MQTT_PORT=1887
+
 
 FILTER ?= all
 COVER ?= true
@@ -67,8 +76,30 @@ RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include \
 SSL_VERIFY_OPTION :={verify,verify_peer},{fail_if_no_peer_cert,false}
 export SSL_CERTS_DIR := $(realpath certs)
 export PASSWORD := test
-RABBIT_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
-HARE_BROKER_OPTIONS := "-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] -rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] -rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO']"
+
+define RABBIT_BROKER_OPTIONS
+"\
+-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_RABBIT_SSL_PORT)}] \
+-rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] \
+-rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO'] \
+-rabbitmq_stomp tcp_listeners [$(TEST_RABBIT_STOMP_PORT)] \
+-rabbitmq_management listener [{port,$(TEST_RABBIT_MGMT_PORT)}] \
+-rabbitmq_mqtt tcp_listeners [$(TEST_RABBIT_MQTT_PORT)] \
+-rabbitmq_web_mqtt tcp_config [{port,$(TEST_RABBIT_WEB_MQTT_PORT)}] \
+"
+endef
+
+define HARE_BROKER_OPTIONS
+"\
+-rabbit ssl_listeners [{\\\"0.0.0.0\\\",$(TEST_HARE_SSL_PORT)}] \
+-rabbit ssl_options [{cacertfile,\\\"$(SSL_CERTS_DIR)/testca/cacert.pem\\\"},{certfile,\\\"$(SSL_CERTS_DIR)/server/cert.pem\\\"},{keyfile,\\\"$(SSL_CERTS_DIR)/server/key.pem\\\"},$(SSL_VERIFY_OPTION)] \
+-rabbit auth_mechanisms ['PLAIN','AMQPLAIN','EXTERNAL','RABBIT-CR-DEMO'] \
+-rabbitmq_stomp tcp_listeners [$(TEST_HARE_STOMP_PORT)] \
+-rabbitmq_management listener [{port,$(TEST_HARE_MGMT_PORT)}] \
+-rabbitmq_mqtt tcp_listeners [$(TEST_HARE_MQTT_PORT)] \
+-rabbitmq_web_mqtt tcp_config [{port,$(TEST_HARE_WEB_MQTT_PORT)}] \
+"
+endef
 
 TESTS_FAILED := echo '\n============'\
 	   	     '\nTESTS FAILED'\
