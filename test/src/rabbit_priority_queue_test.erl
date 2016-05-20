@@ -277,6 +277,42 @@ mirror_queue_sync([CfgA, _CfgB]) ->
     wait_for_sync(CfgA, rabbit_misc:r(<<"/">>, queue, Q)),
     passed.
 
+mirror_queue_sync_priority_above_max_with() -> cluster_ab.
+mirror_queue_sync_priority_above_max([CfgA, _CfgB]) ->
+    %% Tests synchronisation of slaves when priority is higher than max priority.
+    %% This causes an infinity loop (and test timeout) before rabbitmq-server-795
+    Ch = pget(channel, CfgA),
+    Q = <<"test">>,
+    declare(Ch, Q, 3),
+    publish(Ch, Q, [5, 5, 5]),
+    ok = rabbit_test_util:set_ha_policy(CfgA, <<".*">>, <<"all">>),
+    rabbit_test_util:control_action(sync_queue, CfgA, [binary_to_list(Q)],
+                                    [{"-p", "/"}]),
+    wait_for_sync(CfgA, rabbit_misc:r(<<"/">>, queue, Q)),
+    delete(Ch, Q),
+    passed.
+
+mirror_queue_sync_priority_above_max_pending_ack_with() -> cluster_ab.
+mirror_queue_sync_priority_above_max_pending_ack([CfgA, CfgB]) ->
+    %% Tests synchronisation of slaves when priority is higher than max priority
+    %% and there are pending acks.
+    %% This causes an infinity loop (and test timeout) before rabbitmq-server-795
+    Ch = pget(channel, CfgA),
+    Q = <<"test">>,
+    declare(Ch, Q, 3),
+    publish(Ch, Q, [5, 5, 5]),
+    %% Consume but 'forget' to acknowledge
+    get_without_ack(Ch, Q),
+    get_without_ack(Ch, Q),
+    ok = rabbit_test_util:set_ha_policy(CfgA, <<".*">>, <<"all">>),
+    rabbit_test_util:control_action(sync_queue, CfgA, [binary_to_list(Q)],
+                                    [{"-p", "/"}]),
+    wait_for_sync(CfgA, rabbit_misc:r(<<"/">>, queue, Q)),
+    synced_msgs(CfgA, rabbit_misc:r(<<"/">>, queue, Q), 3),
+    synced_msgs(CfgB, rabbit_misc:r(<<"/">>, queue, Q), 3),
+    delete(Ch, Q),
+    passed.
+
 %%----------------------------------------------------------------------------
 
 open() ->
@@ -352,6 +388,10 @@ get_ok(Ch, Q, Ack, P) ->
     ?assertEqual(PBin, PBin2),
     maybe_ack(Ch, Ack, DTag).
 
+get_without_ack(Ch, Q) ->
+    {#'basic.get_ok'{}, _} =
+        amqp_channel:call(Ch, #'basic.get'{queue  = Q, no_ack = false}).
+
 maybe_ack(Ch, do_ack, DTag) ->
     amqp_channel:cast(Ch, #'basic.ack'{delivery_tag = DTag}),
     DTag;
@@ -381,4 +421,10 @@ synced(Cfg, Q) ->
                         Q =:= Q1],
     length(SSPids) =:= 1.
 
+synced_msgs(Cfg, Q, Expected) ->
+    Info = rpc:call(pget(node, Cfg),
+                    rabbit_amqqueue, info_all,
+                    [<<"/">>, [name, messages]]),
+    [M] = [M || [{name, Q1}, {messages, M}] <- Info, Q =:= Q1],
+    M =:= Expected.
 %%----------------------------------------------------------------------------
