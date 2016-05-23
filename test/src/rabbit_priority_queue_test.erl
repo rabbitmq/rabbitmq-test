@@ -277,6 +277,35 @@ mirror_queue_sync([CfgA, _CfgB]) ->
     wait_for_sync(CfgA, rabbit_misc:r(<<"/">>, queue, Q)),
     passed.
 
+mirror_queue_auto_ack_with() -> [cluster_abc, ha_policy_all].
+mirror_queue_auto_ack([CfgA, _CfgB, _CfgC] = Cfgs) ->
+    %% Check correct use of AckRequired in the notifications to the slaves.
+    %% If slaves are notified with AckRequired == true when it is false,
+    %% the slaves will crash with the depth notification as they will not
+    %% match the master delta.
+    %% Bug rabbitmq-server 687
+    Ch = pget(channel, CfgA),
+    Q = <<"test">>,
+    declare(Ch, Q, 3),
+    publish(Ch, Q, [1, 2, 3]),
+    ok = rabbit_test_util:set_ha_policy(CfgA, <<".*">>, <<"all">>),
+    get_partial(Ch, Q, no_ack, [3, 2, 1]),
+
+    %% Retrieve slaves
+    SPids = slave_pids(CfgA, rabbit_misc:r(<<"/">>, queue, Q)),
+    [{SNode1, _SPid1}, {SNode2, SPid2}] = nodes_and_pids(SPids),
+
+    %% Restart one of the slaves so `request_depth` is triggered
+    rabbit_test_configs:restart_node(select_config(SNode1, Cfgs)),
+
+    %% The alive slave must have the same pid after its neighbour is restarted
+    timer:sleep(2000), % ugly, but we can't know when the `depth` instruction arrives
+    Slaves = nodes_and_pids(slave_pids(CfgA, rabbit_misc:r(<<"/">>, queue, Q))),
+    SPid2 = proplists:get_value(SNode2, Slaves),
+
+    delete(Ch, Q),
+    passed.
+
 mirror_queue_sync_priority_above_max_with() -> cluster_ab.
 mirror_queue_sync_priority_above_max([CfgA, _CfgB]) ->
     %% Tests synchronisation of slaves when priority is higher than max priority.
@@ -312,6 +341,7 @@ mirror_queue_sync_priority_above_max_pending_ack([CfgA, CfgB]) ->
     synced_msgs(CfgB, rabbit_misc:r(<<"/">>, queue, Q), 3),
     delete(Ch, Q),
     passed.
+
 
 %%----------------------------------------------------------------------------
 
@@ -428,3 +458,23 @@ synced_msgs(Cfg, Q, Expected) ->
     [M] = [M || [{name, Q1}, {messages, M}] <- Info, Q =:= Q1],
     M =:= Expected.
 %%----------------------------------------------------------------------------
+select_config(_Node, []) ->
+    throw(not_found);
+select_config(Node, [Cfg | Rest]) ->
+    case proplists:get_value(node, Cfg) of
+        Node ->
+            Cfg;
+        _ ->
+            select_config(Node, Rest)
+    end.
+
+nodes_and_pids(SPids) ->
+    lists:zip([node(S) || S <- SPids], SPids).
+
+slave_pids(Cfg, Q) ->
+    Info = rpc:call(pget(node, Cfg),
+                    rabbit_amqqueue, info_all,
+                    [<<"/">>, [name, slave_pids]]),
+    [SPids] = [SPids || [{name, Q1}, {slave_pids, SPids}] <- Info,
+                        Q =:= Q1],
+    SPids.
