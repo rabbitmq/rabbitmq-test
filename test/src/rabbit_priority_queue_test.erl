@@ -299,7 +299,7 @@ mirror_queue_auto_ack([CfgA, _CfgB, _CfgC] = Cfgs) ->
     rabbit_test_configs:restart_node(select_config(SNode1, Cfgs)),
 
     %% The alive slave must have the same pid after its neighbour is restarted
-    timer:sleep(2000), % ugly, but we can't know when the `depth` instruction arrives
+    timer:sleep(3000), %% ugly but we can't know when the `depth` instruction arrives
     Slaves = nodes_and_pids(slave_pids(CfgA, rabbit_misc:r(<<"/">>, queue, Q))),
     SPid2 = proplists:get_value(SNode2, Slaves),
 
