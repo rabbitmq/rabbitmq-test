@@ -44,8 +44,6 @@ STANDALONE_TEST_COMMANDS := rabbit_test_runner:run_multi(\"$(DEPS_DIR)\",\"$(CUR
 
 pre-standalone-tests:: test-tmpdir
 
-RMQ_ERLC_OPTS := -Derlang_r15b_or_later
-
 RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include \
 		 -I $(RABBITMQ_BROKER_DIR)/include \
 		 -pa $(RABBITMQ_BROKER_DIR)/ebin
