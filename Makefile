@@ -10,7 +10,8 @@ ifneq ($(IS_DEP),1)
 TEST_DEPS += rabbit
 endif
 
-DEP_PLUGINS = rabbit_common/mk/rabbitmq-run.mk \
+DEP_PLUGINS = rabbit_common/mk/rabbitmq-build.mk \
+	      rabbit_common/mk/rabbitmq-run.mk \
 	      rabbit_common/mk/rabbitmq-tests.mk \
 	      rabbit_common/mk/rabbitmq-tools.mk
 
