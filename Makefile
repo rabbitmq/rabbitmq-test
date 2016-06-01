@@ -50,9 +50,6 @@ RMQ_ERLC_OPTS += -I $(DEPS_DIR)/rabbit_common/include \
 		 -I $(RABBITMQ_BROKER_DIR)/include \
 		 -pa $(RABBITMQ_BROKER_DIR)/ebin
 
-ERLC_OPTS += $(RMQ_ERLC_OPTS)
-TEST_ERLC_OPTS += $(RMQ_ERLC_OPTS)
-
 # This requires Erlang R13B+.
 SSL_VERIFY_OPTION :={verify,verify_peer},{fail_if_no_peer_cert,false}
 export SSL_CERTS_DIR := $(realpath certs)
