@@ -317,11 +317,8 @@ environment(Cfg) ->
               {"-rabbitmq_management listener [{port,1~B}]", [Port]}},
              {"SERVER_ERL_ARGS",
               %% Next two lines are defaults
-              {"+K true +A30 +P 1048576 "
-               "-kernel inet_default_connect_options [{nodelay,true}] "
-               %% Some tests need to be able to make distribution unhappy
-               "-pa ~s/ebin "
-               "-proto_dist inet_proxy", [TestFramework]}}
+              "+K true +A30 +P 1048576 "
+              "-kernel inet_default_connect_options [{nodelay,true}]"}
              | plugins_env(Plugins)]
     end.
 
