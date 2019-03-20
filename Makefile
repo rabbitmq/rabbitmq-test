@@ -126,8 +126,8 @@ qpid_testsuite:
 	$(verbose) $(MAKE) update-qpid-testsuite
 
 update-qpid-testsuite:
-	$(verbose) svn co -r 906960 http://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
-	# hg clone http://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
+	$(verbose) svn co -r 906960 https://svn.apache.org/repos/asf/qpid/trunk/qpid/python qpid_testsuite
+	# hg clone https://rabbit-hg.eng.vmware.com/mirrors/qpid_testsuite
 
 prepare-qpid-patch:
 	$(verbose) cd qpid_testsuite && svn diff > ../qpid_patch && cd ..
